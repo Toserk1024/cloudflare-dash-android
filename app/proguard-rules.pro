@@ -32,3 +32,9 @@
 
 # 保留行号，便于 R8 后崩溃排障
 -keepattributes SourceFile,LineNumberTable
+
+# ===== Tink(security-crypto) 依赖的编译期注解类，运行时不需要 =====
+# R8 分析 com.google.crypto.tink 时找不到 errorprone/jsr305/animal-sniffer 注解类，需忽略
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**
+-dontwarn org.codehaus.mojo.animal_sniffer.**
