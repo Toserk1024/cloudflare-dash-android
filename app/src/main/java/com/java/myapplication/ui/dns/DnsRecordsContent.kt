@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -64,6 +65,11 @@ fun DnsRecordsContent(
     viewModel: DnsViewModel
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    // 从编辑/新建页返回（重新进入组合）时，同步本地缓存中的新增/修改记录
+    LaunchedEffect(Unit) {
+        viewModel.syncPendingChanges()
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {

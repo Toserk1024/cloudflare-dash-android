@@ -118,11 +118,13 @@ class DnsEditViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
                     comment = s.comment.trim().ifEmpty { null },
                     tags = emptyList()
                 )
-                if (recordId != null) {
+                val savedRecord = if (recordId != null) {
                     AppContainer.repository.updateDnsRecord(zoneId, recordId, request)
                 } else {
                     AppContainer.repository.createDnsRecord(zoneId, request)
                 }
+                // 记录到同步队列：返回列表页时本地更新缓存，无需重新请求 API
+                DnsRecordsSync.add(zoneId, savedRecord)
                 _uiState.update { it.copy(submitting = false, saved = true) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(submitting = false, error = e.message) }

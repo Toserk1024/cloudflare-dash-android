@@ -1,6 +1,7 @@
 package com.java.myapplication.ui.home
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -44,7 +45,6 @@ fun HomeScreen(
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val homeState by homeViewModel.uiState.collectAsState()
-    val dnsState by dnsViewModel.uiState.collectAsState()
 
     Scaffold(
         bottomBar = {
@@ -74,12 +74,13 @@ fun HomeScreen(
             AnimatedContent(
                 targetState = selectedTab,
                 transitionSpec = {
+                    // 缩短动画时长并减小位移，避免切换时新旧两页同时渲染造成的卡顿
                     if (targetState > initialState) {
-                        (slideInHorizontally { it / 4 } + fadeIn()) togetherWith
-                            (slideOutHorizontally { -it / 4 } + fadeOut())
+                        (slideInHorizontally(tween(200)) { it / 6 } + fadeIn(tween(200))) togetherWith
+                            (slideOutHorizontally(tween(200)) { -it / 6 } + fadeOut(tween(200)))
                     } else {
-                        (slideInHorizontally { -it / 4 } + fadeIn()) togetherWith
-                            (slideOutHorizontally { it / 4 } + fadeOut())
+                        (slideInHorizontally(tween(200)) { -it / 6 } + fadeIn(tween(200))) togetherWith
+                            (slideOutHorizontally(tween(200)) { it / 6 } + fadeOut(tween(200)))
                     }
                 },
                 label = "tabContent"
@@ -88,13 +89,17 @@ fun HomeScreen(
                     0 -> ZonesScreen(
                         onZoneClick = onZoneClick
                     )
-                    1 -> DnsRecordsContent(
-                        onEditRecord = { record: DnsRecord ->
-                            onDnsEdit(dnsState.selectedZone?.id.orEmpty(), record.id)
-                        },
-                        onAddRecord = { onDnsEdit(dnsState.selectedZone?.id.orEmpty(), null) },
-                        viewModel = dnsViewModel
-                    )
+                    1 -> {
+                        // 仅 DNS Tab 显示时才收集 DNS 状态，减少无关重组
+                        val dnsState by dnsViewModel.uiState.collectAsState()
+                        DnsRecordsContent(
+                            onEditRecord = { record: DnsRecord ->
+                                onDnsEdit(dnsState.selectedZone?.id.orEmpty(), record.id)
+                            },
+                            onAddRecord = { onDnsEdit(dnsState.selectedZone?.id.orEmpty(), null) },
+                            viewModel = dnsViewModel
+                        )
+                    }
                     2 -> ProfileScreen(
                         uiState = homeState,
                         onRetry = homeViewModel::loadUser,

@@ -192,6 +192,22 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         }
     }
 
+    /**
+     * 应用编辑/新建后的本地同步（无需重新请求 API）。
+     * 从编辑/新建页返回列表时调用：编辑的记录原位替换，新建的记录追加到末尾。
+     */
+    fun syncPendingChanges() {
+        val zone = _uiState.value.selectedZone ?: return
+        val changes = DnsRecordsSync.takeFor(zone.id)
+        if (changes.isEmpty()) return
+
+        val existingIds = allRecords.map { it.id }.toSet()
+        allRecords = allRecords.map { old ->
+            changes.firstOrNull { it.id == old.id } ?: old
+        } + changes.filter { it.id !in existingIds }
+        applyFilter()
+    }
+
     companion object {
         const val PAGE_SIZE = 100
     }
