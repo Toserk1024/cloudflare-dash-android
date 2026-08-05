@@ -4,7 +4,7 @@
 
 ## 1. 项目概览
 
-基于 **Jetpack Compose + Material 3** 的 Cloudflare 第三方 Android 客户端（包名 `com.java.myapplication`）。
+基于 **Jetpack Compose + Material 3** 的 Cloudflare 第三方 Android 客户端（包名 `com.cloudflare.dash3rd`）。
 当前已实现：**API Token 初始化验证、域名管理（列表/搜索/详情/删除）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、用户信息与退出登录**。
 
 **已移除功能**：添加域名（用户要求删除，相关代码已清理干净，如需恢复参考 §9.3）。
@@ -128,19 +128,19 @@ Token 权限要求：Zone Read/Edit、DNS Read/Edit、User Details Read（Accoun
 
 1. 仓库 → **Actions** → **Build APK** → **Run workflow**（ref 选 `main`）
 2. 等待完成，在 Run 页底部 **Artifacts** 下载 `app-debug-apk`（zip）
-3. 解压得到 `app-debug.apk` 安装到设备
+3. 解压得到 `app-release.apk` 安装到设备
 
 构建环境：`ubuntu-latest`（x86_64）+ JDK 17（temurin）+ platform-35 + build-tools 35.0.0；`gradle-wrapper.properties` 使用官方 distributionUrl。**注意：不要把 distributionUrl 再改成本地路径（如 file:///root/...），CI 无法访问。**
 
 ### 6.2 安装到设备（Shizuku/ADB）
 ```bash
 # 终端（proot）把 APK 复制到 sdcard
-cp app/build/outputs/apk/debug/app-debug.apk /sdcard/Download/cf-app.apk
+cp app/build/outputs/apk/debug/app-release.apk /sdcard/Download/cf-app.apk
 # shell（Shizuku）复制到 /data/local/tmp 并安装（system_server 读不了 /sdcard，必须经 tmp）
 cp /sdcard/Download/cf-app.apk /data/local/tmp/cf-app.apk
 pm install -r /data/local/tmp/cf-app.apk
 ```
-启动：`am start -n com.java.myapplication/.MainActivity`
+启动：`am start -n com.cloudflare.dash3rd/.MainActivity`
 
 ## 7. 已知问题与注意事项
 
@@ -152,7 +152,7 @@ pm install -r /data/local/tmp/cf-app.apk
 6. **"我的"页**：HomeViewModel 有 loading/error 状态机，失败显示错误+重试，不会无限转圈。
 7. **删除域名/记录**：均有 AlertDialog 二次确认；删除后本地缓存同步移除。
 8. **DNS 记录类型**：MX/URI 显示 priority 字段；A/AAAA/CNAME 显示 proxied 开关；SRV/CAA 等用 content 文本（Cloudflare 接受 content 格式）。
-9. **ProfileScreen 中 HomeUiState 是 HomeViewModel 嵌套类**，import 需写 `com.java.myapplication.ui.home.HomeViewModel.HomeUiState`。
+9. **ProfileScreen 中 HomeUiState 是 HomeViewModel 嵌套类**，import 需写 `com.cloudflare.dash3rd.ui.home.HomeViewModel.HomeUiState`。
 
 ## 8. 二次开发指南
 

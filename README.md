@@ -57,7 +57,7 @@ app/src/main/java/com/java/myapplication/
 
 1. 仓库 → **Actions** → **Build APK** → **Run workflow**
 2. 等待构建完成，在 Run 页底部 **Artifacts** 下载 `app-debug-apk`
-3. 解压得到 `app-debug.apk`，安装到设备：`adb install app-debug.apk`
+3. 解压得到 `app-release.apk`，安装到设备：`adb install app-release.apk`
 
 > 本地不保留 Android SDK / Gradle 构建环境，全部走 CI 构建。
 

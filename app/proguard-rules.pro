@@ -19,3 +19,16 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# ===== R8 开启后的关键 keep 规则 =====
+# kotlinx.serialization 官方规则（保留序列化器，防止 R8 后运行时崩溃）
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+-keepclassmembers class kotlinx.serialization.json.** { *** Companion; }
+-keepclasseswithmembers class kotlinx.serialization.json.** { kotlinx.serialization.KSerializer serializer(...); }
+-keep,includedescriptorclasses class com.cloudflare.dash3rd.**$$serializer { *; }
+-keepclassmembers class com.cloudflare.dash3rd.** { *** Companion; }
+-keepclasseswithmembers class com.cloudflare.dash3rd.** { kotlinx.serialization.KSerializer serializer(...); }
+
+# 保留行号，便于 R8 后崩溃排障
+-keepattributes SourceFile,LineNumberTable

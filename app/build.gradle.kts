@@ -5,14 +5,15 @@ plugins {
 }
 
 android {
-    namespace = "com.java.myapplication"
+    namespace = "com.cloudflare.dash3rd"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.java.myapplication"
+        applicationId = "com.cloudflare.dash3rd"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
+        // 构建时 unix 时间戳秒数（动态版本号，每次构建递增）
+        versionCode = (System.currentTimeMillis() / 1000).toInt()
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -23,7 +24,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // 开启 R8 压缩（节约打包资源）
+            isMinifyEnabled = true
+            // 复用默认 debug 签名，产物可直接安装（非正式发布）
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
