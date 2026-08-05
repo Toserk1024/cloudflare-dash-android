@@ -53,11 +53,13 @@ app/src/main/java/com/java/myapplication/
 
 ## 🚀 构建
 
-```bash
-./setup_android_env.sh        # 首次：初始化 ARM64 AAPT2 环境
-./gradlew assembleDebug       # 打包 Debug APK
-# 产物：app/build/outputs/apk/debug/app-debug.apk
-```
+构建由 **GitHub Actions** 完成（`.github/workflows/build.yml`，手动触发）：
+
+1. 仓库 → **Actions** → **Build APK** → **Run workflow**
+2. 等待构建完成，在 Run 页底部 **Artifacts** 下载 `app-debug-apk`
+3. 解压得到 `app-debug.apk`，安装到设备：`adb install app-debug.apk`
+
+> 本地不保留 Android SDK / Gradle 构建环境，全部走 CI 构建。
 
 ## ⚠️ 说明
 

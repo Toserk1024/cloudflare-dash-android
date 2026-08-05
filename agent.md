@@ -122,13 +122,15 @@ Token 权限要求：Zone Read/Edit、DNS Read/Edit、User Details Read（Accoun
 
 ## 6. 构建与部署
 
-### 6.1 构建（Linux/Proot 环境）
-```bash
-cd <workspace>
-bash setup_android_env.sh      # 首次必须：ARM64 AAPT2 替换（耗时 2-5 分钟）
-./gradlew assembleDebug        # 产物：app/build/outputs/apk/debug/app-debug.apk
-```
-注意：`setup_android_env.sh` 会修改 gradle-wrapper.properties 指向本地 Gradle zip；构建耗时约 1-3 分钟；**前台超时易挂，建议 `nohup ./gradlew assembleDebug > /tmp/build.log 2>&1 &` 后台跑再轮询**。
+### 6.1 构建（GitHub Actions CI，推荐）
+
+本地已移除 Android SDK / Gradle 构建环境，构建统一走 **GitHub Actions**（`.github/workflows/build.yml`，`workflow_dispatch` 手动触发）：
+
+1. 仓库 → **Actions** → **Build APK** → **Run workflow**（ref 选 `main`）
+2. 等待完成，在 Run 页底部 **Artifacts** 下载 `app-debug-apk`（zip）
+3. 解压得到 `app-debug.apk` 安装到设备
+
+构建环境：`ubuntu-latest`（x86_64）+ JDK 17（temurin）+ platform-35 + build-tools 35.0.0；`gradle-wrapper.properties` 使用官方 distributionUrl。**注意：不要把 distributionUrl 再改成本地路径（如 file:///root/...），CI 无法访问。**
 
 ### 6.2 安装到设备（Shizuku/ADB）
 ```bash
@@ -181,3 +183,4 @@ pm install -r /data/local/tmp/cf-app.apk
 - v1.2：修复"我的"转圈（状态机）、移除添加域名、修复 DNS 编辑导航
 - v1.3：全量缓存 + 本地搜索 + 下拉刷新（PullToRefreshBox）+ DNS FAB
 - v1.4：Tab/导航过渡动画（AnimatedContent + NavHost transitions）、修复请求体序列化（reified BodyT）
+- v1.5：移除本地构建环境（ARM64 AAPT2 hack、setup_android_env.sh、tools/、gradle wrapper 本地 distributionUrl），改用 GitHub Actions CI 构建（`.github/workflows/build.yml`，手动触发）
