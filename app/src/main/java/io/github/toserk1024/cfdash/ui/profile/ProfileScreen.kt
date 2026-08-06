@@ -1,5 +1,7 @@
 package io.github.toserk1024.cfdash.ui.profile
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,9 +38,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.github.toserk1024.cfdash.BuildConfig
 import io.github.toserk1024.cfdash.ui.home.HomeViewModel.HomeUiState
 import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
 
@@ -146,10 +150,25 @@ fun ProfileScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "v1.0.0",
+                        text = BuildConfig.VERSION_NAME,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // 开源仓库地址（点击打开浏览器）
+                    val context = LocalContext.current
+                    TextButton(
+                        onClick = {
+                            try {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Toserk1024/cloudflare-dash-android"))
+                                )
+                            } catch (_: Exception) { }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("开源地址：github.com/Toserk1024/cloudflare-dash-android")
+                    }
                 }
             }
 

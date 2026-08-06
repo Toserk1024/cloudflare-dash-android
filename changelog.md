@@ -1,5 +1,14 @@
 # Changelog
 
+## 历史版本记录（v1 ~ v1.5，迁移自 agent.md）
+
+- **v1**：基础框架（Onboarding 验证 + 域名列表 + DNS CRUD + 我的）→ 构建通过
+- **v1.1**：修复验证流程 Bug（tokenOverride）、Token 格式校验
+- **v1.2**：修复"我的"转圈（状态机）、移除添加域名、修复 DNS 编辑导航
+- **v1.3**：全量缓存 + 本地搜索 + 下拉刷新（PullToRefreshBox）+ DNS FAB
+- **v1.4**：Tab/导航过渡动画（AnimatedContent + NavHost transitions）、修复请求体序列化（reified BodyT）
+- **v1.5**：移除本地构建环境（ARM64 AAPT2 hack、setup_android_env.sh、tools/、gradle wrapper 本地 distributionUrl），改用 GitHub Actions CI 构建（手动触发）
+
 ## 2026-08-05 · 本次构建改造
 
 - 包名定稿为 `io.github.toserk1024.cfdash`（规避商标风险；此前曾迁移至 com.cloudflare.dash3rd）

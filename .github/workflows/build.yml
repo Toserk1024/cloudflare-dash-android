@@ -1,6 +1,8 @@
 name: Build APK
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -28,9 +30,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: version.properties
-          key: version-counter-${{ hashFiles('version.properties') }}
+          key: version-counter-v2-${{ hashFiles('version.properties') }}
           restore-keys: |
-            version-counter-
+            version-counter-v2-
 
       - name: Install required SDK components
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"

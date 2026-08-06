@@ -7,7 +7,7 @@
 基于 **Jetpack Compose + Material 3** 的 Cloudflare 第三方 Android 客户端（包名 `io.github.toserk1024.cfdash`）。
 当前已实现：**API Token 初始化验证、域名管理（列表/搜索/详情/删除）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、用户信息与退出登录**。
 
-**已移除功能**：添加域名（用户要求删除，相关代码已清理干净，如需恢复参考 §9.3）。
+**已移除功能**：添加域名（用户要求删除，相关代码已清理干净，如需恢复参考 §8.3）。
 **未开发**：Workers、Zero Trust 等高级功能（用户明确暂不开发）。
 
 ## 2. 技术栈与依赖
@@ -93,7 +93,7 @@ UI(Composable) ⇄ ViewModel(StateFlow) ⇄ Repository ⇄ CloudflareClient(OkHt
 ### 4.5 导航
 - 单 Activity，路由见 `Routes.kt`：onboarding / home / zone_detail / dns_records / dns_edit
 - `AppNavHost` 配置了全局转场动画（fadeIn + slideInHorizontally 1/4 屏）
-- HomeScreen 底部三 Tab（域名/DNS/我的）用 `AnimatedContent` 切换（方向性滑动+淡入淡出）
+- HomeScreen 底部三 Tab（域名/DNS/我的）：首次访问后常驻组合（visitedMask 懒加载），切换仅透明度过渡（FadeTab，GPU 合成），避免重建卡顿
 - 带参路由：`zone_detail/{zoneId}?zoneName={zoneName}`（可选参数有 defaultValue=""）
 - ViewModel 从 `SavedStateHandle` 读参数（如 DnsEditViewModel 的 zoneId/recordId、DnsViewModel 的 zoneId）
 - **注意**：`SavedStateHandle["key"]` 泛型推断可能失败，用 `savedStateHandle.get<String>("key")` 显式类型
@@ -124,10 +124,10 @@ Token 权限要求：Zone Read/Edit、DNS Read/Edit、User Details Read（Accoun
 
 ### 6.1 构建（GitHub Actions CI，推荐）
 
-本地已移除 Android SDK / Gradle 构建环境，构建统一走 **GitHub Actions**（`.github/workflows/build.yml`，`workflow_dispatch` 手动触发）：
+本地已移除 Android SDK / Gradle 构建环境，构建统一走 **GitHub Actions**（`.github/workflows/build.yml`，**push 到 main 自动触发**，也可在 Actions 页手动触发）：
 
-1. 仓库 → **Actions** → **Build APK** → **Run workflow**（ref 选 `main`）
-2. 等待完成，在 Run 页底部 **Artifacts** 下载 `app-debug-apk`（zip）
+1. `git push origin main` 自动开始构建；或仓库 → **Actions** → **Build APK** → **Run workflow**（手动）
+2. 等待完成，在 Run 页底部 **Artifacts** 下载 `app-release-apk`（zip）
 3. 解压得到 `app-release.apk` 安装到设备
 
 构建环境：`ubuntu-latest`（x86_64）+ JDK 17（temurin）+ platform-35 + build-tools 35.0.0；`gradle-wrapper.properties` 使用官方 distributionUrl。**注意：不要把 distributionUrl 再改成本地路径（如 file:///root/...），CI 无法访问。**
@@ -135,7 +135,7 @@ Token 权限要求：Zone Read/Edit、DNS Read/Edit、User Details Read（Accoun
 ### 6.2 安装到设备（Shizuku/ADB）
 ```bash
 # 终端（proot）把 APK 复制到 sdcard
-cp app/build/outputs/apk/debug/app-release.apk /sdcard/Download/cf-app.apk
+cp app/build/outputs/apk/release/app-release.apk /sdcard/Download/cf-app.apk
 # shell（Shizuku）复制到 /data/local/tmp 并安装（system_server 读不了 /sdcard，必须经 tmp）
 cp /sdcard/Download/cf-app.apk /data/local/tmp/cf-app.apk
 pm install -r /data/local/tmp/cf-app.apk
@@ -177,10 +177,5 @@ pm install -r /data/local/tmp/cf-app.apk
 2. Repository 恢复 `createZone(name, accountId)` + `getAccounts()`
 3. 新建 AddZoneScreen/AddZoneViewModel；ZonesScreen 加 FAB；Routes/AppNavHost 加 add_zone 路由
 
-## 9. 版本记录（便于二次开发了解演进）
-- v1：基础框架（Onboarding 验证 + 域名列表 + DNS CRUD + 我的）→ 构建通过
-- v1.1：修复验证流程 Bug（tokenOverride）、Token 格式校验
-- v1.2：修复"我的"转圈（状态机）、移除添加域名、修复 DNS 编辑导航
-- v1.3：全量缓存 + 本地搜索 + 下拉刷新（PullToRefreshBox）+ DNS FAB
-- v1.4：Tab/导航过渡动画（AnimatedContent + NavHost transitions）、修复请求体序列化（reified BodyT）
-- v1.5：移除本地构建环境（ARM64 AAPT2 hack、setup_android_env.sh、tools/、gradle wrapper 本地 distributionUrl），改用 GitHub Actions CI 构建（`.github/workflows/build.yml`，手动触发）
+## 9. 版本记录
+版本演进记录已迁移至 [`changelog.md`](changelog.md)，此处不再维护。

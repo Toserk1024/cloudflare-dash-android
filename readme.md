@@ -1,6 +1,7 @@
 # Cloudflare 客户端（Android）
 
-> <font color="red">⚠️ **All in Vibe Coding，略有瑕疵，见谅。**</font>
+> [!CAUTION]
+> 本项目由 **Vibe Coding**（AI 辅助快速迭代）开发，功能以实际使用为准，可能留有瑕疵，恳请见谅，欢迎反馈改进。
 
 基于 Jetpack Compose + Material 3 的 Cloudflare 第三方客户端（包名 `io.github.toserk1024.cfdash`），支持域名管理与 DNS 记录管理。
 
@@ -12,7 +13,7 @@
 - **初始化向导**：输入 API Token → 调用 `GET /user/tokens/verify` 验证 → 成功进入主界面
 - **域名管理**：列表（全量缓存 + 本地搜索 + 下拉刷新）/ 详情（NS、状态、套餐）/ 删除域名
 - **DNS 记录管理**：按域名查看（全量缓存 + 类型筛选 + 本地搜索 + 下拉刷新）/ 新建 / 编辑 / 删除，支持 A、AAAA、CNAME、MX、TXT、NS、SRV、CAA 等类型
-- **我的**：用户信息展示、退出登录（清除 Token）
+- **我的**：用户信息展示、版本号、开源地址、退出登录
 - **安全**：API Token 使用 EncryptedSharedPreferences（Android Keystore）加密存储，仅保存在本机
 - **性能**：API 数据首次/下拉刷新时缓存到内存，搜索筛选纯本地完成；三个 Tab 常驻组合，切换仅透明度过渡，流畅无重建
 
@@ -59,10 +60,10 @@ app/src/main/java/io/github/toserk1024/cfdash/
 
 ## 🚀 构建
 
-构建由 **GitHub Actions** 完成（`.github/workflows/build.yml`，手动触发，release + R8）：
+构建由 **GitHub Actions** 自动完成（`.github/workflows/build.yml`，**push 到 main 自动触发**，也可手动触发；release + R8）：
 
-1. 仓库 → **Actions** → **Build APK** → **Run workflow**
-2. 等待构建完成，在 Run 页底部 **Artifacts** 下载 `app-release-apk`
+1. `git push origin main` → 自动开始构建（Actions → Build APK）
+2. 构建完成，在 Run 页底部 **Artifacts** 下载 `app-release-apk`
 3. 解压得到 `app-release.apk`，安装到设备：`adb install app-release.apk`
 
 > 本地不保留 Android SDK / Gradle 构建环境，全部走 CI 构建。
