@@ -24,6 +24,14 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Restore version counter
+        uses: actions/cache@v4
+        with:
+          path: version.properties
+          key: version-counter-${{ hashFiles('version.properties') }}
+          restore-keys: |
+            version-counter-
+
       - name: Install required SDK components
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 

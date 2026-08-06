@@ -26,9 +26,9 @@
 -dontnote kotlinx.serialization.AnnotationsKt
 -keepclassmembers class kotlinx.serialization.json.** { *** Companion; }
 -keepclasseswithmembers class kotlinx.serialization.json.** { kotlinx.serialization.KSerializer serializer(...); }
--keep,includedescriptorclasses class com.cloudflare.dash3rd.**$$serializer { *; }
--keepclassmembers class com.cloudflare.dash3rd.** { *** Companion; }
--keepclasseswithmembers class com.cloudflare.dash3rd.** { kotlinx.serialization.KSerializer serializer(...); }
+-keep,includedescriptorclasses class io.github.toserk1024.cfdash.**$$serializer { *; }
+-keepclassmembers class io.github.toserk1024.cfdash.** { *** Companion; }
+-keepclasseswithmembers class io.github.toserk1024.cfdash.** { kotlinx.serialization.KSerializer serializer(...); }
 
 # 保留行号，便于 R8 后崩溃排障
 -keepattributes SourceFile,LineNumberTable

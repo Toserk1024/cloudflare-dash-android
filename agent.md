@@ -4,7 +4,7 @@
 
 ## 1. 项目概览
 
-基于 **Jetpack Compose + Material 3** 的 Cloudflare 第三方 Android 客户端（包名 `com.cloudflare.dash3rd`）。
+基于 **Jetpack Compose + Material 3** 的 Cloudflare 第三方 Android 客户端（包名 `io.github.toserk1024.cfdash`）。
 当前已实现：**API Token 初始化验证、域名管理（列表/搜索/详情/删除）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、用户信息与退出登录**。
 
 **已移除功能**：添加域名（用户要求删除，相关代码已清理干净，如需恢复参考 §9.3）。
@@ -31,7 +31,7 @@
 ## 3. 完整代码结构（29 个 Kotlin 文件）
 
 ```
-app/src/main/java/com/java/myapplication/
+app/src/main/java/io/github/toserk1024/cfdash/
 ├── MainActivity.kt               # 入口：AppContainer.init + 登录态路由（onboarding/home）
 ├── AppContainer.kt               # 全局单例容器：tokenStore + repository（Service Locator）
 ├── navigation/
@@ -140,7 +140,7 @@ cp app/build/outputs/apk/debug/app-release.apk /sdcard/Download/cf-app.apk
 cp /sdcard/Download/cf-app.apk /data/local/tmp/cf-app.apk
 pm install -r /data/local/tmp/cf-app.apk
 ```
-启动：`am start -n com.cloudflare.dash3rd/.MainActivity`
+启动：`am start -n io.github.toserk1024.cfdash/.MainActivity`
 
 ## 7. 已知问题与注意事项
 
@@ -152,7 +152,7 @@ pm install -r /data/local/tmp/cf-app.apk
 6. **"我的"页**：HomeViewModel 有 loading/error 状态机，失败显示错误+重试，不会无限转圈。
 7. **删除域名/记录**：均有 AlertDialog 二次确认；删除后本地缓存同步移除。
 8. **DNS 记录类型**：MX/URI 显示 priority 字段；A/AAAA/CNAME 显示 proxied 开关；SRV/CAA 等用 content 文本（Cloudflare 接受 content 格式）。
-9. **ProfileScreen 中 HomeUiState 是 HomeViewModel 嵌套类**，import 需写 `com.cloudflare.dash3rd.ui.home.HomeViewModel.HomeUiState`。
+9. **ProfileScreen 中 HomeUiState 是 HomeViewModel 嵌套类**，import 需写 `io.github.toserk1024.cfdash.ui.home.HomeViewModel.HomeUiState`。
 
 ## 8. 二次开发指南
 
