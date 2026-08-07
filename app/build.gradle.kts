@@ -63,7 +63,8 @@ android {
         create("release") {
             // 环境变量引入正式签名（CI 注入）；未设置时回退 debug 签名
             val store = System.getenv("BUILD_STORE_FILE")
-            storeFile = store?.let { file(it) }
+            // 用 rootProject 相对仓库根解析路径，避免相对 app/ 模块目录造成双重 app/app/
+            storeFile = store?.let { rootProject.file(it) }
             storePassword = System.getenv("BUILD_STORE_PASSWORD")
             keyAlias = System.getenv("BUILD_KEY_ALIAS")
             keyPassword = System.getenv("BUILD_KEY_PASSWORD")
