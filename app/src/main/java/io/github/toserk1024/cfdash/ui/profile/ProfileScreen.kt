@@ -13,17 +13,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -40,6 +39,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,6 +50,24 @@ import androidx.compose.ui.unit.dp
 import io.github.toserk1024.cfdash.BuildConfig
 import io.github.toserk1024.cfdash.ui.home.HomeViewModel.HomeUiState
 import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
+
+/** Web（地球）图标：material-icons-core 无 Public 图标，自定义 ImageVector */
+private val WebIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "Web",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).apply {
+        addPath(
+            pathData = PathParser().parsePathString(
+                "M12,2C6.48,22,6.482,12s4.48,1010,1010,-4.4810,-10S17.52,212,2zM11,19.93c-3.95,-0.49 -7,-3.85 -7,-7.930,-0.620.08,-1.210.21,-1.79L9,15v1c0,1.10.9,22,2v1.93zM17.9,17.39c-0.26,-0.81 -1,-1.39 -1.9,-1.39h-1v-3c0,-0.55 -0.45,-1 -1,-1L8,12v-2h2c0.55,01,-0.451,-1L11,7h2c1.1,02,-0.92,-2v-0.41c2.93,1.195,4.065,7.410,2.08 -0.8,3.97 -2.1,5.39z"
+            ).toNodes(),
+            fill = SolidColor(Color.Black)
+        )
+    }.build()
+}
 
 /** 我的（Profile）Tab */
 @Composable
@@ -157,22 +178,44 @@ fun ProfileScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    // 开源仓库（独立 chip，点击打开浏览器）
+                    // 开源仓库（Card，点击打开浏览器）
                     val context = LocalContext.current
-                    AssistChip(
-                        onClick = {
-                            try {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Toserk1024/cloudflare-dash-android"))
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                try {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Toserk1024/cloudflare-dash-android"))
+                                    )
+                                } catch (_: Exception) { }
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                WebIcon,
+                                contentDescription = "开源仓库",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "GitHub 开源仓库",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold
                                 )
-                            } catch (_: Exception) { }
-                        },
-                        label = { Text("github.com/Toserk1024/cloudflare-dash-android") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Build, contentDescription = "GitHub 仓库", modifier = Modifier.size(18.dp))
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                                Text(
+                                    text = "github.com/Toserk1024/cloudflare-dash-android",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
                 }
             }
 

@@ -16,8 +16,9 @@
   - versionName 采用 `日期_自增序号`（如 `2026.08.08_1`，序号每次构建 +1，应用内展示前缀 v）
   - versionCode 采用构建时间(unix秒)前 9 位截取，规避 32 位 Int 极限
   - 构建日期按 **UTC+8**（Asia/Shanghai）计算
-- 主题：曾尝试黑白灰极客风（含 OLED 纯黑），**已回滚为 Cloudflare 橙主题**（沿用默认 dynamic color）
-- 关于页：动态显示版本号（前缀 v）+ 独立 **AssistChip** 开源仓库入口（带图标，点击打开浏览器）
+- 主题：Cloudflare 橙主题（沿用 dynamic color）；深色模式背景 **OLED 纯黑**（background/surface=#000000，省电）
+- 关于页：动态显示版本号（前缀 v）+ 开源仓库 **Card** 入口（自定义 Web/地球图标，点击打开浏览器）
+- 初始化页：移除 Logo 区域（仅保留标题与 Token 输入）
 - CI 构建方式由 debug 改为 **release**，开启 **R8 压缩**；**push 到 main 自动触发**构建
 - 正式签名支持：`signingConfigs.release` 通过环境变量（`BUILD_STORE_FILE/BUILD_STORE_PASSWORD/BUILD_KEY_ALIAS/BUILD_KEY_PASSWORD`）引入，未配置自动回退 debug 签名；**仅 v2+v3**（v1 关闭，v3 由 AGP 8+ 默认开启）；CI 从 GitHub Secrets 解码 keystore（workflow 用 env 注入，`if` 条件不可直接用 secrets；keystore 路径用 `rootProject.file()` 相对仓库根解析，修复 CI 双重 `app/app/` 路径问题）
 - 修复 R8 构建：补充 kotlinx.serialization keep 规则与 Tink 编译期注解 `-dontwarn` 规则

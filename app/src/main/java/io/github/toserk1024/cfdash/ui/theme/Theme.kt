@@ -9,12 +9,17 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
     primary = CloudflareOrange,
     secondary = CloudflareDarkBlue,
-    tertiary = CloudflareBlue
+    tertiary = CloudflareBlue,
+    // OLED 深色模式背景纯黑，省电且更纯粹
+    background = Color(0xFF000000),
+    surface = Color(0xFF000000),
+    surfaceVariant = Color(0xFF1F1F1F)
 )
 
 private val LightColorScheme = lightColorScheme(
