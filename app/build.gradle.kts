@@ -59,12 +59,30 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            // 环境变量引入正式签名（CI 注入）；未设置时回退 debug 签名
+            val store = System.getenv("BUILD_STORE_FILE")
+            storeFile = store?.let { file(it) }
+            storePassword = System.getenv("BUILD_STORE_PASSWORD")
+            keyAlias = System.getenv("BUILD_KEY_ALIAS")
+            keyPassword = System.getenv("BUILD_KEY_PASSWORD")
+            // 仅 v2+v3（v1 关闭；v3 由 AGP 8+ 默认开启）
+            enableV1Signing = false
+            enableV2Signing = true
+        }
+    }
+
     buildTypes {
         release {
             // 开启 R8 压缩（节约打包资源）
             isMinifyEnabled = true
-            // 复用默认 debug 签名，产物可直接安装（非正式发布）
-            signingConfig = signingConfigs.getByName("debug")
+            // 环境变量未配置时回退 debug 签名（保证构建不挂）；配置后使用正式签名
+            signingConfig = if (System.getenv("BUILD_STORE_FILE") != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

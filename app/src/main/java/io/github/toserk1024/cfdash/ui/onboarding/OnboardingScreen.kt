@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
 
 /** 初始化界面：输入 API Token → 验证 → 进入主界面 */
 @Composable
@@ -64,7 +65,7 @@ fun OnboardingScreen(
             // Logo 区域
             Surface(
                 shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.primary,
+                color = CloudflareOrange,
                 modifier = Modifier.size(72.dp)
             ) {
                 Column(

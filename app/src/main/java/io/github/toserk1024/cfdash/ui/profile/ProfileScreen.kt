@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.toserk1024.cfdash.BuildConfig
 import io.github.toserk1024.cfdash.ui.home.HomeViewModel.HomeUiState
+import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
 
 /** 我的（Profile）Tab */
 @Composable
@@ -99,7 +100,7 @@ fun ProfileScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary
+                            color = CloudflareOrange
                         ) {
                             Box(
                                 modifier = Modifier.size(56.dp),

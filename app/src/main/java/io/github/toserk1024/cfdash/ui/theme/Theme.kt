@@ -1,65 +1,47 @@
 package io.github.toserk1024.cfdash.ui.theme
 
+import android.app.Activity
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 
-// 极客风黑白灰 · 浅色
-private val LightColorScheme = lightColorScheme(
-    primary = GeeksBlack,
-    onPrimary = GeeksWhite,
-    primaryContainer = GeeksLightGray,
-    onPrimaryContainer = GeeksBlack,
-    secondary = GeeksDarkGray,
-    onSecondary = GeeksWhite,
-    secondaryContainer = GeeksLightGray,
-    onSecondaryContainer = GeeksBlack,
-    tertiary = GeeksGray,
-    onTertiary = GeeksWhite,
-    background = GeeksWhite,
-    onBackground = GeeksBlack,
-    surface = GeeksWhite,
-    onSurface = GeeksBlack,
-    surfaceVariant = GeeksLightGray,
-    onSurfaceVariant = GeeksDarkGray,
-    outline = GeeksGray,
-    error = Color(0xFFB3261E),
-    onError = GeeksWhite
+private val DarkColorScheme = darkColorScheme(
+    primary = CloudflareOrange,
+    secondary = CloudflareDarkBlue,
+    tertiary = CloudflareBlue
 )
 
-// 极客风黑白灰 · 深色（背景 OLED 纯黑）
-private val DarkColorScheme = darkColorScheme(
-    primary = GeeksWhite,
-    onPrimary = GeeksBlack,
-    primaryContainer = GeeksDarkGray,
-    onPrimaryContainer = GeeksWhite,
-    secondary = GeeksLightGray,
-    onSecondary = GeeksBlack,
-    secondaryContainer = GeeksDarkGray,
-    onSecondaryContainer = GeeksWhite,
-    tertiary = GeeksGray,
-    onTertiary = GeeksBlack,
-    background = GeeksBlack,
-    onBackground = GeeksWhite,
-    surface = GeeksBlack,
-    onSurface = GeeksWhite,
-    surfaceVariant = GeeksDarkGray,
-    onSurfaceVariant = GeeksLightGray,
-    outline = GeeksGray,
-    error = Color(0xFFCF6679),
-    onError = GeeksBlack
+private val LightColorScheme = lightColorScheme(
+    primary = CloudflareOrange,
+    secondary = CloudflareDarkBlue,
+    tertiary = CloudflareBlue
 )
 
 @Composable
 fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    // Dynamic color is available on Android 12+
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val context = LocalContext.current
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
+    }
+
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+        colorScheme = colorScheme,
         typography = Typography,
         content = content
     )

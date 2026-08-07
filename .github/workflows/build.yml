@@ -34,6 +34,15 @@ jobs:
           restore-keys: |
             version-counter-v2-
 
+      - name: Prepare release signing keystore
+        if: ${{ secrets.BUILD_KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.BUILD_KEYSTORE_BASE64 }}" | base64 -d > app/cfdash-release.jks
+          echo "BUILD_STORE_FILE=app/cfdash-release.jks" >> $GITHUB_ENV
+          echo "BUILD_STORE_PASSWORD=${{ secrets.BUILD_STORE_PASSWORD }}" >> $GITHUB_ENV
+          echo "BUILD_KEY_ALIAS=${{ secrets.BUILD_KEY_ALIAS }}" >> $GITHUB_ENV
+          echo "BUILD_KEY_PASSWORD=${{ secrets.BUILD_KEY_PASSWORD }}" >> $GITHUB_ENV
+
       - name: Install required SDK components
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 

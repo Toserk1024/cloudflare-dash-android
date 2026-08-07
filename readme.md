@@ -29,7 +29,7 @@
 
 ## 🛠️ 技术栈
 
-- Kotlin + Jetpack Compose + Material 3（黑白灰极客风主题，深色模式 OLED 纯黑）
+- Kotlin + Jetpack Compose + Material 3（Cloudflare 橙主题）
 - MVVM：ViewModel + StateFlow + Repository
 - OkHttp（Bearer 认证）+ kotlinx.serialization
 - Navigation Compose（单 Activity 多路由）
