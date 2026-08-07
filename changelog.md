@@ -13,11 +13,14 @@
 
 - 包名定稿为 `io.github.toserk1024.cfdash`（规避商标风险；此前曾迁移至 com.cloudflare.dash3rd）
 - 版本号机制：
-  - versionName 采用 `v日期_自增序号`（如 `v2026.08.08_123`，序号每次构建 +1）
+  - versionName 采用 `日期_自增序号`（如 `2026.08.08_1`，序号每次构建 +1，应用内展示前缀 v）
   - versionCode 采用构建时间(unix秒)前 9 位截取，规避 32 位 Int 极限
-- CI 构建方式由 debug 改为 **release**，并开启 **R8 压缩**（节约打包资源、减小体积）
+  - 构建日期按 **UTC+8**（Asia/Shanghai）计算
+- 主题改为**黑白灰极客风**，深色模式背景 **OLED 纯黑**（跟随系统深浅色）
+- 关于页：动态显示版本号（前缀 v）+ 独立 **AssistChip** 开源仓库入口（带图标，点击打开浏览器）
+- CI 构建方式由 debug 改为 **release**，开启 **R8 压缩**；**push 到 main 自动触发**构建
 - 修复 R8 构建：补充 kotlinx.serialization keep 规则与 Tink 编译期注解 `-dontwarn` 规则
-- README 调整：更名 `readme.md`，顶部新增 vibe coding 红色提示，并指向 `agent.md` / `changelog.md`
+- README 调整：更名 `readme.md`，顶部新增 vibe coding 警示提示，并指向 `agent.md` / `changelog.md`
 
 ## 会话内累积更新（本次之前的修改）
 

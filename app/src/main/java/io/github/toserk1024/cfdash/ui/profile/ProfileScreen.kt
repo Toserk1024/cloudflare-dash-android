@@ -23,13 +23,13 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -158,7 +158,7 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     // 开源仓库（独立 chip，点击打开浏览器）
                     val context = LocalContext.current
-                    SuggestionChip(
+                    AssistChip(
                         onClick = {
                             try {
                                 context.startActivity(

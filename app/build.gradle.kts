@@ -3,6 +3,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.Properties
+import java.util.TimeZone
 
 plugins {
     alias(libs.plugins.android.application)
@@ -20,7 +21,10 @@ fun currentBuildSeq(): Int = try {
     0
 }
 
-val buildDate = SimpleDateFormat("yyyy.MM.dd", Locale.US).format(Date())
+// 构建日期按 UTC+8（Asia/Shanghai）计算，CI 构建机默认 UTC
+val buildDate = SimpleDateFormat("yyyy.MM.dd", Locale.US).apply {
+    timeZone = TimeZone.getTimeZone("Asia/Shanghai")
+}.format(Date())
 val buildSeq = currentBuildSeq() + 1
 
 // 每次构建后序号 +1 写回 version.properties（CI 用 actions/cache 持久化跨构建保留）
