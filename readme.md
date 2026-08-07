@@ -22,19 +22,19 @@
 在 https://dash.cloudflare.com/profile/api-tokens 创建 Token 时，建议勾选：
 
 | 权限 | 说明 |
-|---|---|---|
+|---|---|
 | Zone → Zone → Read / Edit | 域名列表、详情、删除 |
 | Zone → DNS → Read / Edit | DNS 记录查看与增删改 |
 | User → User Details → Read | 验证 Token 与用户信息 |
 
 ## 🛠️ 技术栈
 
-- Kotlin + Jetpack Compose + Material 3（Cloudflare 橙主题）
+- Kotlin + Jetpack Compose + Material 3（黑白灰极客风主题，深色模式 OLED 纯黑）
 - MVVM：ViewModel + StateFlow + Repository
 - OkHttp（Bearer 认证）+ kotlinx.serialization
 - Navigation Compose（单 Activity 多路由）
 - EncryptedSharedPreferences（安全存储）
-- Release 构建开启 **R8 压缩**，versionName 采用 `v日期_自增序号`、versionCode 采用时间戳前 9 位
+- Release 构建开启 **R8 压缩**；versionName 采用 `日期_自增序号`、versionCode 采用时间戳前 9 位
 
 ## 📁 代码结构
 

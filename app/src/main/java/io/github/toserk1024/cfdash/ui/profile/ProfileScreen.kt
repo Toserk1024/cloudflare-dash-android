@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -28,6 +29,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,7 +46,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.toserk1024.cfdash.BuildConfig
 import io.github.toserk1024.cfdash.ui.home.HomeViewModel.HomeUiState
-import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
 
 /** 我的（Profile）Tab */
 @Composable
@@ -98,7 +99,7 @@ fun ProfileScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             shape = CircleShape,
-                            color = CloudflareOrange
+                            color = MaterialTheme.colorScheme.primary
                         ) {
                             Box(
                                 modifier = Modifier.size(56.dp),
@@ -150,14 +151,14 @@ fun ProfileScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = BuildConfig.VERSION_NAME,
+                        text = "v${BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    // 开源仓库地址（点击打开浏览器）
+                    // 开源仓库（独立 chip，点击打开浏览器）
                     val context = LocalContext.current
-                    TextButton(
+                    SuggestionChip(
                         onClick = {
                             try {
                                 context.startActivity(
@@ -165,10 +166,12 @@ fun ProfileScreen(
                                 )
                             } catch (_: Exception) { }
                         },
+                        label = { Text("github.com/Toserk1024/cloudflare-dash-android") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Build, contentDescription = "GitHub 仓库", modifier = Modifier.size(18.dp))
+                        },
                         modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("开源地址：github.com/Toserk1024/cloudflare-dash-android")
-                    }
+                    )
                 }
             }
 

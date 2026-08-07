@@ -46,8 +46,8 @@ android {
         targetSdk = 35
         // versionCode：构建时间(unix秒)前9位截取，规避 32 位 Int 极限（如 1785916376 → 178591637）
         versionCode = ((System.currentTimeMillis() / 1000) / 10).toInt()
-        // versionName：v日期_自增序号（如 v2026.08.08_123）
-        versionName = "v${buildDate}_$buildSeq"
+        // versionName：日期_自增序号（如 2026.08.08_1，应用内展示时前缀 v）
+        versionName = "${buildDate}_$buildSeq"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
