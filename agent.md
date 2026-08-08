@@ -50,7 +50,7 @@ app/src/main/java/io/github/toserk1024/cfdash/
 │   │   ├── DnsRecord.kt          # DnsRecord + DnsRecordRequest + DnsRecordTypes(常量)
 │   │   └── User.kt               # 用户信息 + AccountRef（账号级统计用）
 │   ├── repository/
-│   │   └── CloudflareRepository.kt  # 业务层：verifyCredential/getUser/getZones/getZone/deleteZone/getZoneSetting/updateZoneSetting/getZoneAnalytics/getAccountAnalytics/getDnsRecords/createDnsRecord/updateDnsRecord/deleteDnsRecord
+│   │   └── CloudflareRepository.kt  # 业务层：verifyCredential/getUser/getAccounts/getZones/getZone/deleteZone/getZoneSetting/updateZoneSetting/getZoneAnalytics/getAccountAnalytics/getDnsRecords/createDnsRecord/updateDnsRecord/deleteDnsRecord
 │   └── storage/
 │       └── TokenStore.kt         # EncryptedSharedPreferences 双凭据存储（authMode + token/email+key）
 └── ui/
@@ -117,6 +117,7 @@ FAB 已内置在 Content 中，DnsRecordsScreen 不再自带 FAB。
 | 域名列表 | GET `/zones?page=&per_page=&name=&status=` | |
 | 域名详情 | GET `/zones/{zone_id}` | |
 | 删除域名 | DELETE `/zones/{zone_id}` | |
+| 账号列表 | GET `/accounts` | 账号级统计取 accountTag（比 /user.accounts 可靠） |
 | 获取 Zone 设置 | GET `/zones/{zone_id}/settings/{name}` | development_mode / security_level / ipv6 等 |
 | 更新 Zone 设置 | PATCH `/zones/{zone_id}/settings/{name}` | body: {"value": ...}，需 Zone Settings 权限 |
 | 统计数据 | POST `/graphql` | GraphQL Analytics（httpRequests1dGroups/1hGroups），需 Analytics Read |
@@ -166,7 +167,7 @@ pm install -r /data/local/tmp/cf-app.apk
 8. **DNS 记录类型**：MX/URI 显示 priority 字段；A/AAAA/CNAME 显示 proxied 开关；SRV/CAA 等用 content 文本（Cloudflare 接受 content 格式）。
 9. **ProfileScreen 中 HomeUiState 是 HomeViewModel 嵌套类**，import 需写 `io.github.toserk1024.cfdash.ui.home.HomeViewModel.HomeUiState`。
 10. **双认证头**：`CloudflareClient.requestRaw` 按 `AuthCredential` 类型添加请求头（Token → `Authorization: Bearer`；GlobalKey → `X-Auth-Email` + `X-Auth-Key`），均校验 ASCII 可打印字符；验证走 `verifyCredential()`（Token → `/user/tokens/verify`，GlobalKey → `GET /user`）。修改 Zone 设置需 Token 具备 **Zone Settings Read/Edit** 权限，否则 403（高级卡片会显示错误 + 重试按钮）。
-11. **GraphQL Analytics**：`client.graphql()` POST `/graphql`，响应为 data/errors 结构（非 ApiResponse 包装），errors 非空抛 CloudflareException；查询构建与解析统一在 `AnalyticsParser`（时间窗口 UTC、数据集映射 24h/7d/30d）；统计需 Token 具备 **Zone Analytics Read**（域名级）/ **Account Analytics Read**（账号级）权限，否则 403。
+11. **GraphQL Analytics**：`client.graphql()` POST `/graphql`，响应为 data/errors 结构（非 ApiResponse 包装），errors 非空抛 CloudflareException；查询构建与解析统一在 `AnalyticsParser`（时间窗口 UTC、数据集映射 24h/7d/30d）；统计需 Token 具备 **Zone Analytics Read**（域名级）/ **Account Analytics Read**（账号级）权限，否则 403。**关键约束（踩坑记录）**：① 预聚合 Groups 数据集（1d/1h Groups）的 `orderBy` **仅支持聚合字段**（如 `sum_bytes_DESC`/`count_DESC`），**不支持时间维度排序**（曾报 "cannot order by datetime/date"），本项目只做总量累加**不使用 orderBy**；② filter 时间字段：1hGroups → `datetime_geq/leq`（ISO8601），1dGroups → `date_geq/leq`（yyyy-MM-dd）；③ 账号级统计的 accountTag 用 `GET /accounts`（`/user` 的 `accounts` 字段可能为空）。
 
 ## 8. 二次开发指南
 
