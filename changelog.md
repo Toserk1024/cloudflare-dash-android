@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-08-08 · todo批次5：饼图弹窗移除 + 域名流量拆分列表 + 多修复
+
+- **饼图移除 dialog**：维度分布饼图（国家/状态码/缓存）图例/扇区点击不再弹出 AlertDialog 详情；`LegendRow` 移除选中高亮与点击交互，仅展示色块/名称/数值/占比（`StatsCharts.kt`）
+- **域名流量拆分列表**：账号级「域名流量拆分」柱状图下方新增**图例列表**，像饼图图例一样逐行列出每个 host 的名称/请求量/占比（Top8+其他，柱状图保留；`ZoneBarChart` 外包 `Column` + `LegendRow`）
+- **A/AAAA 编辑页说明修复**：根因是模板占位符 `[IPv4 地址]`（带空格）与 replace 的 `[IPv4地址]`（无空格）不匹配导致地址未替换；文案更正为「将 [名称] 指向 [IPv4 地址]」/「将 [名称] 指向 [IPv6 地址]」，占位符统一带空格并随输入/回填值动态替换（`DnsRecordFieldDefs.kt` + `DnsRecordEditScreen.kt`）
+- **高级设置开关独立防抖**：根因①ViewModel `settingsBusy != null` 全局拦截（任一设置切换时其他设置请求被直接忽略）；②Screen 端 `enabled` 条件写反（非正在操作时反而禁用）。修复：`settingsBusy` 改为 `Set<String>`，仅防**同一设置**重复操作，不同设置可**并行独立切换**；Screen 端 `enabled = "xxx" !in settingsBusy`（仅自己忙时禁用/转圈，其余保持可用）（`ZoneDetailViewModel.kt` + `ZoneDetailScreen.kt`）
+- **侧边栏分割线间距**：侧边栏用户区与菜单之间的 `HorizontalDivider` 与菜单项之间增加 8dp 间距（`HomeScreen.kt`）
+
+## 2026-08-08 · 代码清理（移除测试代码与无用文件）
+
+- **移除测试代码**：删除 `app/src/test/`（ExampleUnitTest）与 `app/src/androidTest/`（ExampleInstrumentedTest）整目录（项目无真实测试，纯脚手架示例）
+- **移除测试依赖**：`gradle/libs.versions.toml` 删除 junit / junitVersion / espressoCore 版本号及 junit / androidx-junit / androidx-espresso-core / androidx-ui-test-manifest / androidx-ui-test-junit4 库；`app/build.gradle.kts` 删除 `testImplementation` / `androidTestImplementation` / `debugImplementation(ui-test-manifest)` 及 `testInstrumentationRunner`（保留 debugImplementation ui-tooling，开发预览用）
+- **todo.md 精简**：按用户要求删除全部已实施条目（git 与 changelog 兜底记录），仅保留 4 条未实施需求（饼图移除 dialog、域名流量拆分列表、A/AAAA 编辑页说明异常、高级设置开关独立防抖）
+
 ## 历史版本记录（v1 ~ v1.5，迁移自 agent.md）
 
 - **v1**：基础框架（Onboarding 验证 + 域名列表 + DNS CRUD + 我的）→ 构建通过

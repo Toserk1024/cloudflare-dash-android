@@ -54,7 +54,6 @@ android {
         // versionName：日期_自增序号（如 2026.08.08_1，应用内展示时前缀 v）
         versionName = "${buildDate}_$buildSeq"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // 仅打包 armeabi-v7a + arm64-v8a（排除 x86/x86_64 等，减小 APK 体积）
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
@@ -130,11 +129,5 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.vico.compose)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
 }

@@ -32,8 +32,8 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         val devModeRemaining: Long = 0,
         val underAttack: Boolean? = null,
         val ipv6: Boolean? = null,
-        // 正在切换的 setting 名（防连点，非 null 时禁用全部开关）
-        val settingsBusy: String? = null,
+        // 正在切换的 setting 名集合（独立防抖：仅对应开关禁用/转圈，其余保持可用）
+        val settingsBusy: Set<String> = emptySet(),
         val settingsError: String? = null,
         // ===== 域名级统计 =====
         val statsData: StatsData = StatsData(),
@@ -193,18 +193,18 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
             _uiState.update { it.copy(ipv6 = s.value == "on") }
         }
 
-    /** 通用设置更新：切换中防连点，成功后回调更新状态，失败保留原值并提示 */
+    /** 通用设置更新：切换中防连点（仅防同一设置重复操作，不同设置可并行独立切换），成功后回调更新状态，失败保留原值并提示 */
     private fun updateSetting(setting: String, value: String, onSuccess: (ZoneSetting) -> Unit) {
-        if (_uiState.value.settingsBusy != null) return
+        if (setting in _uiState.value.settingsBusy) return
         viewModelScope.launch {
-            _uiState.update { it.copy(settingsBusy = setting, settingsError = null) }
+            _uiState.update { it.copy(settingsBusy = it.settingsBusy + setting, settingsError = null) }
             try {
                 val s = AppContainer.repository.updateZoneSetting(zoneId, setting, value)
                 onSuccess(s)
             } catch (e: Exception) {
                 _uiState.update { it.copy(settingsError = e.message) }
             } finally {
-                _uiState.update { it.copy(settingsBusy = null) }
+                _uiState.update { it.copy(settingsBusy = it.settingsBusy - setting) }
             }
         }
     }

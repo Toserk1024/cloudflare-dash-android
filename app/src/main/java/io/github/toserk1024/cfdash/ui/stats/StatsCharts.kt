@@ -1,7 +1,6 @@
 package io.github.toserk1024.cfdash.ui.stats
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,15 +11,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,9 +27,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
@@ -170,8 +163,6 @@ fun BreakdownPieChart(
         }
     }
     val total = chartItems.sumOf { it.value }
-    // 点击图例项 → 弹窗预览该项具体数量与占比（明确反馈）
-    var selectedDetail by remember { mutableStateOf<AnalyticsBreakdown?>(null) }
     Column(modifier = modifier) {
         PieChartHost(
             chart = rememberPieChart(
@@ -191,29 +182,9 @@ fun BreakdownPieChart(
                 color = pieColors[index % pieColors.size],
                 name = item.name,
                 value = item.value,
-                total = total,
-                selected = item == selectedDetail,
-                onClick = {
-                    selectedDetail = if (selectedDetail == item) null else item
-                }
+                total = total
             )
         }
-    }
-    selectedDetail?.let { item ->
-        AlertDialog(
-            onDismissRequest = { selectedDetail = null },
-            title = { Text(item.name) },
-            text = {
-                Text(
-                    "${item.name}：${formatCount(item.value)} · ${
-                        if (total > 0) "${(item.value * 100.0 / total).roundToInt()}%" else "0%"
-                    }"
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { selectedDetail = null }) { Text("确定") }
-            }
-        )
     }
 }
 
@@ -249,62 +220,70 @@ fun ZoneBarChart(
             extras { it[labelListKey] = chartItems.map { item -> item.zoneName } }
         }
     }
-    CartesianChartHost(
-        chart = rememberCartesianChart(
-            rememberColumnCartesianLayer(
-                ColumnCartesianLayer.ColumnProvider.series(
-                    rememberLineComponent(Fill(CloudflareOrange), 16.dp)
+    val total = chartItems.sumOf { it.sum.requests }
+    Column(modifier = modifier) {
+        CartesianChartHost(
+            chart = rememberCartesianChart(
+                rememberColumnCartesianLayer(
+                    ColumnCartesianLayer.ColumnProvider.series(
+                        rememberLineComponent(Fill(CloudflareOrange), 16.dp)
+                    )
+                ),
+                startAxis = VerticalAxis.rememberStart(
+                    valueFormatter = CartesianValueFormatter { _, y, _ -> formatCount(y.toLong()) }
+                ),
+                bottomAxis = HorizontalAxis.rememberBottom(
+                    valueFormatter = CartesianValueFormatter { context, x, _ ->
+                        context.model.extraStore[labelListKey].getOrNull(x.toInt()) ?: ""
+                    }
+                ),
+                // 点击柱子：显示该 host 与请求量
+                marker = rememberDefaultCartesianMarker(
+                    label = rememberTextComponent(
+                        style = TextStyle(color = Color.White, fontSize = 12.sp, background = Color(0xCC000000)),
+                        lineCount = 2,
+                        overflow = TextOverflow.Visible
+                    ),
+                    valueFormatter = remember {
+                        DefaultCartesianMarker.ValueFormatter { context, targets ->
+                            val target = targets.firstOrNull() ?: return@ValueFormatter ""
+                            val xLabel = context.model.extraStore[labelListKey].getOrNull(target.x.toInt()) ?: ""
+                            val yText = (target as? ColumnCartesianLayerMarkerTarget)
+                                ?.columns?.firstOrNull()?.entry?.y?.toLong()?.let { formatCount(it) } ?: ""
+                            if (xLabel.isNotBlank()) "$xLabel\n$yText" else yText
+                        }
+                    }
                 )
             ),
-            startAxis = VerticalAxis.rememberStart(
-                valueFormatter = CartesianValueFormatter { _, y, _ -> formatCount(y.toLong()) }
-            ),
-            bottomAxis = HorizontalAxis.rememberBottom(
-                valueFormatter = CartesianValueFormatter { context, x, _ ->
-                    context.model.extraStore[labelListKey].getOrNull(x.toInt()) ?: ""
-                }
-            ),
-            // 点击柱子：显示该 host 与请求量
-            marker = rememberDefaultCartesianMarker(
-                label = rememberTextComponent(
-                    style = TextStyle(color = Color.White, fontSize = 12.sp, background = Color(0xCC000000)),
-                    lineCount = 2,
-                    overflow = TextOverflow.Visible
-                ),
-                valueFormatter = remember {
-                    DefaultCartesianMarker.ValueFormatter { context, targets ->
-                        val target = targets.firstOrNull() ?: return@ValueFormatter ""
-                        val xLabel = context.model.extraStore[labelListKey].getOrNull(target.x.toInt()) ?: ""
-                        val yText = (target as? ColumnCartesianLayerMarkerTarget)
-                            ?.columns?.firstOrNull()?.entry?.y?.toLong()?.let { formatCount(it) } ?: ""
-                        if (xLabel.isNotBlank()) "$xLabel\n$yText" else yText
-                    }
-                }
+            modelProducer = modelProducer,
+            modifier = Modifier.fillMaxWidth().height(200.dp)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        // 下方图例列表：像饼图图例一样逐行列出每个 host 的名称/请求量/占比
+        chartItems.forEachIndexed { index, item ->
+            LegendRow(
+                color = pieColors[index % pieColors.size],
+                name = item.zoneName,
+                value = item.sum.requests,
+                total = total
             )
-        ),
-        modelProducer = modelProducer,
-        modifier = modifier.height(200.dp)
-    )
+        }
+    }
 }
 
-/** 图例行：色块 + 名称 + 数值 + 占比；可点击选中（高亮背景，配合详情行） */
+/** 图例行：色块 + 名称 + 数值 + 占比 */
 @Composable
 private fun LegendRow(
     color: Color,
     name: String,
     value: Long,
     total: Long,
-    modifier: Modifier = Modifier,
-    selected: Boolean = false,
-    onClick: () -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 3.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (selected) color.copy(alpha = 0.15f) else Color.Transparent)
-            .clickable(onClick = onClick)
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

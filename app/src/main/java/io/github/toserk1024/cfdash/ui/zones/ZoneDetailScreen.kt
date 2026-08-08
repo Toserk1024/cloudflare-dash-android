@@ -135,7 +135,7 @@ private fun ZoneDetailContent(
     devModeRemaining: Long,
     underAttack: Boolean?,
     ipv6: Boolean?,
-    settingsBusy: String?,
+    settingsBusy: Set<String>,
     settingsError: String?,
     statsData: StatsData,
     statsRange: AnalyticsRange,
@@ -233,9 +233,9 @@ private fun ZoneDetailContent(
                         else -> "开启后绕过CDN缓存"
                     },
                     checked = devMode == true,
-                    // 仅当前正在切换的开关禁用，其余保持可用
-                    enabled = (settingsBusy == null || settingsBusy == "development_mode") && devMode != null,
-                    busy = settingsBusy == "development_mode",
+                    // 独立防抖：仅当前正在切换的开关禁用/转圈，其余保持可用
+                    enabled = "development_mode" !in settingsBusy && devMode != null,
+                    busy = "development_mode" in settingsBusy,
                     onCheckedChange = onSetDevMode
                 )
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -245,8 +245,8 @@ private fun ZoneDetailContent(
                     title = "五秒盾模式",
                     subtitle = "开启后所有访客需通过 5 秒安全挑战",
                     checked = underAttack == true,
-                    enabled = (settingsBusy == null || settingsBusy == "security_level") && underAttack != null,
-                    busy = settingsBusy == "security_level",
+                    enabled = "security_level" !in settingsBusy && underAttack != null,
+                    busy = "security_level" in settingsBusy,
                     onCheckedChange = onSetUnderAttack
                 )
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -256,8 +256,8 @@ private fun ZoneDetailContent(
                     title = "IPv6 兼容性",
                     subtitle = "自动处理 IPv6 流量",
                     checked = ipv6 == true,
-                    enabled = (settingsBusy == null || settingsBusy == "ipv6") && ipv6 != null,
-                    busy = settingsBusy == "ipv6",
+                    enabled = "ipv6" !in settingsBusy && ipv6 != null,
+                    busy = "ipv6" in settingsBusy,
                     onCheckedChange = onSetIpv6
                 )
 

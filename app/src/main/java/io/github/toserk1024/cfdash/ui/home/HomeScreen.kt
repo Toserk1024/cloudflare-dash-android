@@ -262,6 +262,7 @@ fun HomeScreen(
                         }
                     }
                     HorizontalDivider()
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     NavigationDrawerItem(
                         icon = { Icon(Icons.Default.Home, contentDescription = null) },

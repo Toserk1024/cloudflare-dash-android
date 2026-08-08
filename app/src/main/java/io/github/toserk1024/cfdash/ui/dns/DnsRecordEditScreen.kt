@@ -117,13 +117,13 @@ fun DnsRecordEditScreen(
                 }
             }
 
-            // 顶部直观说明（如 "[名称] 是 [目标] 的别名"），占位符随实际值动态替换
+            // 顶部直观说明（如 "将 [名称] 指向 [IPv4 地址]"），占位符随实际值动态替换
             Spacer(modifier = Modifier.height(12.dp))
             val desc = DnsRecordFieldDefs.description(state.recordType)
                 .replace("[名称]", state.name.ifBlank { "记录名" })
                 .replace("[目标]", state.fields[DnsRecordFieldDefs.TARGET]?.takeIf { it.isNotBlank() } ?: "目标")
-                .replace("[IPv4地址]", state.fields[DnsRecordFieldDefs.TARGET]?.takeIf { it.isNotBlank() } ?: "IPv4 地址")
-                .replace("[IPv6地址]", state.fields[DnsRecordFieldDefs.TARGET]?.takeIf { it.isNotBlank() } ?: "IPv6 地址")
+                .replace("[IPv4 地址]", state.fields[DnsRecordFieldDefs.TARGET]?.takeIf { it.isNotBlank() } ?: "IPv4 地址")
+                .replace("[IPv6 地址]", state.fields[DnsRecordFieldDefs.TARGET]?.takeIf { it.isNotBlank() } ?: "IPv6 地址")
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
