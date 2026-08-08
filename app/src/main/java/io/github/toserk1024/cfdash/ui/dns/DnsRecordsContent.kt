@@ -297,7 +297,7 @@ private fun DnsRecordCard(
             Spacer(modifier = Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "TTL: ${if (record.ttl == 1L) "自动" else "${record.ttl}s"}",
+                    text = "TTL: ${if (record.ttl == 1L) "自动" else formatTtl(record.ttl)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -369,5 +369,21 @@ private fun TypeBadge(type: String) {
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
         )
+    }
+}
+
+/** TTL（秒）格式化为可读时分秒（如 300→5分钟、3600→1小时、86400→1天）；调用处负责 TTL=1（自动）特判 */
+fun formatTtl(seconds: Long): String = when {
+    seconds < 60L -> "${seconds}秒"
+    seconds < 3600L -> "${seconds / 60}分钟"
+    seconds < 86400L -> {
+        val h = seconds / 3600
+        val m = (seconds % 3600) / 60
+        if (m > 0) "${h}小时${m}分钟" else "${h}小时"
+    }
+    else -> {
+        val d = seconds / 86400
+        val h = (seconds % 86400) / 3600
+        if (h > 0) "${d}天${h}小时" else "${d}天"
     }
 }

@@ -1,6 +1,7 @@
 package io.github.toserk1024.cfdash.ui.stats
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,15 +12,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -38,8 +43,13 @@ import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.compose.cartesian.marker.ColumnCartesianLayerMarkerTarget
+import com.patrykandpatrick.vico.compose.cartesian.marker.DefaultCartesianMarker
+import com.patrykandpatrick.vico.compose.cartesian.marker.LineCartesianLayerMarkerTarget
+import com.patrykandpatrick.vico.compose.cartesian.marker.rememberDefaultCartesianMarker
 import com.patrykandpatrick.vico.compose.common.Fill
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
+import com.patrykandpatrick.vico.compose.common.component.rememberTextComponent
 import com.patrykandpatrick.vico.compose.common.data.ExtraStore
 import com.patrykandpatrick.vico.compose.pie.PieChart
 import com.patrykandpatrick.vico.compose.pie.PieChartHost
@@ -111,6 +121,21 @@ fun TrendLineChart(
                 valueFormatter = CartesianValueFormatter { context, x, _ ->
                     context.model.extraStore[labelListKey].getOrNull(x.toInt()) ?: ""
                 }
+            ),
+            // 点击拐点：显示该点时间与对应数据量
+            marker = rememberDefaultCartesianMarker(
+                label = rememberTextComponent(
+                    style = TextStyle(color = Color.White, fontSize = 12.sp, background = Color(0xCC000000))
+                ),
+                valueFormatter = remember {
+                    DefaultCartesianMarker.ValueFormatter { context, targets ->
+                        val target = targets.firstOrNull() ?: return@ValueFormatter ""
+                        val xLabel = context.model.extraStore[labelListKey].getOrNull(target.x.toInt()) ?: ""
+                        val yText = (target as? LineCartesianLayerMarkerTarget)
+                            ?.points.firstOrNull()?.entry?.y?.toLong()?.let { currentFormatter(it) } ?: ""
+                        if (xLabel.isNotBlank()) "$xLabel\n$yText" else yText
+                    }
+                }
             )
         ),
         modelProducer = modelProducer,
@@ -139,6 +164,7 @@ fun BreakdownPieChart(
         }
     }
     val total = chartItems.sumOf { it.value }
+    var selectedIndex by remember { mutableIntStateOf(-1) }
     Column(modifier = modifier) {
         PieChartHost(
             chart = rememberPieChart(
@@ -152,13 +178,30 @@ fun BreakdownPieChart(
             modelProducer = modelProducer,
             modifier = Modifier.fillMaxWidth().height(200.dp)
         )
+        // 选中项详情：点击图例查看该标签对应的具体数量与占比
+        selectedIndex.takeIf { it in chartItems.indices }?.let { i ->
+            val item = chartItems[i]
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "${item.name}：${formatCount(item.value)} · ${
+                    if (total > 0) "${(item.value * 100.0 / total).roundToInt()}%" else "0%"
+                }",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = pieColors[i % pieColors.size]
+            )
+        }
         Spacer(modifier = Modifier.height(8.dp))
         chartItems.forEachIndexed { index, item ->
             LegendRow(
                 color = pieColors[index % pieColors.size],
                 name = item.name,
                 value = item.value,
-                total = total
+                total = total,
+                selected = index == selectedIndex,
+                onClick = {
+                    selectedIndex = if (selectedIndex == index) -1 else index
+                }
             )
         }
     }
@@ -210,6 +253,21 @@ fun ZoneBarChart(
                 valueFormatter = CartesianValueFormatter { context, x, _ ->
                     context.model.extraStore[labelListKey].getOrNull(x.toInt()) ?: ""
                 }
+            ),
+            // 点击柱子：显示该 host 与请求量
+            marker = rememberDefaultCartesianMarker(
+                label = rememberTextComponent(
+                    style = TextStyle(color = Color.White, fontSize = 12.sp, background = Color(0xCC000000))
+                ),
+                valueFormatter = remember {
+                    DefaultCartesianMarker.ValueFormatter { context, targets ->
+                        val target = targets.firstOrNull() ?: return@ValueFormatter ""
+                        val xLabel = context.model.extraStore[labelListKey].getOrNull(target.x.toInt()) ?: ""
+                        val yText = (target as? ColumnCartesianLayerMarkerTarget)
+                            ?.columns.firstOrNull()?.entry?.y?.toLong()?.let { formatCount(it) } ?: ""
+                        if (xLabel.isNotBlank()) "$xLabel\n$yText" else yText
+                    }
+                }
             )
         ),
         modelProducer = modelProducer,
@@ -217,11 +275,25 @@ fun ZoneBarChart(
     )
 }
 
-/** 图例行：色块 + 名称 + 数值 + 占比 */
+/** 图例行：色块 + 名称 + 数值 + 占比；可点击选中（高亮背景，配合详情行） */
 @Composable
-private fun LegendRow(color: Color, name: String, value: Long, total: Long, modifier: Modifier = Modifier) {
+private fun LegendRow(
+    color: Color,
+    name: String,
+    value: Long,
+    total: Long,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    onClick: () -> Unit = {}
+) {
     Row(
-        modifier = modifier.fillMaxWidth().padding(vertical = 3.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (selected) color.copy(alpha = 0.15f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(

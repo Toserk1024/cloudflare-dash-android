@@ -162,7 +162,7 @@ fun DnsRecordEditScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = if (state.ttl == 1L) "自动" else "${state.ttl} 秒",
+                    text = if (state.ttl == 1L) "自动" else formatTtl(state.ttl),
                     modifier = Modifier.weight(1f)
                 )
                 Icon(Icons.Default.ArrowDropDown, contentDescription = null)
@@ -170,7 +170,7 @@ fun DnsRecordEditScreen(
             DropdownMenu(expanded = ttlMenu, onDismissRequest = { ttlMenu = false }) {
                 TTL_OPTIONS.forEach { ttl ->
                     DropdownMenuItem(
-                        text = { Text(if (ttl == 1L) "自动" else "$ttl 秒") },
+                        text = { Text(if (ttl == 1L) "自动" else formatTtl(ttl)) },
                         onClick = {
                             viewModel.setTtl(ttl)
                             ttlMenu = false

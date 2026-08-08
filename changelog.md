@@ -26,6 +26,12 @@
 - **GraphQL 字段修正（运行时验证，schema 反查）**：① **1hGroups 时间维度为 `datetime`**（"truncated to the hour"），非 `datetimeHour`——趋势 H24 查询与解析同步修正；② **1d/1h Groups 的 orderBy 枚举无 `count_DESC`**（仅 sum_*/uniq_*/date 等），且其 dimensions **仅有 date/datetime**（无国家/状态码/缓存维度）——**维度分布与域名拆分改用 `httpRequestsAdaptiveGroups`**（自适应采样：支持 `clientCountryName`/`edgeResponseStatus`/`cacheStatus`/`clientRequestHTTPHost`，orderBy 支持 `count_DESC`，时间过滤统一 `datetime_geq/leq`）；③ **`zones` 节点无 `name` 字段**——域名拆分改为 AdaptiveGroups 按 `clientRequestHTTPHost` 分组（zoneName=host）；④ 修复 `StatsContent` 多余 `!!` 编译警告（smart cast）
 - **运行时修复（第三次迭代）**：① **独立访客始终为 0** → 汇总查询补查 `uniq { uniques }`，`accumulate` 解析 uniques；② **7d/30d 维度分布/域名拆分报错**（`httpRequestsAdaptiveGroups` 查询范围**限 1 天**，"cannot request a time range wider than 1d"）→ 维度分布改用 **Groups sum 的 `countryMap`/`responseStatusMap`**（支持 7d/30d，一次查询同时返回国家+状态码），**缓存分布**由 `cachedRequests/requests` 计算"命中/未命中"两切片（Groups 无 cacheStatus 维度），**域名拆分仅 24h**（AdaptiveGroups 限 1d，7d/30d 自动隐藏）；③ **带宽趋势 Y 轴**改用 `formatBytes`（KB/MB/GB），`TrendLineChart` 新增 `valueFormatter` 参数并用 `rememberUpdatedState` 稳定 LaunchedEffect（避免 lambda 每次重组触发重复 runTransaction 导致图表异常）
 - **体验与版本修复（第四次迭代）**：① **移除右滑调出侧边栏手势**（`ModalNavigationDrawer(gesturesEnabled = false)`，仅顶部菜单按钮打开）；② **带宽趋势**调用改为与请求数趋势完全一致（高度/逻辑统一）；③ **统计全量缓存**：账号级 `StatsViewModel` 与域名级 `ZoneDetailViewModel` 均按时间范围缓存 StatsData，首次/切换加载后走缓存，**下拉刷新**（账号级 `PullToRefreshBox` + `verticalScroll`，域名级因内嵌页面 scroll 不启用下拉避免嵌套冲突）；④ **版本号自增修复**：CI `actions/cache` 的 key 由 `hashFiles('version.properties')` 改为 **`github.run_id`**（每次构建唯一，restore-keys 前缀匹配最近一次保存的 buildSeq）——原 hash 方案因 version.properties 每次 checkout 重置为仓库值、hash 恒等导致缓存永不精确命中、buildSeq 无法持久化，版本号停在第 1 个
+- **体验优化与图表交互（todo.md 批次1）**：
+  - **侧边栏宽度收窄**：`ModalDrawerSheet` 宽度 300dp；**点击空白处关闭**侧边栏（ModalNavigationDrawer 内置 scrim tap-to-close，与 gesturesEnabled 无关，确认已支持）
+  - **域名详情页三个高级设置开关单独禁用**：仅正在切换的那个禁用/转圈，其余保持可用
+  - **TTL 可读化**：新增 `formatTtl`（秒→X分钟/X小时/X天），DNS 记录列表与编辑页 TTL 展示、TTL 下拉选项均应用
+  - **图表点击显示详情（Vico CartesianMarker）**：请求数/带宽趋势折线图**点击拐点**显示"时间 + 数值"；域名柱状图**点击柱子**显示"host + 请求量"（`rememberDefaultCartesianMarker` + 自定义 ValueFormatter，经 extras 读时间标签）
+  - **饼图图例点击**：点击图例项高亮并显示"名称：数量 · 占比"详情行（BreakdownPieChart 图例可交互）
 - **打包清理**：`packaging.resources.excludes` 追加 `**/DebugProbesKt.bin`（kotlinx-coroutines 协程调试探针，仅 IDE 调试用，release 不激活，避免 APK 内出现无用 .bin 文件）
 - **文档**：agent.md（统计模块/依赖/注意点/速查表）、readme.md（功能/技术栈）同步更新
 

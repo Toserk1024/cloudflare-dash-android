@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -102,7 +103,10 @@ fun HomeScreen(
         // 移除右滑调出侧边栏的手势（仅通过顶部菜单按钮打开）
         gesturesEnabled = false,
         drawerContent = {
-            ModalDrawerSheet {
+            ModalDrawerSheet(
+                // 侧边栏宽度收窄（默认偏大，改 300dp）
+                modifier = Modifier.width(300.dp)
+            ) {
                 // 用户信息
                 val user = homeState.user
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {

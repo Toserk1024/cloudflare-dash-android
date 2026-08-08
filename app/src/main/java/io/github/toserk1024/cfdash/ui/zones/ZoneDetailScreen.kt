@@ -233,7 +233,8 @@ private fun ZoneDetailContent(
                         else -> "开启后绕过CDN缓存"
                     },
                     checked = devMode == true,
-                    enabled = settingsBusy == null && devMode != null,
+                    // 仅当前正在切换的开关禁用，其余保持可用
+                    enabled = (settingsBusy == null || settingsBusy == "development_mode") && devMode != null,
                     busy = settingsBusy == "development_mode",
                     onCheckedChange = onSetDevMode
                 )
@@ -244,7 +245,7 @@ private fun ZoneDetailContent(
                     title = "五秒盾模式",
                     subtitle = "开启后所有访客需通过 5 秒安全挑战",
                     checked = underAttack == true,
-                    enabled = settingsBusy == null && underAttack != null,
+                    enabled = (settingsBusy == null || settingsBusy == "security_level") && underAttack != null,
                     busy = settingsBusy == "security_level",
                     onCheckedChange = onSetUnderAttack
                 )
@@ -255,7 +256,7 @@ private fun ZoneDetailContent(
                     title = "IPv6 兼容性",
                     subtitle = "自动处理 IPv6 流量",
                     checked = ipv6 == true,
-                    enabled = settingsBusy == null && ipv6 != null,
+                    enabled = (settingsBusy == null || settingsBusy == "ipv6") && ipv6 != null,
                     busy = settingsBusy == "ipv6",
                     onCheckedChange = onSetIpv6
                 )
