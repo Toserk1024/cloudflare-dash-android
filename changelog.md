@@ -24,6 +24,7 @@
 - **文档**：agent.md（34 文件结构/GraphQL 端点/权限/注意点/速查表）、readme.md（功能/权限表）同步
 - **构建修复**：移除 `CloudflareClient.kt` 两个不存在的顶层 import（`json.content` 为成员属性、`parseToJsonElement` 为 Json 成员函数，均无需 import），修复 CI release 编译失败
 - **统计修复**：账号级统计取账号改用 `GET /accounts`（`Repository.getAccounts()`），替代 `GET /user` 的 `accounts` 字段（Global Key 下该字段可能为空导致「账号信息缺失」）
+- **构建修复**：`getAccounts()` 泛型参数修正为 `client.get<List<AccountRef>>`（`get<T>` 的 T 即 result 类型，勿再嵌套 ApiResponse），修复 CI 编译失败
 
 ## 2026-08-08 · 高级设置修复 + Global API Key 登录 + Token 权限提示
 

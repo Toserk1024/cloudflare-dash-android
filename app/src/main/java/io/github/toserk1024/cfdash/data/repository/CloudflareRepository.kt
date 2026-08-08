@@ -47,7 +47,7 @@ class CloudflareRepository(private val client: CloudflareClient) {
 
     /** 获取账号列表（GET /accounts，统计账号级数据需要 accountTag） */
     suspend fun getAccounts(): List<AccountRef> =
-        client.get<ApiResponse<List<AccountRef>>>(CloudflareApi.ACCOUNTS).result ?: emptyList()
+        client.get<List<AccountRef>>(CloudflareApi.ACCOUNTS).result ?: emptyList()
 
     /** 分页获取域名列表（name 支持模糊匹配，status 支持 active/pending 等） */
     suspend fun getZones(
