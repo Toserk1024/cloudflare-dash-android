@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.data.model.DnsRecord
+import io.github.toserk1024.cfdash.data.model.DnsRecordRequest
+import io.github.toserk1024.cfdash.data.model.DnsRecordTypes
 import io.github.toserk1024.cfdash.data.model.Zone
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,7 +38,13 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         val error: String? = null,
         val deletingId: String? = null,
         val showDeleteDialog: DnsRecord? = null,
-        val showZonePicker: Boolean = false
+        val showZonePicker: Boolean = false,
+        // ===== 批量操作（候选框）=====
+        val selectedIds: Set<String> = emptySet(),
+        val showBulkDeleteDialog: Boolean = false,
+        /** 批量代理确认目标：null=不显示；true=开启代理；false=关闭代理 */
+        val bulkProxyTarget: Boolean? = null,
+        val bulkBusy: Boolean = false
     )
 
     private val _uiState = MutableStateFlow(DnsUiState())
@@ -206,6 +214,105 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
             changes.firstOrNull { it.id == old.id } ?: old
         } + changes.filter { it.id !in existingIds }
         applyFilter()
+    }
+
+    // ===== 批量操作（候选框）=====
+
+    fun toggleSelect(id: String) {
+        _uiState.update { s ->
+            s.copy(selectedIds = if (id in s.selectedIds) s.selectedIds - id else s.selectedIds + id)
+        }
+    }
+
+    /** 全选/取消全选（作用于当前过滤后的显示列表） */
+    fun setSelectAll(selected: Boolean) {
+        _uiState.update {
+            it.copy(selectedIds = if (selected) it.records.map { r -> r.id }.toSet() else emptySet())
+        }
+    }
+
+    fun clearSelection() {
+        _uiState.update { it.copy(selectedIds = emptySet()) }
+    }
+
+    fun requestBulkDelete() {
+        _uiState.update { it.copy(showBulkDeleteDialog = true) }
+    }
+
+    fun dismissBulkDelete() {
+        _uiState.update { it.copy(showBulkDeleteDialog = false) }
+    }
+
+    fun requestBulkProxy(proxied: Boolean) {
+        _uiState.update { it.copy(bulkProxyTarget = proxied) }
+    }
+
+    fun dismissBulkProxy() {
+        _uiState.update { it.copy(bulkProxyTarget = null) }
+    }
+
+    /** 批量删除（逐条 DELETE，本地同步移除；部分失败汇总到 error 提示） */
+    fun bulkDelete() {
+        val zone = _uiState.value.selectedZone ?: return
+        val ids = _uiState.value.selectedIds
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(bulkBusy = true, showBulkDeleteDialog = false) }
+            val remaining = allRecords.toMutableList()
+            var firstError: String? = null
+            ids.forEach { id ->
+                try {
+                    AppContainer.repository.deleteDnsRecord(zone.id, id)
+                    remaining.removeAll { it.id == id }
+                } catch (e: Exception) {
+                    if (firstError == null) firstError = e.message
+                }
+            }
+            allRecords = remaining
+            _uiState.update { it.copy(bulkBusy = false, selectedIds = emptySet(), error = firstError) }
+            applyFilter()
+        }
+    }
+
+    /** 批量开关代理（仅 A/AAAA/CNAME 生效，逐条 PATCH proxied，本地同步） */
+    fun bulkSetProxy(proxied: Boolean) {
+        val zone = _uiState.value.selectedZone ?: return
+        val ids = _uiState.value.selectedIds
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(bulkBusy = true, bulkProxyTarget = null) }
+            val remaining = allRecords.toMutableList()
+            var firstError: String? = null
+            ids.forEach { id ->
+                val record = remaining.find { it.id == id } ?: return@forEach
+                // 仅对可代理类型（A/AAAA/CNAME）生效，其余忽略
+                if (record.type !in DnsRecordTypes.PROXIABLE) return@forEach
+                try {
+                    AppContainer.repository.updateDnsRecord(
+                        zone.id,
+                        id,
+                        DnsRecordRequest(
+                            type = record.type,
+                            name = record.name,
+                            content = record.content,
+                            ttl = record.ttl,
+                            proxied = proxied,
+                            priority = record.priority,
+                            comment = record.comment,
+                            tags = record.tags,
+                            data = record.data
+                        )
+                    )
+                    val idx = remaining.indexOf(record)
+                    if (idx >= 0) remaining[idx] = record.copy(proxied = proxied)
+                } catch (e: Exception) {
+                    if (firstError == null) firstError = e.message
+                }
+            }
+            allRecords = remaining
+            _uiState.update { it.copy(bulkBusy = false, selectedIds = emptySet(), error = firstError) }
+            applyFilter()
+        }
     }
 
     companion object {

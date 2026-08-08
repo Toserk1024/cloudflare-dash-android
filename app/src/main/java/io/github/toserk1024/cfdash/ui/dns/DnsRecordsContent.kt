@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -128,6 +129,28 @@ fun DnsRecordsContent(
 
             Spacer(modifier = Modifier.height(4.dp))
 
+            // 批量操作栏（候选框选中时显示）
+            if (state.selectedIds.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "已选 ${state.selectedIds.size} 条",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { viewModel.setSelectAll(false) }, enabled = !state.bulkBusy) { Text("取消") }
+                    TextButton(onClick = viewModel::requestBulkDelete, enabled = !state.bulkBusy) { Text("删除") }
+                    // 批量代理仅对 A/AAAA/CNAME 生效（其余类型选中会被忽略）
+                    TextButton(onClick = { viewModel.requestBulkProxy(true) }, enabled = !state.bulkBusy) { Text("开代理") }
+                    TextButton(onClick = { viewModel.requestBulkProxy(false) }, enabled = !state.bulkBusy) { Text("关代理") }
+                }
+            }
+
             // 记录列表（下拉刷新）
             PullToRefreshBox(
                 isRefreshing = state.refreshing,
@@ -176,6 +199,8 @@ fun DnsRecordsContent(
                             DnsRecordCard(
                                 record = record,
                                 deleting = state.deletingId == record.id,
+                                selected = record.id in state.selectedIds,
+                                onSelectChange = { viewModel.toggleSelect(record.id) },
                                 onEdit = { onEditRecord(record) },
                                 onDelete = { viewModel.requestDelete(record) }
                             )
@@ -250,13 +275,49 @@ fun DnsRecordsContent(
             }
         )
     }
+
+    // 批量删除确认
+    if (state.showBulkDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissBulkDelete,
+            title = { Text("批量删除记录") },
+            text = { Text("确定要删除选中的 ${state.selectedIds.size} 条 DNS 记录吗？\n\n此操作不可恢复！") },
+            confirmButton = {
+                TextButton(onClick = viewModel::bulkDelete) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissBulkDelete) { Text("取消") }
+            }
+        )
+    }
+
+    // 批量代理确认（仅 A/AAAA/CNAME 生效）
+    state.bulkProxyTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissBulkProxy,
+            title = { Text(if (target) "开启代理" else "关闭代理") },
+            text = { Text("确定要${if (target) "开启" else "关闭"}选中记录（仅 A/AAAA/CNAME 类型生效）的 Cloudflare 代理吗？") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.bulkSetProxy(target) }) {
+                    Text(if (target) "开启" else "关闭")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissBulkProxy) { Text("取消") }
+            }
+        )
+    }
 }
 
-/** DNS 记录卡片 */
+/** DNS 记录卡片（含候选框，可勾选参与批量操作） */
 @Composable
 private fun DnsRecordCard(
     record: DnsRecord,
     deleting: Boolean,
+    selected: Boolean = false,
+    onSelectChange: (Boolean) -> Unit = {},
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -268,6 +329,7 @@ private fun DnsRecordCard(
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = selected, onCheckedChange = onSelectChange)
                 TypeBadge(record.type)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(

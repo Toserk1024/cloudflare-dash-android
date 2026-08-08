@@ -12,11 +12,11 @@
 - [x] **域名详情页三个高级设置开关单独禁用**：当前 `settingsBusy` 非 null 时三个开关（开发模式/五秒盾/IPv6）一起禁用；改为仅正在切换的那个开关禁用/转圈，其余保持可用（ZoneDetailScreen `AdvancedSwitchRow` 的 enabled/busy 逻辑调整）— 2026-08-08（批次1已完成）
 - [ ] **多用户功能**：支持多个 Cloudflare 账号并存；新建用户与切换用户入口均在**侧边栏上部**（用户信息卡区域）——涉及 TokenStore 多凭据存储（按用户隔离）、Onboarding 新建流程、侧边栏用户卡 + 新建/切换入口，实施时需详细设计— 2026-08-08
 - [x] **TTL 显示可读化（时分秒）**：DNS 记录 TTL（秒）展示为友好格式（如 300→5分钟、3600→1小时、86400→1天；复用现有 formatRemaining 类逻辑，实施时定位 DnsRecord 相关展示处统一格式化）— 2026-08-08（批次1已完成：新增 formatTtl，列表/编辑页/TTL 下拉均应用）
-- [ ] **DNS 记录列表批量操作（候选框）**：每条记录前加**复选框**，支持批量：
+- [x] **DNS 记录列表批量操作（候选框）**：每条记录前加**复选框**，支持批量：
   - **批量删除**（二次确认，逐条 DELETE 并本地同步移除）
   - **批量开关代理**：**仅对 A/AAAA/CNAME（PROXIABLE）类型生效**（其余类型复选框禁用或忽略），逐条 PATCH proxied 并本地同步
   - 全选/取消全选；批量操作栏（选中数 + 删除/代理开关按钮）；操作中防抖与失败提示
-  - 涉及：DnsRecordsContent（行复选框 + 批量操作栏）、DnsViewModel（selected 集合/全选/批量删除/批量代理）、DnsRecord（proxied 更新）— 2026-08-08
+  - 涉及：DnsRecordsContent（行复选框 + 批量操作栏）、DnsViewModel（selected 集合/全选/批量删除/批量代理）、DnsRecord（proxied 更新）— 2026-08-08（批次2已完成：复选框+批量栏+二次确认+仅可代理类型生效）
 - [ ] **DNS 记录完整表单（全部类型按字段拆分重写，仿 Cloudflare 控制台）**：当前所有类型基本只让用户填 name/content 自由文本（SRV/DNSKEY 等的 data 字段未用），填写全靠猜；**重写 DNS 记录编辑页**，每种记录类型渲染**完整字段表单**并序列化为 `DnsRecordRequest.data`/content：
   - **A/AAAA**：名称 + IPv4/IPv6 地址（目标）+ TTL + 代理开关 + 说明"[名称] 是 [IPv4 地址] 的别名"
   - **CNAME**：名称 + 目标（别名指向）+ 说明"[名称] 是 [目标] 的别名"
