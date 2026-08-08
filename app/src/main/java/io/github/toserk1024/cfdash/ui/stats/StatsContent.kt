@@ -33,6 +33,7 @@ import io.github.toserk1024.cfdash.data.model.AnalyticsRange
  * 展示：汇总指标卡（请求/威胁/带宽/缓存命中率/独立访客）+ 时间趋势折线图（请求数、带宽）
  * + 维度分布饼图（国家/地区、状态码、缓存）+ 域名拆分柱状图（仅账号级，showZoneBreakdown=true）。
  * 单项图表加载失败不阻塞其他（data 内对应字段为 null，顶部展示 partError 提示）。
+ * 账号级（enablePullRefresh=true）独立可滚动 + 下拉刷新；域名级内嵌页面 scroll 不启用下拉。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,15 +52,33 @@ fun StatsContent(
     onRetry: () -> Unit
 ) {
     if (enablePullRefresh) {
-        // 账号级统计 Tab：独立可滚动 + 下拉刷新
         PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                StatsContentBody(data, loading, error, partError, range, showZoneBreakdown, enabled, onRangeChange, onRetry)
+                StatsContentBody(
+                    data = data,
+                    loading = loading,
+                    error = error,
+                    partError = partError,
+                    range = range,
+                    showZoneBreakdown = showZoneBreakdown,
+                    enabled = enabled,
+                    onRangeChange = onRangeChange,
+                    onRetry = onRetry
+                )
             }
         }
     } else {
-        // 域名级：内嵌于页面 scroll，不启用下拉刷新（避免嵌套滚动冲突）
-        StatsContentBody(data, loading, error, partError, range, showZoneBreakdown, enabled, onRangeChange, onRetry)
+        StatsContentBody(
+            data = data,
+            loading = loading,
+            error = error,
+            partError = partError,
+            range = range,
+            showZoneBreakdown = showZoneBreakdown,
+            enabled = enabled,
+            onRangeChange = onRangeChange,
+            onRetry = onRetry
+        )
     }
 }
 
@@ -193,7 +212,6 @@ private fun StatsContentBody(
             }
         }
     }
-}
 }
 
 /** 图表卡片容器（标题 + 内容） */
