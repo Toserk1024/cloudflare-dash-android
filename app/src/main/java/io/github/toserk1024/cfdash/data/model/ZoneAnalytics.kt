@@ -84,6 +84,9 @@ enum class BreakdownDimension(val field: String) {
 /** GraphQL Analytics 查询构建与响应解析（GraphQL 响应为 data/errors 结构，非 ApiResponse 包装） */
 object AnalyticsParser {
 
+    /** 自适应采样 HTTP 数据集（维度分布/域名拆分用：支持 clientCountryName/edgeResponseStatus/cacheStatus/clientRequestHTTPHost，orderBy 支持 count_DESC） */
+    private const val ADAPTIVE_DATASET = "httpRequestsAdaptiveGroups"
+
     // ===== 汇总查询（原有，仅做总量累加）=====
 
     /** 构建域名级统计查询（不排序：只做总量累加，orderBy 对 Groups 数据集仅支持聚合字段，规避排序错误） */
@@ -126,13 +129,15 @@ object AnalyticsParser {
         append(" }\n sum { requests threats bytes cachedRequests cachedBytes }\n uniq { uniques }\n }\n }\n }\n }\n }")
     }
 
-    // ===== 维度分布查询（count + dimensions，orderBy 聚合字段取 Top N）=====
+    // ===== 维度分布查询（AdaptiveGroups：count + dimensions，orderBy 聚合字段取 Top N）=====
+    // 说明：1d/1h Groups 的 dimensions 仅有 date/datetime，国家/状态码/缓存维度需用 httpRequestsAdaptiveGroups
+    // （自适应采样，支持 clientCountryName/edgeResponseStatus/cacheStatus，orderBy 支持 count_DESC）
 
     /** 构建域名级维度分布查询 */
     fun zoneBreakdownQuery(zoneId: String, range: AnalyticsRange, dimension: BreakdownDimension): String = buildString {
         append("query {\n viewer {\n zones(filter: {zoneTag: \"$zoneId\"}) {\n ")
-        append(range.dataset)
-        append("(limit: 15, filter: {").append(filterField(range))
+        append(ADAPTIVE_DATASET)
+        append("(limit: 15, filter: {").append(adaptiveFilterField(range))
         append("}, orderBy: [count_DESC]) {\n count\n dimensions { ").append(dimension.field)
         append(" }\n }\n }\n }\n }")
     }
@@ -140,21 +145,20 @@ object AnalyticsParser {
     /** 构建账号级维度分布查询（各域名的分布合并累加） */
     fun accountBreakdownQuery(accountId: String, range: AnalyticsRange, dimension: BreakdownDimension): String = buildString {
         append("query {\n viewer {\n accounts(filter: {accountTag: \"$accountId\"}) {\n zones {\n ")
-        append(range.dataset)
-        append("(limit: 15, filter: {").append(filterField(range))
+        append(ADAPTIVE_DATASET)
+        append("(limit: 15, filter: {").append(adaptiveFilterField(range))
         append("}, orderBy: [count_DESC]) {\n count\n dimensions { ").append(dimension.field)
         append(" }\n }\n }\n }\n }\n }")
     }
 
-    // ===== 账号级域名拆分查询（zones 节点带 zoneTag/name + 各自 sum）=====
+    // ===== 账号级域名拆分查询（AdaptiveGroups 按 clientRequestHTTPHost 分组，规避 zones 节点无 name 字段）=====
 
-    /** 构建账号级域名拆分查询（各域名汇总数据） */
+    /** 构建账号级域名拆分查询（各域名的 host 请求量，客户端按 host 合并累加） */
     fun accountZoneBreakdownQuery(accountId: String, range: AnalyticsRange): String = buildString {
-        append("query {\n viewer {\n accounts(filter: {accountTag: \"$accountId\"}) {\n zones {\n zoneTag\n name\n ")
-        append(range.dataset)
-        append("(limit: ").append(range.limit)
-        append(", filter: {").append(filterField(range))
-        append("}) {\n sum { requests threats bytes cachedRequests cachedBytes }\n }\n }\n }\n }\n }")
+        append("query {\n viewer {\n accounts(filter: {accountTag: \"$accountId\"}) {\n zones {\n ")
+        append(ADAPTIVE_DATASET)
+        append("(limit: 15, filter: {").append(adaptiveFilterField(range))
+        append("}, orderBy: [count_DESC]) {\n count\n dimensions { clientRequestHTTPHost }\n }\n }\n }\n }\n }")
     }
 
     // ===== 汇总解析（原有）=====
@@ -209,11 +213,11 @@ object AnalyticsParser {
 
     // ===== 维度分布解析 =====
 
-    /** 解析域名级维度分布 */
+    /** 解析域名级维度分布（AdaptiveGroups） */
     fun parseZoneBreakdown(root: JsonElement, range: AnalyticsRange, dimension: BreakdownDimension): List<AnalyticsBreakdown> {
         val zones = root.jsonObject["data"]?.jsonObject?.get("viewer")?.jsonObject?.get("zones") as? JsonArray
             ?: return emptyList()
-        return parseGroups(zones.firstOrNull()?.jsonObject?.get(range.dataset) as? JsonArray, dimension)
+        return parseGroups(zones.firstOrNull()?.jsonObject?.get(ADAPTIVE_DATASET) as? JsonArray, dimension)
     }
 
     /** 解析账号级维度分布（各域名同名维度合并累加） */
@@ -221,7 +225,7 @@ object AnalyticsParser {
         val zones = accountZones(root) ?: return emptyList()
         val map = LinkedHashMap<String, Long>()
         zones.forEach { zone ->
-            (zone.jsonObject[range.dataset] as? JsonArray)?.forEach { g ->
+            (zone.jsonObject[ADAPTIVE_DATASET] as? JsonArray)?.forEach { g ->
                 val name = dimensionName(g.jsonObject, dimension) ?: return@forEach
                 map[name] = (map[name] ?: 0L) + (g.jsonObject["count"]?.jsonPrimitive?.longOrNull ?: 0L)
             }
@@ -231,15 +235,22 @@ object AnalyticsParser {
 
     // ===== 账号级域名拆分解析 =====
 
-    /** 解析账号级域名拆分（按请求量降序，过滤零流量域名） */
+    /** 解析账号级域名拆分（各域名 host 的请求量合并，按请求量降序，过滤零流量） */
     fun parseZoneItems(root: JsonElement, range: AnalyticsRange): List<ZoneAnalyticsItem> {
         val zones = accountZones(root) ?: return emptyList()
-        return zones.mapNotNull { zone ->
-            val zoneObj = zone.jsonObject
-            val zoneId = zoneObj["zoneTag"]?.jsonPrimitive?.content ?: return@mapNotNull null
-            val zoneName = zoneObj["name"]?.jsonPrimitive?.content ?: zoneId
-            ZoneAnalyticsItem(zoneId, zoneName, accumulate(zoneObj, range.dataset))
-        }.filter { it.sum.requests > 0 }.sortedByDescending { it.sum.requests }
+        val byHost = LinkedHashMap<String, Long>()
+        zones.forEach { zone ->
+            (zone.jsonObject[ADAPTIVE_DATASET] as? JsonArray)?.forEach { g ->
+                val host = g.jsonObject["dimensions"]?.jsonObject
+                    ?.get("clientRequestHTTPHost")?.jsonPrimitive?.content ?: return@forEach
+                if (host.isNotBlank()) {
+                    byHost[host] = (byHost[host] ?: 0L) + (g.jsonObject["count"]?.jsonPrimitive?.longOrNull ?: 0L)
+                }
+            }
+        }
+        return byHost.entries.sortedByDescending { it.value }.map { (host, count) ->
+            ZoneAnalyticsItem(zoneId = host, zoneName = host, sum = AnalyticsSum(requests = count))
+        }.filter { it.sum.requests > 0 }
     }
 
     // ===== 内部工具 =====
@@ -268,7 +279,8 @@ object AnalyticsParser {
     /** 提取单个序列点（dimensions 时间字段 + sum + uniq） */
     private fun seriesPoint(g: JsonObject, range: AnalyticsRange): AnalyticsSeriesPoint? {
         val dims = g["dimensions"] as? JsonObject ?: return null
-        val time = dims[if (range == AnalyticsRange.H24) "datetimeHour" else "date"]?.jsonPrimitive?.content ?: return null
+        // 1hGroups 时间维度为 datetime（截断到小时），1dGroups 为 date
+        val time = dims[if (range == AnalyticsRange.H24) "datetime" else "date"]?.jsonPrimitive?.content ?: return null
         val s = g["sum"] as? JsonObject
         val u = g["uniq"] as? JsonObject
         return AnalyticsSeriesPoint(
@@ -316,9 +328,20 @@ object AnalyticsParser {
         "unknown" to "未知"
     )
 
-    /** 趋势时间字段：24h 用 datetimeHour，7d/30d 用 date */
+    /** 趋势时间字段：24h 用 datetime（1hGroups 按小时），7d/30d 用 date（1dGroups 按天） */
     private fun seriesDimensionField(range: AnalyticsRange): String =
-        if (range == AnalyticsRange.H24) "datetimeHour" else "date"
+        if (range == AnalyticsRange.H24) "datetime" else "date"
+
+    /** 维度分布/域名拆分（AdaptiveGroups）时间过滤：统一 datetime_geq/leq（UTC ISO），窗口随 range */
+    private fun adaptiveFilterField(range: AnalyticsRange): String {
+        val now = System.currentTimeMillis()
+        val days = when (range) {
+            AnalyticsRange.H24 -> 1
+            AnalyticsRange.D7 -> 7
+            AnalyticsRange.D30 -> 30
+        }
+        return "datetime_geq: \"${isoUtc(now - days * 24 * 3600_000L)}\", datetime_leq: \"${isoUtc(now)}\""
+    }
 
     /** 时间窗过滤字段：24h → datetime_geq/leq；7d/30d → date_geq/leq（UTC） */
     private fun filterField(range: AnalyticsRange): String {

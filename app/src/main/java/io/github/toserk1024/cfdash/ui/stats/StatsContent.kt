@@ -80,7 +80,8 @@ fun StatsContent(
             }
 
             data.summary != null -> {
-                val summary = data.summary!!
+                // smart cast 已保证非空，直接取用
+                val summary = data.summary
                 // 汇总指标卡
                 Row(modifier = Modifier.fillMaxWidth()) {
                     MetricCard(title = "请求数", value = formatCount(summary.requests), modifier = Modifier.weight(1f))

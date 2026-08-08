@@ -23,6 +23,7 @@
 - **模型扩展**：`AnalyticsSum` 新增 `uniques`；新增 `AnalyticsSeriesPoint`/`AnalyticsSeries`/`AnalyticsBreakdown`/`ZoneAnalyticsItem`/`BreakdownDimension`；新增 UI 聚合 `StatsData`
 - **UI**：新增 `StatsCharts.kt`（`TrendLineChart`/`BreakdownPieChart`/`ZoneBarChart`，Vico 3.x API：`CartesianChartHost` + `lineModel`/`columnModel` + extras 分类轴标签 + `PieChartHost` + `pieSeries`）；`StatsContent` 参数重构为 `data: StatsData`
 - **构建修复（首次 CI 失败）**：① Vico 3.2.3 的 AAR 元数据要求 **compileSdk ≥ 36** → 升级 `compileSdk` 35→36（targetSdk 保持 35），CI workflow 同步 `platforms;android-36` + `build-tools;36.0.0`；② `AnalyticsParser` 账号级解析（趋势/维度/域名拆分）中 `JsonElement` 不能直接 `[key]` 索引，改为 `zone.jsonObject[...]`；③ 汇总 `async` 缺少 `runCatching` 包装导致 `Deferred<AnalyticsSum>` 无 `getOrElse`，改为 `async { runCatching { ... } }` 后再 `getOrElse { throw it }`
+- **GraphQL 字段修正（运行时验证，schema 反查）**：① **1hGroups 时间维度为 `datetime`**（"truncated to the hour"），非 `datetimeHour`——趋势 H24 查询与解析同步修正；② **1d/1h Groups 的 orderBy 枚举无 `count_DESC`**（仅 sum_*/uniq_*/date 等），且其 dimensions **仅有 date/datetime**（无国家/状态码/缓存维度）——**维度分布与域名拆分改用 `httpRequestsAdaptiveGroups`**（自适应采样：支持 `clientCountryName`/`edgeResponseStatus`/`cacheStatus`/`clientRequestHTTPHost`，orderBy 支持 `count_DESC`，时间过滤统一 `datetime_geq/leq`）；③ **`zones` 节点无 `name` 字段**——域名拆分改为 AdaptiveGroups 按 `clientRequestHTTPHost` 分组（zoneName=host）；④ 修复 `StatsContent` 多余 `!!` 编译警告（smart cast）
 - **文档**：agent.md（统计模块/依赖/注意点/速查表）、readme.md（功能/技术栈）同步更新
 
 ## 2026-08-08 · 侧边栏导航 + 统计数据 + 构建优化
