@@ -13,11 +13,11 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-/** 统计时间范围（数据集 + limit 映射） */
+/** 统计时间范围（数据集 + limit 映射，limit 留缓冲防边界漏行） */
 enum class AnalyticsRange(val label: String, val dataset: String, val limit: Int) {
-    H24("24小时", "httpRequests1hGroups", 24),
-    D7("7天", "httpRequests1dGroups", 7),
-    D30("30天", "httpRequests1dGroups", 30)
+    H24("24小时", "httpRequests1hGroups", 48),
+    D7("7天", "httpRequests1dGroups", 15),
+    D30("30天", "httpRequests1dGroups", 32)
 }
 
 /** 统计聚合结果（GraphQL sum） */
@@ -44,13 +44,13 @@ data class AnalyticsSum(
 /** GraphQL Analytics 查询构建与响应解析（GraphQL 响应为 data/errors 结构，非 ApiResponse 包装） */
 object AnalyticsParser {
 
-    /** 构建域名级统计查询 */
+    /** 构建域名级统计查询（不排序：只做总量累加，orderBy 对 Groups 数据集仅支持聚合字段，规避排序错误） */
     fun zoneQuery(zoneId: String, range: AnalyticsRange): String = buildString {
         append("query {\n viewer {\n zones(filter: {zoneTag: \"$zoneId\"}) {\n ")
         append(range.dataset)
         append("(limit: ").append(range.limit)
-        append(", filter: {").append(filterField(range)).append("}, orderBy: [").append(orderByField(range))
-        append("]) {\n sum { requests threats bytes cachedRequests cachedBytes }\n }\n }\n }\n }")
+        append(", filter: {").append(filterField(range))
+        append("}) {\n sum { requests threats bytes cachedRequests cachedBytes }\n }\n }\n }\n }")
     }
 
     /** 构建账号级统计查询（遍历账号下所有域名） */
@@ -58,8 +58,8 @@ object AnalyticsParser {
         append("query {\n viewer {\n accounts(filter: {accountTag: \"$accountId\"}) {\n zones {\n ")
         append(range.dataset)
         append("(limit: ").append(range.limit)
-        append(", filter: {").append(filterField(range)).append("}, orderBy: [").append(orderByField(range))
-        append("]) {\n sum { requests threats bytes cachedRequests cachedBytes }\n }\n }\n }\n }\n }")
+        append(", filter: {").append(filterField(range))
+        append("}) {\n sum { requests threats bytes cachedRequests cachedBytes }\n }\n }\n }\n }\n }")
     }
 
     private fun filterField(range: AnalyticsRange): String {
@@ -70,9 +70,6 @@ object AnalyticsParser {
             "date_geq: \"$start\", date_leq: \"$end\""
         }
     }
-
-    private fun orderByField(range: AnalyticsRange): String =
-        if (range == AnalyticsRange.H24) "datetime_ASC" else "date_ASC"
 
     /** 时间窗口（UTC）：24h → datetime ISO；7d/30d → date */
     private fun rangeWindow(range: AnalyticsRange): Pair<String, String> {

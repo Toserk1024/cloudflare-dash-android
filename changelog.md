@@ -25,6 +25,7 @@
 - **构建修复**：移除 `CloudflareClient.kt` 两个不存在的顶层 import（`json.content` 为成员属性、`parseToJsonElement` 为 Json 成员函数，均无需 import），修复 CI release 编译失败
 - **统计修复**：账号级统计取账号改用 `GET /accounts`（`Repository.getAccounts()`），替代 `GET /user` 的 `accounts` 字段（Global Key 下该字段可能为空导致「账号信息缺失」）
 - **构建修复**：`getAccounts()` 泛型参数修正为 `client.get<List<AccountRef>>`（`get<T>` 的 T 即 result 类型，勿再嵌套 ApiResponse），修复 CI 编译失败
+- **统计查询修复**：移除 GraphQL 查询中的 `orderBy`（官方文档：预聚合 Groups 数据集排序仅支持聚合字段，如 `sum_bytes_DESC`，不支持时间维度排序，导致三个时间范围全部报 "cannot order by datetime/date"）；只做总量累加与顺序无关；filter 保持官方验证字段（1hGroups → `datetime_geq/leq`，1dGroups → `date_geq/leq`）；limit 加缓冲（48/15/32）防时间边界漏行
 
 ## 2026-08-08 · 高级设置修复 + Global API Key 登录 + Token 权限提示
 
