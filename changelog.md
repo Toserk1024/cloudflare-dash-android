@@ -22,6 +22,7 @@
 - **Repository 扩展**：新增 `getZoneAnalyticsSeries`/`getAccountAnalyticsSeries`/`getZoneBreakdown`/`getAccountBreakdown`/`getAccountZoneBreakdown`
 - **模型扩展**：`AnalyticsSum` 新增 `uniques`；新增 `AnalyticsSeriesPoint`/`AnalyticsSeries`/`AnalyticsBreakdown`/`ZoneAnalyticsItem`/`BreakdownDimension`；新增 UI 聚合 `StatsData`
 - **UI**：新增 `StatsCharts.kt`（`TrendLineChart`/`BreakdownPieChart`/`ZoneBarChart`，Vico 3.x API：`CartesianChartHost` + `lineModel`/`columnModel` + extras 分类轴标签 + `PieChartHost` + `pieSeries`）；`StatsContent` 参数重构为 `data: StatsData`
+- **构建修复（首次 CI 失败）**：① Vico 3.2.3 的 AAR 元数据要求 **compileSdk ≥ 36** → 升级 `compileSdk` 35→36（targetSdk 保持 35），CI workflow 同步 `platforms;android-36` + `build-tools;36.0.0`；② `AnalyticsParser` 账号级解析（趋势/维度/域名拆分）中 `JsonElement` 不能直接 `[key]` 索引，改为 `zone.jsonObject[...]`；③ 汇总 `async` 缺少 `runCatching` 包装导致 `Deferred<AnalyticsSum>` 无 `getOrElse`，改为 `async { runCatching { ... } }` 后再 `getOrElse { throw it }`
 - **文档**：agent.md（统计模块/依赖/注意点/速查表）、readme.md（功能/技术栈）同步更新
 
 ## 2026-08-08 · 侧边栏导航 + 统计数据 + 构建优化

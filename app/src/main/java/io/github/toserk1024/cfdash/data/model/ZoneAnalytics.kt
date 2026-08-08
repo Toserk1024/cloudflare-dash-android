@@ -189,7 +189,7 @@ object AnalyticsParser {
         val zones = accountZones(root) ?: return AnalyticsSeries()
         val byLabel = LinkedHashMap<String, AnalyticsSeriesPoint>()
         zones.forEach { zone ->
-            (zone[range.dataset] as? JsonArray)?.forEach { g ->
+            (zone.jsonObject[range.dataset] as? JsonArray)?.forEach { g ->
                 val point = seriesPoint(g.jsonObject, range) ?: return@forEach
                 byLabel.merge(point.label, point) { a, b ->
                     AnalyticsSeriesPoint(
@@ -221,7 +221,7 @@ object AnalyticsParser {
         val zones = accountZones(root) ?: return emptyList()
         val map = LinkedHashMap<String, Long>()
         zones.forEach { zone ->
-            (zone[range.dataset] as? JsonArray)?.forEach { g ->
+            (zone.jsonObject[range.dataset] as? JsonArray)?.forEach { g ->
                 val name = dimensionName(g.jsonObject, dimension) ?: return@forEach
                 map[name] = (map[name] ?: 0L) + (g.jsonObject["count"]?.jsonPrimitive?.longOrNull ?: 0L)
             }
@@ -235,9 +235,10 @@ object AnalyticsParser {
     fun parseZoneItems(root: JsonElement, range: AnalyticsRange): List<ZoneAnalyticsItem> {
         val zones = accountZones(root) ?: return emptyList()
         return zones.mapNotNull { zone ->
-            val zoneId = zone["zoneTag"]?.jsonPrimitive?.content ?: return@mapNotNull null
-            val zoneName = zone["name"]?.jsonPrimitive?.content ?: zoneId
-            ZoneAnalyticsItem(zoneId, zoneName, accumulate(zone, range.dataset))
+            val zoneObj = zone.jsonObject
+            val zoneId = zoneObj["zoneTag"]?.jsonPrimitive?.content ?: return@mapNotNull null
+            val zoneName = zoneObj["name"]?.jsonPrimitive?.content ?: zoneId
+            ZoneAnalyticsItem(zoneId, zoneName, accumulate(zoneObj, range.dataset))
         }.filter { it.sum.requests > 0 }.sortedByDescending { it.sum.requests }
     }
 

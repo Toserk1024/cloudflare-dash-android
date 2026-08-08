@@ -51,7 +51,7 @@ class StatsViewModel : ViewModel() {
                 val range = _uiState.value.range
                 val failures = mutableListOf<String>()
                 coroutineScope {
-                    val summary = async { AppContainer.repository.getAccountAnalytics(accountId, range) }
+                    val summary = async { runCatching { AppContainer.repository.getAccountAnalytics(accountId, range) } }
                     val series = async { loadPart("趋势", failures) { AppContainer.repository.getAccountAnalyticsSeries(accountId, range) } }
                     val country = async { loadPart("国家/地区", failures) { AppContainer.repository.getAccountBreakdown(accountId, range, BreakdownDimension.COUNTRY) } }
                     val status = async { loadPart("状态码", failures) { AppContainer.repository.getAccountBreakdown(accountId, range, BreakdownDimension.STATUS) } }

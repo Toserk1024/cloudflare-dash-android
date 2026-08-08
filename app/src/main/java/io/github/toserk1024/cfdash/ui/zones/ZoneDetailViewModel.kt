@@ -120,7 +120,7 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         try {
             val failures = mutableListOf<String>()
             coroutineScope {
-                val summary = async { AppContainer.repository.getZoneAnalytics(zoneId, _uiState.value.statsRange) }
+                val summary = async { runCatching { AppContainer.repository.getZoneAnalytics(zoneId, _uiState.value.statsRange) } }
                 val series = async { loadStatsPart("趋势", failures) { AppContainer.repository.getZoneAnalyticsSeries(zoneId, _uiState.value.statsRange) } }
                 val country = async { loadStatsPart("国家/地区", failures) { AppContainer.repository.getZoneBreakdown(zoneId, _uiState.value.statsRange, BreakdownDimension.COUNTRY) } }
                 val status = async { loadStatsPart("状态码", failures) { AppContainer.repository.getZoneBreakdown(zoneId, _uiState.value.statsRange, BreakdownDimension.STATUS) } }
