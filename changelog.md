@@ -15,6 +15,7 @@
 - **Global API Key 登录**：认证链路重构为双凭据（`sealed interface AuthCredential`：Token / GlobalKey）；请求头支持 `Authorization: Bearer` 与 `X-Auth-Email` + `X-Auth-Key` 两种；验证按模式区分（Token 走 `/user/tokens/verify`，Global Key 走 `GET /user`）；TokenStore 加密存储扩展（authMode + email/key）；登录页 SegmentedButton 切换，**Global API Key 默认优先，API Token 其次**
 - **Token 权限提示**：Token 登录表单展示所需权限列表（Zone Read/Edit、DNS Read/Edit、Zone Settings Read/Edit、User Details Read）
 - **readme**：权限表补充 Zone Settings Read/Edit，并注明支持 Global API Key 登录
+- **构建修复**：`verify()` 泛型化（`<C : AuthCredential>`），修复 onSave lambda 中无法解析子类属性（email/apiKey/value）导致的 CI 编译失败
 
 ## 2026-08-08 · 图标库扩展 + 域名详情高级设置 + Tab 水平平移动画
 

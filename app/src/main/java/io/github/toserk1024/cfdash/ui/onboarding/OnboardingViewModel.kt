@@ -66,7 +66,7 @@ class OnboardingViewModel : ViewModel() {
     }
 
     /** 先验证后保存（验证时用 credentialOverride，不落盘） */
-    private fun verify(credential: AuthCredential, onSave: (AuthCredential) -> Unit) {
+    private fun <C : AuthCredential> verify(credential: C, onSave: (C) -> Unit) {
         viewModelScope.launch {
             _state.value = OnboardingState.Loading
             try {
