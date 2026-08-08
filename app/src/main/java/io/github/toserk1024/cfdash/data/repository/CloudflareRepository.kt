@@ -1,5 +1,6 @@
 package io.github.toserk1024.cfdash.data.repository
 
+import io.github.toserk1024.cfdash.data.api.AuthCredential
 import io.github.toserk1024.cfdash.data.api.CloudflareApi
 import io.github.toserk1024.cfdash.data.api.CloudflareClient
 import io.github.toserk1024.cfdash.data.api.CloudflareException
@@ -16,13 +17,23 @@ import kotlinx.serialization.json.JsonElement
 /** 业务仓储层：封装所有 Cloudflare API 调用 */
 class CloudflareRepository(private val client: CloudflareClient) {
 
-    /** 验证 Token 是否有效（使用用户输入的 Token，尚未保存） */
-    suspend fun verifyToken(token: String): Boolean {
-        val resp: ApiResponse<TokenVerifyResult> = client.get(
-            CloudflareApi.VERIFY_TOKEN,
-            tokenOverride = token
-        )
-        return resp.success && resp.result?.status == "active"
+    /** 验证认证凭据是否有效（使用用户输入，尚未保存） */
+    suspend fun verifyCredential(credential: AuthCredential): Boolean = when (credential) {
+        is AuthCredential.Token -> {
+            val resp: ApiResponse<TokenVerifyResult> = client.get(
+                CloudflareApi.VERIFY_TOKEN,
+                credentialOverride = credential
+            )
+            resp.success && resp.result?.status == "active"
+        }
+        is AuthCredential.GlobalKey -> {
+            // Global API Key 无专用验证端点，GET /user 成功即有效
+            val resp: ApiResponse<User> = client.get(
+                CloudflareApi.USER,
+                credentialOverride = credential
+            )
+            resp.success
+        }
     }
 
     /** 获取当前用户信息 */

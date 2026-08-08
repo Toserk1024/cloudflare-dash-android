@@ -35,9 +35,9 @@ internal inline fun <reified T> decodeApiResponse(raw: String): ApiResponse<T> =
 
 /**
  * Cloudflare API 客户端（OkHttp 封装）
- * @param tokenProvider 每次请求时获取当前 Token
+ * @param credentialProvider 每次请求时获取当前认证凭据（Token / GlobalKey）
  */
-class CloudflareClient(private val tokenProvider: () -> String?) {
+class CloudflareClient(private val credentialProvider: () -> AuthCredential?) {
 
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
@@ -50,17 +50,17 @@ class CloudflareClient(private val tokenProvider: () -> String?) {
     internal suspend inline fun <reified RespT> get(
         path: String,
         query: Map<String, String> = emptyMap(),
-        tokenOverride: String? = null
-    ): ApiResponse<RespT> = decodeApiResponse(requestRaw("GET", path, null, query, tokenOverride))
+        credentialOverride: AuthCredential? = null
+    ): ApiResponse<RespT> = decodeApiResponse(requestRaw("GET", path, null, query, credentialOverride))
 
     /** POST：body 使用具体类型序列化（reified），避免 Any 序列化失败 */
     internal suspend inline fun <reified RespT, reified BodyT> post(
         path: String,
         body: BodyT,
         query: Map<String, String> = emptyMap(),
-        tokenOverride: String? = null
+        credentialOverride: AuthCredential? = null
     ): ApiResponse<RespT> = decodeApiResponse(
-        requestRaw("POST", path, CloudflareJson.encodeToString(body), query, tokenOverride)
+        requestRaw("POST", path, CloudflareJson.encodeToString(body), query, credentialOverride)
     )
 
     /** PATCH：body 使用具体类型序列化（reified） */
@@ -68,16 +68,16 @@ class CloudflareClient(private val tokenProvider: () -> String?) {
         path: String,
         body: BodyT,
         query: Map<String, String> = emptyMap(),
-        tokenOverride: String? = null
+        credentialOverride: AuthCredential? = null
     ): ApiResponse<RespT> = decodeApiResponse(
-        requestRaw("PATCH", path, CloudflareJson.encodeToString(body), query, tokenOverride)
+        requestRaw("PATCH", path, CloudflareJson.encodeToString(body), query, credentialOverride)
     )
 
     internal suspend inline fun <reified RespT> delete(
         path: String,
         query: Map<String, String> = emptyMap(),
-        tokenOverride: String? = null
-    ): ApiResponse<RespT> = decodeApiResponse(requestRaw("DELETE", path, null, query, tokenOverride))
+        credentialOverride: AuthCredential? = null
+    ): ApiResponse<RespT> = decodeApiResponse(requestRaw("DELETE", path, null, query, credentialOverride))
 
     /** 执行请求并返回原始响应体字符串 */
     internal suspend fun requestRaw(
@@ -85,22 +85,31 @@ class CloudflareClient(private val tokenProvider: () -> String?) {
         path: String,
         jsonBody: String?,
         query: Map<String, String>,
-        tokenOverride: String? = null
+        credentialOverride: AuthCredential? = null
     ): String = withContext(Dispatchers.IO) {
-        val token = tokenOverride ?: tokenProvider()
-            ?: throw CloudflareException("未配置 API Token，请先登录")
-        // 校验 Token 只能包含 ASCII 可打印字符（OkHttp 禁止 header 含中文等非 ASCII 字符）
-        if (!token.all { it.code in 0x21..0x7E }) {
-            throw CloudflareException("API Token 格式无效：只能包含英文字母、数字与符号，请检查是否粘贴时混入了其他字符")
-        }
+        val credential = credentialOverride ?: credentialProvider()
+            ?: throw CloudflareException("未配置认证信息，请先登录")
 
         val urlBuilder = (CloudflareApi.BASE_URL + path).toHttpUrl().newBuilder()
         query.forEach { (k, v) -> if (v.isNotBlank()) urlBuilder.addQueryParameter(k, v) }
 
         val requestBuilder = Request.Builder()
             .url(urlBuilder.build())
-            .header("Authorization", "Bearer $token")
             .header("Accept", "application/json")
+
+        // 按认证方式添加请求头（OkHttp 禁止 header 含中文等非 ASCII 字符，先校验）
+        when (credential) {
+            is AuthCredential.Token -> {
+                requireAscii(credential.value, "API Token")
+                requestBuilder.header("Authorization", "Bearer ${credential.value}")
+            }
+            is AuthCredential.GlobalKey -> {
+                requireAscii(credential.email, "邮箱")
+                requireAscii(credential.apiKey, "Global API Key")
+                requestBuilder.header("X-Auth-Email", credential.email)
+                requestBuilder.header("X-Auth-Key", credential.apiKey)
+            }
+        }
 
         val req = when (method) {
             "GET" -> requestBuilder.get().build()
@@ -135,6 +144,13 @@ class CloudflareClient(private val tokenProvider: () -> String?) {
             )
         } catch (e: Exception) {
             CloudflareException("请求失败 (HTTP $code)", code)
+        }
+    }
+
+    /** 校验认证字段只能包含 ASCII 可打印字符（OkHttp 禁止 header 含非 ASCII 字符） */
+    private fun requireAscii(value: String, name: String) {
+        if (!value.all { it.code in 0x21..0x7E }) {
+            throw CloudflareException("$name 格式无效：只能包含英文字母、数字与符号，请检查是否粘贴时混入了其他字符")
         }
     }
 }

@@ -25,7 +25,10 @@
 |---|---|
 | Zone → Zone → Read / Edit | 域名列表、详情、删除 |
 | Zone → DNS → Read / Edit | DNS 记录查看与增删改 |
-| User → User Details → Read | 验证 Token 与用户信息 |
+| Zone → Zone Settings → Read / Edit | 高级设置（开发模式 / 五秒盾 / IPv6） |
+| User → User Details → Read | 验证与用户信息 |
+
+> 也支持 **Global API Key**（邮箱 + API Key，`X-Auth-Email` / `X-Auth-Key`）登录，拥有账号全部权限，请谨慎保管。
 
 ## 🛠️ 技术栈
 

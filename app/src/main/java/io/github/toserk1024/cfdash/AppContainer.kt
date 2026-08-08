@@ -19,7 +19,7 @@ object AppContainer {
         if (::tokenStore.isInitialized) return
         val appContext = context.applicationContext
         tokenStore = TokenStore(appContext)
-        val client = CloudflareClient(tokenStore::getToken)
+        val client = CloudflareClient(tokenStore::getCredential)
         repository = CloudflareRepository(client)
     }
 }

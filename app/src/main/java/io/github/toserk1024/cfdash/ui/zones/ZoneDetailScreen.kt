@@ -96,7 +96,8 @@ fun ZoneDetailScreen(
                     onDelete = viewModel::deleteZone,
                     onSetDevMode = viewModel::setDevelopmentMode,
                     onSetUnderAttack = viewModel::setUnderAttack,
-                    onSetIpv6 = viewModel::setIpv6
+                    onSetIpv6 = viewModel::setIpv6,
+                    onRetrySettings = viewModel::refreshSettings
                 )
                 else -> Column(
                     modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -130,7 +131,8 @@ private fun ZoneDetailContent(
     onDelete: () -> Unit,
     onSetDevMode: (Boolean) -> Unit,
     onSetUnderAttack: (Boolean) -> Unit,
-    onSetIpv6: (Boolean) -> Unit
+    onSetIpv6: (Boolean) -> Unit,
+    onRetrySettings: () -> Unit
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -209,11 +211,9 @@ private fun ZoneDetailContent(
                 AdvancedSwitchRow(
                     title = "开发模式",
                     subtitle = when {
-                        devMode == null -> "加载中…"
-                        devMode && devModeRemaining > 0 ->
-                            "已开启，剩余 ${formatRemaining(devModeRemaining)}（到期自动关闭）"
-                        devMode -> "已开启（3 小时自动关闭）"
-                        else -> "绕过缓存直接访问源站"
+                        devMode == null && settingsError == null -> "加载中…"
+                        devMode == true -> "剩余时间：${formatRemaining(devModeRemaining)}"
+                        else -> "开启后绕过CDN缓存"
                     },
                     checked = devMode == true,
                     enabled = settingsBusy == null && devMode != null,
@@ -245,11 +245,17 @@ private fun ZoneDetailContent(
 
                 settingsError?.let {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = onRetrySettings) {
+                            Text("重试", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
             }
         }

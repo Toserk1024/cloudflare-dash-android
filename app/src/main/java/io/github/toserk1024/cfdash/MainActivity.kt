@@ -31,8 +31,8 @@ class MainActivity : ComponentActivity() {
 private fun MainScreen() {
     val navController = rememberNavController()
 
-    // 登录态：有 Token 直接进主界面；否则进初始化界面
-    var loggedIn by remember { mutableStateOf(AppContainer.tokenStore.hasToken()) }
+    // 登录态：已有认证凭据（Token / Global Key）直接进主界面；否则进初始化界面
+    var loggedIn by remember { mutableStateOf(AppContainer.tokenStore.hasCredential()) }
     val startDestination = if (loggedIn) Routes.HOME else Routes.ONBOARDING
 
     AppNavHost(

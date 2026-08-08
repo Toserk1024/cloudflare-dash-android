@@ -12,13 +12,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,14 +43,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-/** 初始化界面：输入 API Token → 验证 → 进入主界面 */
+/** 初始化界面：选择认证方式（Global API Key / API Token）→ 验证 → 进入主界面 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
     onSuccess: () -> Unit,
     viewModel: OnboardingViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val authMode by viewModel.authMode.collectAsState()
     val showPassword by viewModel.showPassword.collectAsState()
+    var email by remember { mutableStateOf("") }
+    var apiKey by remember { mutableStateOf("") }
     var token by remember { mutableStateOf("") }
 
     LaunchedEffect(state) {
@@ -61,10 +70,6 @@ fun OnboardingScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Logo 区域已移除（用户要求），直接显示标题
-
-            Spacer(modifier = Modifier.height(12.dp))
-
             Text(
                 text = "Cloudflare 客户端",
                 style = MaterialTheme.typography.headlineMedium,
@@ -76,59 +81,156 @@ fun OnboardingScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
-            // Token 输入
-            OutlinedTextField(
-                value = token,
-                onValueChange = {
-                    token = it
-                    if (state is OnboardingState.Error) {
-                        // 输入变化时清除错误
-                    }
-                },
-                label = { Text("API Token") },
-                placeholder = { Text("粘贴你的 Cloudflare API Token") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                trailingIcon = {
-                    TextButton(onClick = { viewModel.togglePasswordVisibility() }) {
-                        Text(if (showPassword) "隐藏" else "显示")
-                    }
-                },
-                visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Token 仅保存在本机加密存储中，用于调用 Cloudflare API。可在 dash.cloudflare.com/profile/api-tokens 创建。注意：Token 只能包含英文字母、数字与符号，请勿混入中文或其他字符。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
+            // 认证方式切换（Global API Key 优先，API Token 其次）
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(
+                    selected = authMode == AuthMode.GLOBAL,
+                    onClick = { viewModel.setAuthMode(AuthMode.GLOBAL) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                ) { Text("Global API Key", maxLines = 1) }
+                SegmentedButton(
+                    selected = authMode == AuthMode.TOKEN,
+                    onClick = { viewModel.setAuthMode(AuthMode.TOKEN) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                ) { Text("API Token", maxLines = 1) }
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 验证按钮
-            Button(
-                onClick = { viewModel.verifyToken(token) },
-                enabled = state !is OnboardingState.Loading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-            ) {
-                if (state is OnboardingState.Loading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text("验证中...")
-                } else {
-                    Text("验证并进入", fontWeight = FontWeight.SemiBold)
+            if (authMode == AuthMode.GLOBAL) {
+                // ===== Global API Key 登录表单 =====
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("邮箱") },
+                    placeholder = { Text("Cloudflare 账号邮箱") },
+                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it },
+                    label = { Text("Global API Key") },
+                    placeholder = { Text("粘贴你的 Global API Key") },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    trailingIcon = {
+                        TextButton(onClick = { viewModel.togglePasswordVisibility() }) {
+                            Text(if (showPassword) "隐藏" else "显示")
+                        }
+                    },
+                    visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Global API Key 拥有账号全部权限，请谨慎保管。可在 dash.cloudflare.com → 我的资料 → API 令牌页面底部查看。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = { viewModel.verifyGlobalKey(email, apiKey) },
+                    enabled = state !is OnboardingState.Loading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                ) {
+                    if (state is OnboardingState.Loading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text("验证中...")
+                    } else {
+                        Text("验证并进入", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            } else {
+                // ===== API Token 登录表单 =====
+                OutlinedTextField(
+                    value = token,
+                    onValueChange = { token = it },
+                    label = { Text("API Token") },
+                    placeholder = { Text("粘贴你的 Cloudflare API Token") },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    trailingIcon = {
+                        TextButton(onClick = { viewModel.togglePasswordVisibility() }) {
+                            Text(if (showPassword) "隐藏" else "显示")
+                        }
+                    },
+                    visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Token 所需权限列表
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "该方式需要以下权限：",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        listOf(
+                            "Zone → Zone → Read / Edit（域名管理）",
+                            "Zone → DNS → Read / Edit（DNS 记录）",
+                            "Zone → Zone Settings → Read / Edit（高级设置）",
+                            "User → User Details → Read（验证与用户信息）"
+                        ).forEach { perm ->
+                            Text(
+                                text = "• $perm",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Token 仅保存在本机加密存储中，用于调用 Cloudflare API。可在 dash.cloudflare.com/profile/api-tokens 创建。注意：Token 只能包含英文字母、数字与符号。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = { viewModel.verifyToken(token) },
+                    enabled = state !is OnboardingState.Loading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                ) {
+                    if (state is OnboardingState.Loading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text("验证中...")
+                    } else {
+                        Text("验证并进入", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
 

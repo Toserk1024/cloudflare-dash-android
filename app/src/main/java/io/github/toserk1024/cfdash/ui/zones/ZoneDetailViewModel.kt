@@ -43,43 +43,51 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     fun load() {
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, settingsError = null) }
-            try {
-                val zone = AppContainer.repository.getZone(zoneId)
-                _uiState.update { it.copy(zone = zone, loading = false, error = null) }
-                loadSettings()
-            } catch (e: Exception) {
-                _uiState.update { it.copy(loading = false, error = e.message) }
-            }
-        }
-    }
-
-    /** 并行加载三个高级设置（单项失败不阻塞其他） */
-    private fun loadSettings() {
-        viewModelScope.launch {
+            // 域名详情与三个高级设置并发请求（页面 loading 动画期间即开始）
             coroutineScope {
                 async {
-                    runCatching { AppContainer.repository.getZoneSetting(zoneId, "development_mode") }
-                        .onSuccess { s ->
-                            _uiState.update { it.copy(devMode = s.value == "on", devModeRemaining = s.time_remaining) }
-                        }
+                    runCatching { AppContainer.repository.getZone(zoneId) }
+                        .onSuccess { z -> _uiState.update { it.copy(zone = z, loading = false, error = null) } }
+                        .onFailure { e -> _uiState.update { it.copy(loading = false, error = e.message) } }
                 }
-                async {
-                    runCatching { AppContainer.repository.getZoneSetting(zoneId, "security_level") }
-                        .onSuccess { s ->
-                            _uiState.update { it.copy(underAttack = s.value == "under_attack") }
-                        }
-                }
-                async {
-                    runCatching { AppContainer.repository.getZoneSetting(zoneId, "ipv6") }
-                        .onSuccess { s ->
-                            _uiState.update { it.copy(ipv6 = s.value == "on") }
-                        }
-                }
+                async { loadSettings() }
             }
         }
     }
 
+    /** 并行加载三个高级设置（单项失败不阻塞其他，失败原因写入 settingsError） */
+    private suspend fun loadSettings() {
+        coroutineScope {
+            async {
+                runCatching { AppContainer.repository.getZoneSetting(zoneId, "development_mode") }
+                    .onSuccess { s ->
+                        _uiState.update { it.copy(devMode = s.value == "on", devModeRemaining = s.time_remaining) }
+                    }
+                    .onFailure { e -> _uiState.update { it.copy(settingsError = e.message) } }
+            }
+            async {
+                runCatching { AppContainer.repository.getZoneSetting(zoneId, "security_level") }
+                    .onSuccess { s ->
+                        _uiState.update { it.copy(underAttack = s.value == "under_attack") }
+                    }
+                    .onFailure { e -> _uiState.update { it.copy(settingsError = e.message) } }
+            }
+            async {
+                runCatching { AppContainer.repository.getZoneSetting(zoneId, "ipv6") }
+                    .onSuccess { s ->
+                        _uiState.update { it.copy(ipv6 = s.value == "on") }
+                    }
+                    .onFailure { e -> _uiState.update { it.copy(settingsError = e.message) } }
+            }
+        }
+    }
     // ===== 高级设置切换 =====
+
+    /** 仅重试高级设置加载（页面不重新 loading） */
+    fun refreshSettings() {
+        _uiState.update { it.copy(settingsError = null) }
+        viewModelScope.launch { loadSettings() }
+    }
 
     fun setDevelopmentMode(on: Boolean) =
         updateSetting("development_mode", if (on) "on" else "off") { s ->

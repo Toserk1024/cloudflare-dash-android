@@ -9,6 +9,13 @@
 - **v1.4**：Tab/导航过渡动画（AnimatedContent + NavHost transitions）、修复请求体序列化（reified BodyT）
 - **v1.5**：移除本地构建环境（ARM64 AAPT2 hack、setup_android_env.sh、tools/、gradle wrapper 本地 distributionUrl），改用 GitHub Actions CI 构建（手动触发）
 
+## 2026-08-08 · 高级设置修复 + Global API Key 登录 + Token 权限提示
+
+- **高级设置加载修复**：域名详情与三个高级设置（开发模式/五秒盾/IPv6）改为**并发请求**（页面 loading 动画期间即开始，单项失败不阻塞其他）；加载失败不再静默吞掉（显示错误原因 + 「重试」按钮，仅重刷设置不打断页面）；开发模式文案调整：默认「开启后绕过CDN缓存」，仅确认开启时显示「剩余时间：X」
+- **Global API Key 登录**：认证链路重构为双凭据（`sealed interface AuthCredential`：Token / GlobalKey）；请求头支持 `Authorization: Bearer` 与 `X-Auth-Email` + `X-Auth-Key` 两种；验证按模式区分（Token 走 `/user/tokens/verify`，Global Key 走 `GET /user`）；TokenStore 加密存储扩展（authMode + email/key）；登录页 SegmentedButton 切换，**Global API Key 默认优先，API Token 其次**
+- **Token 权限提示**：Token 登录表单展示所需权限列表（Zone Read/Edit、DNS Read/Edit、Zone Settings Read/Edit、User Details Read）
+- **readme**：权限表补充 Zone Settings Read/Edit，并注明支持 Global API Key 登录
+
 ## 2026-08-08 · 图标库扩展 + 域名详情高级设置 + Tab 水平平移动画
 
 - **图标**：引入 `material-icons-extended` 完整图标库（release 开启 R8，未引用图标被裁剪，APK 体积几乎无增量）；移除「我的」页自定义 `WebIcon`（ImageVector + PathParser 手写 pathData），开源仓库图标改用标准库 `Icons.Filled.Web`
