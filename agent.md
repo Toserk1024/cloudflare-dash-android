@@ -5,7 +5,7 @@
 ## 1. 项目概览
 
 基于 **Jetpack Compose + Material 3** 的 Cloudflare 第三方 Android 客户端（包名 `io.github.toserk1024.cfdash`）。
-当前已实现：**双认证登录（Global API Key / API Token，Global 默认优先）、侧边栏导航（域名/DNS/统计/我的）、域名管理（列表/搜索/详情/删除）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、域名高级设置（开发模式 / 五秒盾 / IPv6）、统计数据（账号级/域名级，24h/7d/30d 切换）、用户信息与退出登录**。
+当前已实现：**双认证登录（Global API Key / API Token，Global 默认优先）、侧边栏导航（域名/DNS/统计/我的）、域名管理（列表/搜索/详情/删除）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、域名高级设置（开发模式 / 五秒盾 / IPv6）、统计数据（账号级/域名级，24h/7d/30d 切换，Vico 图表化：汇总卡 + 时间趋势折线图 + 国家/状态码/缓存维度饼图 + 账号级域名流量拆分柱状图）、用户信息与退出登录**。
 
 **已移除功能**：添加域名（用户要求删除，相关代码已清理干净，如需恢复参考 §8.3）。
 **未开发**：Workers、Zero Trust 等高级功能（用户明确暂不开发）。
@@ -24,6 +24,7 @@
 | 协程 | kotlinx-coroutines-android | 1.9.0 |
 | 图标 | material-icons-extended（完整图标库，release R8 裁剪未引用图标，体积几乎无增量） | BOM 管理 |
 | ViewModel | lifecycle-viewmodel-compose | 2.8.7 |
+| 图表 | Vico（Compose 原生，仅 compose 模块，3.x 无独立 core） | 3.2.3 |
 
 依赖定义位置：`gradle/libs.versions.toml` + `app/build.gradle.kts`。
 仓库镜像：阿里云/华为云优先（`settings.gradle.kts`），离线环境可构建。
@@ -57,7 +58,7 @@ app/src/main/java/io/github/toserk1024/cfdash/
     ├── theme/                    # Color/Theme/Type（Cloudflare 橙 #F6821F）
     ├── onboarding/               # OnboardingScreen + OnboardingViewModel（双认证：Global 默认 / Token）
     ├── home/                     # HomeScreen（侧边栏导航 + 水平平移过渡）+ HomeViewModel（用户信息）
-    ├── stats/                    # StatsViewModel + StatsContent（可复用统计组件，作为 Home 第 4 个 Tab）
+    ├── stats/                    # StatsViewModel（账号级统计）+ StatsContent（复用组件）+ StatsData（展示数据聚合）+ StatsCharts（Vico 图表：趋势折线/维度饼图/域名柱状图）
     ├── zones/                    # ZonesScreen + ZonesViewModel（域名列表）+ ZoneDetailScreen + ZoneDetailViewModel（含高级设置 + 域名统计）
     ├── dns/                      # DnsRecordsContent（复用组件）+ DnsRecordsScreen + DnsRecordEditScreen + DnsViewModel + DnsEditViewModel
     └── profile/                  # ProfileScreen（我的）
@@ -120,7 +121,7 @@ FAB 已内置在 Content 中，DnsRecordsScreen 不再自带 FAB。
 | 账号列表 | GET `/accounts` | 账号级统计取 accountTag（比 /user.accounts 可靠） |
 | 获取 Zone 设置 | GET `/zones/{zone_id}/settings/{name}` | development_mode / security_level / ipv6 等 |
 | 更新 Zone 设置 | PATCH `/zones/{zone_id}/settings/{name}` | body: {"value": ...}，需 Zone Settings 权限 |
-| 统计数据 | POST `/graphql` | GraphQL Analytics（httpRequests1dGroups/1hGroups），需 Analytics Read |
+| 统计数据 | POST `/graphql` | GraphQL Analytics（httpRequests1dGroups/1hGroups），需 Analytics Read；详见下方统计查询说明 |
 | DNS 记录列表 | GET `/zones/{zone_id}/dns_records?page=&per_page=` | 拉全量翻页 |
 | 新建记录 | POST `/zones/{zone_id}/dns_records` | body: DnsRecordRequest |
 | 更新记录 | PATCH `/zones/{zone_id}/dns_records/{id}` | body: DnsRecordRequest |
@@ -167,7 +168,8 @@ pm install -r /data/local/tmp/cf-app.apk
 8. **DNS 记录类型**：MX/URI 显示 priority 字段；A/AAAA/CNAME 显示 proxied 开关；SRV/CAA 等用 content 文本（Cloudflare 接受 content 格式）。
 9. **ProfileScreen 中 HomeUiState 是 HomeViewModel 嵌套类**，import 需写 `io.github.toserk1024.cfdash.ui.home.HomeViewModel.HomeUiState`。
 10. **双认证头**：`CloudflareClient.requestRaw` 按 `AuthCredential` 类型添加请求头（Token → `Authorization: Bearer`；GlobalKey → `X-Auth-Email` + `X-Auth-Key`），均校验 ASCII 可打印字符；验证走 `verifyCredential()`（Token → `/user/tokens/verify`，GlobalKey → `GET /user`）。修改 Zone 设置需 Token 具备 **Zone Settings Read/Edit** 权限，否则 403（高级卡片会显示错误 + 重试按钮）。
-11. **GraphQL Analytics**：`client.graphql()` POST `/graphql`，响应为 data/errors 结构（非 ApiResponse 包装），errors 非空抛 CloudflareException；查询构建与解析统一在 `AnalyticsParser`（时间窗口 UTC、数据集映射 24h/7d/30d）；统计需 Token 具备 **Zone Analytics Read**（域名级）/ **Account Analytics Read**（账号级）权限，否则 403。**关键约束（踩坑记录）**：① 预聚合 Groups 数据集（1d/1h Groups）的 `orderBy` **仅支持聚合字段**（如 `sum_bytes_DESC`/`count_DESC`），**不支持时间维度排序**（曾报 "cannot order by datetime/date"），本项目只做总量累加**不使用 orderBy**；② filter 时间字段：1hGroups → `datetime_geq/leq`（ISO8601），1dGroups → `date_geq/leq`（yyyy-MM-dd）；③ 账号级统计的 accountTag 用 `GET /accounts`（`/user` 的 `accounts` 字段可能为空）。
+11. **GraphQL Analytics**：`client.graphql()` POST `/graphql`，响应为 data/errors 结构（非 ApiResponse 包装），errors 非空抛 CloudflareException；查询构建与解析统一在 `AnalyticsParser`（时间窗口 UTC、数据集映射 24h/7d/30d）；统计需 Token 具备 **Zone Analytics Read**（域名级）/ **Account Analytics Read**（账号级）权限，否则 403。**关键约束（踩坑记录）**：① 预聚合 Groups 数据集（1d/1h Groups）的 `orderBy` **仅支持聚合字段**（如 `sum_bytes_DESC`/`count_DESC`），**不支持时间维度排序**（曾报 "cannot order by datetime/date"），本项目只做总量累加**不使用 orderBy**；趋势序列客户端按时间标签排序；维度分布用 `orderBy: [count_DESC]` 取 Top 15；② filter 时间字段：1hGroups → `datetime_geq/leq`（ISO8601），1dGroups → `date_geq/leq`（yyyy-MM-dd）；③ 账号级统计的 accountTag 用 `GET /accounts`（`/user` 的 `accounts` 字段可能为空）；④ 趋势查询需 `dimensions { datetimeHour | date }` + `sum` + `uniq { uniques }`（独立访客）；维度分布查询用 `count` + `dimensions { clientCountryName | edgeResponseStatus | cacheStatus }`（cacheStatus 返回英文值 hit/miss/dynamic 等，解析时映射中文）；⑤ 账号级域名拆分查询在 `accounts.zones` 节点带 `zoneTag` + `name` + 各自 `sum`，客户端按请求量降序。
+12. **Vico 图表（3.x，踩坑记录）**：仅依赖 `com.patrykandpatrick.vico:compose`（3.x 无独立 core 模块，minSdk≥23）；核心 API：`CartesianChartHost(rememberCartesianChart(rememberLineCartesianLayer/rememberColumnCartesianLayer, startAxis = VerticalAxis.rememberStart(), bottomAxis = HorizontalAxis.rememberBottom()), modelProducer)`；数据更新用 `CartesianChartModelProducer.runTransaction { lineModel/columnModel { series(y = list) } }`；**x 轴分类标签**：x 用序号（series 自动索引），标签经 `extras { it[key] = labels }` 同步，`HorizontalAxis.rememberBottom(valueFormatter = CartesianValueFormatter { context, x, _ -> context.model.extraStore[key][x.toInt()] })` 读取；饼图用 `PieChartHost(rememberPieChart(sliceProvider = PieChart.SliceProvider.series(slices), valueFormatter = PieValueFormatter {...}), modelProducer)` + `pieSeries { series(*values) }`；柱状图颜色 `rememberLineComponent(Fill(color), 16.dp)`，折线 `LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(color)))`。modelProducer 应持久化（remember/ViewModel），runTransaction 是挂起函数。
 
 ## 8. 二次开发指南
 
@@ -185,7 +187,8 @@ pm install -r /data/local/tmp/cf-app.apk
 | 加路由 | navigation/Routes.kt + AppNavHost.kt |
 | 加 API 端点 | data/api/CloudflareApi.kt + Repository |
 | 加 Zone 设置开关 | data/model/ZoneSetting.kt + CloudflareApi/Repository + ZoneDetailViewModel/Screen |
-| 加统计数据 | data/model/ZoneAnalytics.kt + Repository.getZoneAnalytics/getAccountAnalytics + ui/stats/ + HomeScreen/ZoneDetailScreen |
+| 加统计数据 | data/model/ZoneAnalytics.kt（AnalyticsParser 查询/解析 + 模型）+ Repository.getZoneAnalytics/getAccountAnalytics + ui/stats/ + HomeScreen/ZoneDetailScreen |
+| 加统计图表 | ui/stats/StatsCharts.kt（TrendLineChart/BreakdownPieChart/ZoneBarChart，Vico 3.x）+ StatsContent 卡片编排 + StatsData 聚合字段 + AnalyticsParser 对应查询 |
 | 改 DNS 记录字段 | data/model/DnsRecord.kt |
 | 改认证逻辑 | ui/onboarding/OnboardingViewModel.kt + AuthCredential.kt + TokenStore.kt |
 

@@ -14,7 +14,7 @@
 - **侧边栏导航**：域名 / DNS / 统计数据 / 我的 四个入口，未来可扩展更多功能项
 - **域名管理**：列表（全量缓存 + 本地搜索 + 下拉刷新）/ 详情（NS、状态、套餐）/ 删除域名
 - **DNS 记录管理**：按域名查看（全量缓存 + 类型筛选 + 本地搜索 + 下拉刷新）/ 新建 / 编辑 / 删除，支持 A、AAAA、CNAME、MX、TXT、NS、SRV、CAA 等类型
-- **统计数据**：账号级（侧边栏入口）与域名级（域名详情）双维度，请求数 / 威胁数 / 带宽 / 缓存命中率，支持 24小时 / 7天 / 30天 切换
+- **统计数据**：账号级（侧边栏入口）与域名级（域名详情）双维度，请求数 / 威胁数 / 带宽 / 缓存命中率 / 独立访客；**Vico 图表化展示**：请求数与带宽时间趋势折线图（24小时/7天/30天）、国家地区 / HTTP 状态码 / 缓存状态分布饼图、账号级域名流量拆分柱状图
 - **我的**：用户信息展示、版本号、开源地址、退出登录
 - **安全**：凭据使用 EncryptedSharedPreferences（Android Keystore）加密存储，仅保存在本机
 - **性能**：API 数据首次/下拉刷新时缓存到内存，搜索筛选纯本地完成；四个 Tab 常驻组合，切换仅水平平移过渡，流畅无重建
@@ -39,6 +39,7 @@
 - MVVM：ViewModel + StateFlow + Repository
 - OkHttp（Bearer 认证）+ kotlinx.serialization
 - Navigation Compose（单 Activity 多路由）
+- Vico（Compose 原生图表库）
 - EncryptedSharedPreferences（安全存储）
 - Release 构建开启 **R8 压缩**；versionName 采用 `日期_自增序号`、versionCode 采用时间戳前 9 位
 

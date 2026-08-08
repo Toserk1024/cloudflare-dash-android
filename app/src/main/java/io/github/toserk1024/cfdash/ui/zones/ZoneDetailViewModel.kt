@@ -5,9 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.data.model.AnalyticsRange
-import io.github.toserk1024.cfdash.data.model.AnalyticsSum
+import io.github.toserk1024.cfdash.data.model.BreakdownDimension
 import io.github.toserk1024.cfdash.data.model.Zone
 import io.github.toserk1024.cfdash.data.model.ZoneSetting
+import io.github.toserk1024.cfdash.ui.stats.StatsData
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,10 +35,11 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         val settingsBusy: String? = null,
         val settingsError: String? = null,
         // ===== 域名级统计 =====
-        val stats: AnalyticsSum? = null,
+        val statsData: StatsData = StatsData(),
         val statsRange: AnalyticsRange = AnalyticsRange.D7,
         val statsLoading: Boolean = false,
-        val statsError: String? = null
+        val statsError: String? = null,
+        val statsPartError: String? = null
     )
 
     private val _uiState = MutableStateFlow(ZoneDetailUiState())
@@ -112,17 +114,47 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         viewModelScope.launch { loadStats() }
     }
 
-    /** 加载域名级统计（不阻塞页面主内容） */
+    /** 加载域名级统计（不阻塞页面主内容；汇总必须成功，趋势/维度并行加载且单项失败降级） */
     private suspend fun loadStats() {
-        _uiState.update { it.copy(statsLoading = true, statsError = null) }
-        runCatching { AppContainer.repository.getZoneAnalytics(zoneId, _uiState.value.statsRange) }
-            .onSuccess { s ->
-                _uiState.update { it.copy(stats = s, statsLoading = false, statsError = null) }
+        _uiState.update { it.copy(statsLoading = true, statsError = null, statsPartError = null) }
+        try {
+            val failures = mutableListOf<String>()
+            coroutineScope {
+                val summary = async { AppContainer.repository.getZoneAnalytics(zoneId, _uiState.value.statsRange) }
+                val series = async { loadStatsPart("趋势", failures) { AppContainer.repository.getZoneAnalyticsSeries(zoneId, _uiState.value.statsRange) } }
+                val country = async { loadStatsPart("国家/地区", failures) { AppContainer.repository.getZoneBreakdown(zoneId, _uiState.value.statsRange, BreakdownDimension.COUNTRY) } }
+                val status = async { loadStatsPart("状态码", failures) { AppContainer.repository.getZoneBreakdown(zoneId, _uiState.value.statsRange, BreakdownDimension.STATUS) } }
+                val cache = async { loadStatsPart("缓存", failures) { AppContainer.repository.getZoneBreakdown(zoneId, _uiState.value.statsRange, BreakdownDimension.CACHE) } }
+                // 汇总失败 → 统计整体失败（其他 async 由 coroutineScope 取消）
+                val sum = summary.await().getOrElse { throw it }
+                _uiState.update {
+                    it.copy(
+                        statsData = StatsData(
+                            summary = sum,
+                            series = series.await(),
+                            country = country.await(),
+                            status = status.await(),
+                            cache = cache.await()
+                        ),
+                        statsLoading = false,
+                        statsError = null,
+                        statsPartError = failures.takeIf { f -> f.isNotEmpty() }?.joinToString("；")
+                    )
+                }
             }
-            .onFailure { e ->
-                _uiState.update { it.copy(statsLoading = false, statsError = e.message) }
-            }
+        } catch (e: Exception) {
+            _uiState.update { it.copy(statsLoading = false, statsError = e.message ?: "加载统计失败") }
+        }
     }
+
+    /** 统计单项加载：失败时记录提示并返回 null（该区块降级显示） */
+    private suspend fun <T> loadStatsPart(label: String, failures: MutableList<String>, block: suspend () -> T): T? =
+        try {
+            block()
+        } catch (e: Exception) {
+            failures.add("$label：${e.message ?: "加载失败"}")
+            null
+        }
 
     fun setDevelopmentMode(on: Boolean) =
         updateSetting("development_mode", if (on) "on" else "off") { s ->

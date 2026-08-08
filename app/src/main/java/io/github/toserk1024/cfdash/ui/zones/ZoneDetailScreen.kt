@@ -48,10 +48,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.toserk1024.cfdash.data.model.AnalyticsRange
-import io.github.toserk1024.cfdash.data.model.AnalyticsSum
 import io.github.toserk1024.cfdash.data.model.Zone
 import io.github.toserk1024.cfdash.data.model.ZonePlan
 import io.github.toserk1024.cfdash.ui.stats.StatsContent
+import io.github.toserk1024.cfdash.ui.stats.StatsData
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,10 +95,11 @@ fun ZoneDetailScreen(
                     ipv6 = state.ipv6,
                     settingsBusy = state.settingsBusy,
                     settingsError = state.settingsError,
-                    stats = state.stats,
+                    statsData = state.statsData,
                     statsRange = state.statsRange,
                     statsLoading = state.statsLoading,
                     statsError = state.statsError,
+                    statsPartError = state.statsPartError,
                     onManageDns = { onManageDns(state.zone!!.id, state.zone!!.name) },
                     onDelete = viewModel::deleteZone,
                     onSetDevMode = viewModel::setDevelopmentMode,
@@ -136,10 +137,11 @@ private fun ZoneDetailContent(
     ipv6: Boolean?,
     settingsBusy: String?,
     settingsError: String?,
-    stats: AnalyticsSum?,
+    statsData: StatsData,
     statsRange: AnalyticsRange,
     statsLoading: Boolean,
     statsError: String?,
+    statsPartError: String?,
     onManageDns: () -> Unit,
     onDelete: () -> Unit,
     onSetDevMode: (Boolean) -> Unit,
@@ -283,10 +285,11 @@ private fun ZoneDetailContent(
                 Text("统计数据", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(8.dp))
                 StatsContent(
-                    summary = stats,
+                    data = statsData,
                     loading = statsLoading,
                     error = statsError,
                     range = statsRange,
+                    partError = statsPartError,
                     onRangeChange = onStatsRangeChange,
                     onRetry = onRetryStats
                 )

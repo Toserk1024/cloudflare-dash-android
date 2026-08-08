@@ -24,19 +24,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.toserk1024.cfdash.data.model.AnalyticsRange
-import io.github.toserk1024.cfdash.data.model.AnalyticsSum
 
 /**
- * 统计数据组件（账号级 / 域名级复用）
- * 指标：请求数、威胁数、带宽、缓存命中率；支持 24h/7d/30d 切换。
+ * 统计数据组件（账号级 / 域名级复用）。
+ * 展示：汇总指标卡（请求/威胁/带宽/缓存命中率/独立访客）+ 时间趋势折线图（请求数、带宽）
+ * + 维度分布饼图（国家/地区、状态码、缓存）+ 域名拆分柱状图（仅账号级，showZoneBreakdown=true）。
+ * 单项图表加载失败不阻塞其他（data 内对应字段为 null，顶部展示 partError 提示）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatsContent(
-    summary: AnalyticsSum?,
+    data: StatsData,
     loading: Boolean,
     error: String?,
     range: AnalyticsRange,
+    showZoneBreakdown: Boolean = false,
+    partError: String? = null,
     enabled: Boolean = true,
     onRangeChange: (AnalyticsRange) -> Unit,
     onRetry: () -> Unit
@@ -62,7 +65,7 @@ fun StatsContent(
                 contentAlignment = Alignment.Center
             ) { CircularProgressIndicator() }
 
-            error != null && summary == null -> Column(
+            error != null && data.summary == null -> Column(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -76,7 +79,9 @@ fun StatsContent(
                 TextButton(onClick = onRetry) { Text("重试") }
             }
 
-            summary != null -> {
+            data.summary != null -> {
+                val summary = data.summary!!
+                // 汇总指标卡
                 Row(modifier = Modifier.fillMaxWidth()) {
                     MetricCard(title = "请求数", value = formatCount(summary.requests), modifier = Modifier.weight(1f))
                     Spacer(modifier = Modifier.size(8.dp))
@@ -88,7 +93,86 @@ fun StatsContent(
                     Spacer(modifier = Modifier.size(8.dp))
                     MetricCard(title = "缓存命中率", value = formatPercent(summary.cacheHitRatio), modifier = Modifier.weight(1f))
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                MetricCard(title = "独立访客", value = formatCount(summary.uniques), modifier = Modifier.fillMaxWidth())
+
+                // 部分图表加载失败提示
+                if (!partError.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "⚠ 部分图表加载失败：$partError",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = onRetry) { Text("重试", style = MaterialTheme.typography.bodySmall) }
+                    }
+                }
+
+                // 趋势图
+                data.series?.let { series ->
+                    if (series.points.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        ChartCard(title = "请求数趋势") {
+                            TrendLineChart(points = series.points, valueSelector = { it.requests })
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        ChartCard(title = "带宽趋势") {
+                            TrendLineChart(points = series.points, valueSelector = { it.bytes })
+                        }
+                    }
+                }
+
+                // 维度分布
+                data.country?.let { items ->
+                    if (items.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        ChartCard(title = "国家 / 地区") { BreakdownPieChart(items = items) }
+                    }
+                }
+                data.status?.let { items ->
+                    if (items.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        ChartCard(title = "HTTP 状态码") { BreakdownPieChart(items = items) }
+                    }
+                }
+                data.cache?.let { items ->
+                    if (items.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        ChartCard(title = "缓存状态") { BreakdownPieChart(items = items) }
+                    }
+                }
+
+                // 域名拆分（仅账号级）
+                if (showZoneBreakdown) {
+                    data.zoneBreakdown?.let { items ->
+                        if (items.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            ChartCard(title = "域名流量拆分") { ZoneBarChart(items = items) }
+                        }
+                    }
+                }
             }
+        }
+    }
+}
+
+/** 图表卡片容器（标题 + 内容） */
+@Composable
+private fun ChartCard(title: String, content: @Composable () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            content()
         }
     }
 }

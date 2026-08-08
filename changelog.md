@@ -9,6 +9,21 @@
 - **v1.4**：Tab/导航过渡动画（AnimatedContent + NavHost transitions）、修复请求体序列化（reified BodyT）
 - **v1.5**：移除本地构建环境（ARM64 AAPT2 hack、setup_android_env.sh、tools/、gradle wrapper 本地 distributionUrl），改用 GitHub Actions CI 构建（手动触发）
 
+## 2026-08-08 · 统计功能图表化升级（Vico 图表库）
+
+- **图表库**：接入 **Vico 3.2.3**（Compose 原生图表库，Maven Central 分发；仅依赖 `com.patrykandpatrick.vico:compose`——3.x 已无独立 core 模块；minSdk≥23 满足项目 24）
+- **统计数据全面升级**（账号级「统计数据」Tab + 域名详情页同步升级，`StatsContent` 复用组件统一增强）：
+  - **汇总指标卡新增独立访客**（GraphQL `uniq { uniques }`）
+  - **时间趋势折线图**：请求数趋势、带宽趋势（24h 按小时约 24 点、7d/30d 按天 7/30 点；GraphQL `dimensions{datetimeHour|date}` + `sum` + `uniq`，客户端按时间标签排序，规避 Groups 数据集 orderBy 不支持时间排序的限制）
+  - **维度分布饼图**（Top 6 + 其他归并，图例展示名称/数值/占比）：国家/地区（`clientCountryName`）、HTTP 状态码（`edgeResponseStatus`）、缓存状态（`cacheStatus` → 中文映射：命中/未命中/动态/过期/绕过等）
+  - **账号级域名流量拆分柱状图**（Top 8 + 其他归并，`zones{zoneTag name + sum}`，按请求量降序）
+  - **并行加载 + 单项降级**：汇总必须成功（失败 → 整体错误页）；趋势/维度/域名拆分并行请求，单项失败不阻塞其他（顶部红色提示 + 重试按钮）
+- **GraphQL 查询/解析扩展**（`AnalyticsParser`）：新增 `zoneSeriesQuery`/`accountSeriesQuery`/`zoneBreakdownQuery`/`accountBreakdownQuery`/`accountZoneBreakdownQuery` 及对应解析；维度分布用 `count` + `orderBy:[count_DESC]` 取 Top 15
+- **Repository 扩展**：新增 `getZoneAnalyticsSeries`/`getAccountAnalyticsSeries`/`getZoneBreakdown`/`getAccountBreakdown`/`getAccountZoneBreakdown`
+- **模型扩展**：`AnalyticsSum` 新增 `uniques`；新增 `AnalyticsSeriesPoint`/`AnalyticsSeries`/`AnalyticsBreakdown`/`ZoneAnalyticsItem`/`BreakdownDimension`；新增 UI 聚合 `StatsData`
+- **UI**：新增 `StatsCharts.kt`（`TrendLineChart`/`BreakdownPieChart`/`ZoneBarChart`，Vico 3.x API：`CartesianChartHost` + `lineModel`/`columnModel` + extras 分类轴标签 + `PieChartHost` + `pieSeries`）；`StatsContent` 参数重构为 `data: StatsData`
+- **文档**：agent.md（统计模块/依赖/注意点/速查表）、readme.md（功能/技术栈）同步更新
+
 ## 2026-08-08 · 侧边栏导航 + 统计数据 + 构建优化
 
 - **侧边栏导航**：底栏 NavigationBar → **ModalNavigationDrawer 侧边栏**（用户信息卡 + 域名/DNS/统计数据/我的 + 退出登录），为未来更多功能预留扩展位；主内容区第 4 个 Tab「统计数据」，沿用 visitedMask 常驻 + SlidingTab 水平平移过渡

@@ -6,14 +6,18 @@ import io.github.toserk1024.cfdash.data.api.CloudflareClient
 import io.github.toserk1024.cfdash.data.api.CloudflareException
 import io.github.toserk1024.cfdash.data.model.ApiResponse
 import io.github.toserk1024.cfdash.data.model.AccountRef
+import io.github.toserk1024.cfdash.data.model.AnalyticsBreakdown
 import io.github.toserk1024.cfdash.data.model.AnalyticsParser
 import io.github.toserk1024.cfdash.data.model.AnalyticsRange
+import io.github.toserk1024.cfdash.data.model.AnalyticsSeries
 import io.github.toserk1024.cfdash.data.model.AnalyticsSum
+import io.github.toserk1024.cfdash.data.model.BreakdownDimension
 import io.github.toserk1024.cfdash.data.model.DnsRecord
 import io.github.toserk1024.cfdash.data.model.DnsRecordRequest
 import io.github.toserk1024.cfdash.data.model.TokenVerifyResult
 import io.github.toserk1024.cfdash.data.model.User
 import io.github.toserk1024.cfdash.data.model.Zone
+import io.github.toserk1024.cfdash.data.model.ZoneAnalyticsItem
 import io.github.toserk1024.cfdash.data.model.ZoneSetting
 import io.github.toserk1024.cfdash.data.model.ZoneSettingRequest
 import kotlinx.serialization.json.JsonElement
@@ -97,6 +101,44 @@ class CloudflareRepository(private val client: CloudflareClient) {
     suspend fun getAccountAnalytics(accountId: String, range: AnalyticsRange): AnalyticsSum {
         val resp = client.graphql(AnalyticsParser.accountQuery(accountId, range))
         return AnalyticsParser.parseAccount(resp, range)
+    }
+
+    /** 获取域名级统计趋势（时间序列，需 Analytics Read 权限） */
+    suspend fun getZoneAnalyticsSeries(zoneId: String, range: AnalyticsRange): AnalyticsSeries {
+        val resp = client.graphql(AnalyticsParser.zoneSeriesQuery(zoneId, range))
+        return AnalyticsParser.parseZoneSeries(resp, range)
+    }
+
+    /** 获取账号级统计趋势（时间序列，各域名按时间点合并，需 Account Analytics Read 权限） */
+    suspend fun getAccountAnalyticsSeries(accountId: String, range: AnalyticsRange): AnalyticsSeries {
+        val resp = client.graphql(AnalyticsParser.accountSeriesQuery(accountId, range))
+        return AnalyticsParser.parseAccountSeries(resp, range)
+    }
+
+    /** 获取域名级维度分布（国家/状态码/缓存状态 Top N） */
+    suspend fun getZoneBreakdown(
+        zoneId: String,
+        range: AnalyticsRange,
+        dimension: BreakdownDimension
+    ): List<AnalyticsBreakdown> {
+        val resp = client.graphql(AnalyticsParser.zoneBreakdownQuery(zoneId, range, dimension))
+        return AnalyticsParser.parseZoneBreakdown(resp, range, dimension)
+    }
+
+    /** 获取账号级维度分布（各域名同名维度合并） */
+    suspend fun getAccountBreakdown(
+        accountId: String,
+        range: AnalyticsRange,
+        dimension: BreakdownDimension
+    ): List<AnalyticsBreakdown> {
+        val resp = client.graphql(AnalyticsParser.accountBreakdownQuery(accountId, range, dimension))
+        return AnalyticsParser.parseAccountBreakdown(resp, range, dimension)
+    }
+
+    /** 获取账号级域名拆分（各域名请求量，按请求量降序） */
+    suspend fun getAccountZoneBreakdown(accountId: String, range: AnalyticsRange): List<ZoneAnalyticsItem> {
+        val resp = client.graphql(AnalyticsParser.accountZoneBreakdownQuery(accountId, range))
+        return AnalyticsParser.parseZoneItems(resp, range)
     }
 
     /** 分页获取 DNS 记录（type/name 支持筛选） */

@@ -235,10 +235,12 @@ fun HomeScreen(
                         targetOffset = slideOffsetFor(selectedTab, 2, screenWidthPx)
                     ) {
                         StatsContent(
-                            summary = statsState.summary,
+                            data = statsState.data,
                             loading = statsState.loading,
                             error = statsState.error,
                             range = statsState.range,
+                            showZoneBreakdown = true,
+                            partError = statsState.partError,
                             onRangeChange = statsViewModel::setRange,
                             onRetry = statsViewModel::load
                         )
