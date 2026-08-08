@@ -18,6 +18,7 @@
   - **IPv6 兼容性**：`ipv6` on/off 开关
   - 三个设置并行加载（单项失败不阻塞其他）；切换防连点（settingsBusy 禁用全部开关）、失败保留原值并红色文字提示
 - **Tab 切换动画**：透明度过渡（150ms）→ **水平平移过渡**（250ms FastOutSlowInEasing，offset 位移 GPU 合成，方向跟随 Tab 位置：右侧 Tab 从右滑入、左侧 Tab 从左滑入），保持常驻组合不销毁重建（LazyColumn 不重建、滚动位置不丢失）
+- **构建修复**：补充 `HomeScreen.kt` 缺失的 `androidx.compose.ui.unit.dp` import（screenWidthDp.dp 计算屏幕宽度），修复 CI release 编译失败
 
 ## 2026-08-05 · 本次构建改造
 
