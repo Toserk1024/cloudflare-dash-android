@@ -33,6 +33,10 @@
   - **图表点击显示详情（Vico CartesianMarker）**：请求数/带宽趋势折线图**点击拐点**显示"时间 + 数值"；域名柱状图**点击柱子**显示"host + 请求量"（`rememberDefaultCartesianMarker` + 自定义 ValueFormatter，经 extras 读时间标签）
   - **饼图图例点击**：点击图例项高亮并显示"名称：数量 · 占比"详情行（BreakdownPieChart 图例可交互）
   - **DNS 记录列表批量操作（候选框，todo.md 批次2）**：每条记录前加复选框；选中后显示批量操作栏（已选数/取消/删除/开代理/关代理）——**批量删除**（二次确认，逐条 DELETE 本地同步，部分失败汇总提示）、**批量开关代理仅对 A/AAAA/CNAME 生效**（其余类型选中忽略，逐条 PATCH proxied 本地同步）；DnsViewModel 新增 selectedIds/批量方法，DnsRecordsContent 新增批量栏/行复选框/确认对话框
+  - **DNS 记录完整表单（todo.md 批次3，#9）**：按记录类型渲染**完整字段表单**（仿 Cloudflare 控制台），不再让用户填裸 content：
+    - 新增 `DnsRecordFieldDefs`（12 种类型字段模板 + 顶部说明文案，如 CNAME"[名称] 是 [目标] 的别名"）
+    - 新增 `DnsEditViewModel` 重构：字段 Map 状态、编辑回填（record.data/content 解析）、按类型序列化 `data`（JsonObject：SRV/DNSKEY/CAA/SVCB/HTTPS/SSHFP/TLSA/NAPTR/URI）与 `content`（RFC 组合）、数字键盘与必填校验
+    - `DnsRecordEditScreen` 重写：类型选择 + 顶部说明卡 + 名称 + 动态字段表单 + TTL + 代理开关（仅可代理类型）+ 备注
 - **打包清理**：`packaging.resources.excludes` 追加 `**/DebugProbesKt.bin`（kotlinx-coroutines 协程调试探针，仅 IDE 调试用，release 不激活，避免 APK 内出现无用 .bin 文件）
 - **文档**：agent.md（统计模块/依赖/注意点/速查表）、readme.md（功能/技术栈）同步更新
 

@@ -17,7 +17,7 @@
   - **批量开关代理**：**仅对 A/AAAA/CNAME（PROXIABLE）类型生效**（其余类型复选框禁用或忽略），逐条 PATCH proxied 并本地同步
   - 全选/取消全选；批量操作栏（选中数 + 删除/代理开关按钮）；操作中防抖与失败提示
   - 涉及：DnsRecordsContent（行复选框 + 批量操作栏）、DnsViewModel（selected 集合/全选/批量删除/批量代理）、DnsRecord（proxied 更新）— 2026-08-08（批次2已完成：复选框+批量栏+二次确认+仅可代理类型生效）
-- [ ] **DNS 记录完整表单（全部类型按字段拆分重写，仿 Cloudflare 控制台）**：当前所有类型基本只让用户填 name/content 自由文本（SRV/DNSKEY 等的 data 字段未用），填写全靠猜；**重写 DNS 记录编辑页**，每种记录类型渲染**完整字段表单**并序列化为 `DnsRecordRequest.data`/content：
+- [x] **DNS 记录完整表单（全部类型按字段拆分重写，仿 Cloudflare 控制台）**：当前所有类型基本只让用户填 name/content 自由文本（SRV/DNSKEY 等的 data 字段未用），填写全靠猜；**重写 DNS 记录编辑页**，每种记录类型渲染**完整字段表单**并序列化为 `DnsRecordRequest.data`/content：
   - **A/AAAA**：名称 + IPv4/IPv6 地址（目标）+ TTL + 代理开关 + 说明"[名称] 是 [IPv4 地址] 的别名"
   - **CNAME**：名称 + 目标（别名指向）+ 说明"[名称] 是 [目标] 的别名"
   - **MX**：名称 + 优先级 + 邮件服务器（目标）+ TTL + 说明"[名称] 的邮件由 [目标] 处理"
@@ -32,6 +32,12 @@
   - **URI**：优先级/权重/目标 URI
   - 每种类型**顶部直观说明文案**（如 "[名称] 是 [目标] 的别名。"），字段带 placeholder/校验
   - 涉及：DnsRecordEditScreen（按类型动态渲染字段模板）、DnsEditViewModel（分类型状态+校验+data/content 序列化）、DnsRecordTypes（字段模板/说明文案表）、DnsRecord/DnsRecordRequest（data 解析回填）— 2026-08-08
+
+## Pending 队列（用户反馈待修复/优化，先不实施）
+
+- [ ] **点击空白关闭侧边栏未实现**：批次1 的 #4 声称"ModalNavigationDrawer 内置 scrim tap-to-close 已支持"，但实测点击空白不关闭——需排查是否为 `gesturesEnabled=false` 连带禁用了 scrim 点击，或 SlidingTab/内容层拦截了点击事件（修复方向：改用带 scrim 点击处理的方案，或恢复 `gesturesEnabled` 的 tap 部分）— 2026-08-08 用户反馈
+- [ ] **批量代理确认对话框按钮文案不当**：批量开/关代理的 AlertDialog 确认按钮当前显示"开启"/"关闭"，应统一为 **"确定" / "取消"**（DnsRecordsContent 批量代理对话框 confirmButton/dismissButton 文案）— 2026-08-08 用户反馈
+- [ ] **DNS 候选框常显拥挤，改为图标按钮启用**：候选框/复选框一直显示显得拥挤——改为**顶栏右侧加 check-all 图标按钮**点击后启用候选功能；批量操作栏的**文字按钮加边框**（当前无边框太虚，用 OutlinedButton 或 border 修饰）— 2026-08-08 用户反馈
 
 ## 已实施（历史，仅供参考）
 

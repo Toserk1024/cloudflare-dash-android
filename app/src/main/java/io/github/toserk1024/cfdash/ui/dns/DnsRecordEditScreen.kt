@@ -1,6 +1,5 @@
 package io.github.toserk1024.cfdash.ui.dns
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -40,11 +41,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.toserk1024.cfdash.data.model.DnsRecordTypes
 
-/** DNS 记录新建/编辑表单 */
+/** DNS 记录新建/编辑表单（按记录类型渲染完整字段，仿 Cloudflare 控制台） */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DnsRecordEditScreen(
@@ -114,6 +117,21 @@ fun DnsRecordEditScreen(
                 }
             }
 
+            // 顶部直观说明（如 "[名称] 是 [目标] 的别名"）
+            Spacer(modifier = Modifier.height(12.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ) {
+                Text(
+                    text = DnsRecordFieldDefs.description(state.recordType),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             // 名称
@@ -121,32 +139,27 @@ fun DnsRecordEditScreen(
                 value = state.name,
                 onValueChange = viewModel::setName,
                 label = { Text("名称") },
-                placeholder = { Text("例如 www，根域用 @") },
+                placeholder = { Text(if (state.recordType == "SRV") "例如 _sip._tcp" else "例如 www，根域用 @") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // 内容
-            OutlinedTextField(
-                value = state.content,
-                onValueChange = viewModel::setContent,
-                label = { Text("内容") },
-                placeholder = { Text(contentHint(state.recordType)) },
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // 优先级（MX/URI）
-            if (DnsRecordTypes.HAS_PRIORITY.contains(state.recordType)) {
+            // 按类型渲染完整字段表单
+            DnsRecordFieldDefs.fields(state.recordType).forEach { field ->
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
-                    value = state.priority,
-                    onValueChange = viewModel::setPriority,
-                    label = { Text("优先级 (1-65535)") },
-                    placeholder = { Text("10") },
+                    value = state.fields[field.key] ?: "",
+                    onValueChange = { viewModel.setField(field.key, it) },
+                    label = { Text(field.label) },
+                    placeholder = {
+                        if (field.placeholder.isNotBlank()) Text(field.placeholder)
+                    },
                     singleLine = true,
+                    keyboardOptions = if (field.numeric) {
+                        KeyboardOptions(keyboardType = KeyboardType.Number)
+                    } else {
+                        KeyboardOptions.Default
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -247,18 +260,6 @@ fun DnsRecordEditScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
-}
-
-private fun contentHint(type: String): String = when (type) {
-    "A" -> "IPv4 地址，例如 1.2.3.4"
-    "AAAA" -> "IPv6 地址，例如 2001:db8::1"
-    "CNAME" -> "目标域名，例如 example.com"
-    "MX" -> "邮件服务器地址，例如 mail.example.com"
-    "TXT" -> "文本内容，例如 v=spf1 include:_spf.example.com ~all"
-    "NS" -> "名称服务器，例如 ns1.example.com"
-    "SRV" -> "格式：优先级 权重 端口 目标，例如 0 5 5060 sip.example.com"
-    "CAA" -> "格式：flags tag value，例如 0 issue \"letsencrypt.org\""
-    else -> "记录内容"
 }
 
 private val TTL_OPTIONS = listOf(
