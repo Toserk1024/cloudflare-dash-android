@@ -22,6 +22,7 @@
   - `defaultConfig.ndk.abiFilters` 仅打包 `armeabi-v7a` + `arm64-v8a`（排除 x86/x86_64）
   - `gradle.properties`：`org.gradle.caching=true`（Gradle Build Cache 跨构建复用任务输出）+ `-Xmx4096m`
 - **文档**：agent.md（34 文件结构/GraphQL 端点/权限/注意点/速查表）、readme.md（功能/权限表）同步
+- **构建修复**：移除 `CloudflareClient.kt` 两个不存在的顶层 import（`json.content` 为成员属性、`parseToJsonElement` 为 Json 成员函数，均无需 import），修复 CI release 编译失败
 
 ## 2026-08-08 · 高级设置修复 + Global API Key 登录 + Token 权限提示
 
