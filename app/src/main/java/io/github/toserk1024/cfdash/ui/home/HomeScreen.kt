@@ -99,6 +99,8 @@ fun HomeScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        // 移除右滑调出侧边栏的手势（仅通过顶部菜单按钮打开）
+        gesturesEnabled = false,
         drawerContent = {
             ModalDrawerSheet {
                 // 用户信息
@@ -240,8 +242,11 @@ fun HomeScreen(
                             error = statsState.error,
                             range = statsState.range,
                             showZoneBreakdown = true,
+                            refreshing = statsState.refreshing,
+                            enablePullRefresh = true,
                             partError = statsState.partError,
                             onRangeChange = statsViewModel::setRange,
+                            onRefresh = statsViewModel::refresh,
                             onRetry = statsViewModel::load
                         )
                     }

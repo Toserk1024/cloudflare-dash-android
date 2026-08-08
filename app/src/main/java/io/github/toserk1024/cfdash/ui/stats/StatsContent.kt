@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -17,6 +19,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,8 +42,37 @@ fun StatsContent(
     error: String?,
     range: AnalyticsRange,
     showZoneBreakdown: Boolean = false,
+    refreshing: Boolean = false,
+    enablePullRefresh: Boolean = false,
     partError: String? = null,
     enabled: Boolean = true,
+    onRangeChange: (AnalyticsRange) -> Unit,
+    onRefresh: () -> Unit = {},
+    onRetry: () -> Unit
+) {
+    if (enablePullRefresh) {
+        // 账号级统计 Tab：独立可滚动 + 下拉刷新
+        PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                StatsContentBody(data, loading, error, partError, range, showZoneBreakdown, enabled, onRangeChange, onRetry)
+            }
+        }
+    } else {
+        // 域名级：内嵌于页面 scroll，不启用下拉刷新（避免嵌套滚动冲突）
+        StatsContentBody(data, loading, error, partError, range, showZoneBreakdown, enabled, onRangeChange, onRetry)
+    }
+}
+
+/** 统计数据主体内容（padding + 时间切换 + 指标卡 + 图表） */
+@Composable
+private fun StatsContentBody(
+    data: StatsData,
+    loading: Boolean,
+    error: String?,
+    partError: String?,
+    range: AnalyticsRange,
+    showZoneBreakdown: Boolean,
+    enabled: Boolean,
     onRangeChange: (AnalyticsRange) -> Unit,
     onRetry: () -> Unit
 ) {
@@ -123,7 +155,8 @@ fun StatsContent(
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         ChartCard(title = "带宽趋势") {
-                            TrendLineChart(points = series.points, valueSelector = { it.bytes }, valueFormatter = ::formatBytes)
+                            // 与请求数趋势完全一致的调用（高度/逻辑统一）
+                            TrendLineChart(points = series.points, valueSelector = { it.bytes })
                         }
                     }
                 }
@@ -160,6 +193,7 @@ fun StatsContent(
             }
         }
     }
+}
 }
 
 /** 图表卡片容器（标题 + 内容） */

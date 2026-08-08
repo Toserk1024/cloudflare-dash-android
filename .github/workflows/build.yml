@@ -30,7 +30,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: version.properties
-          key: version-counter-v2-${{ hashFiles('version.properties') }}
+          # key 用 github.run_id（每次构建唯一）而非 hashFiles：
+          # version.properties 每次 checkout 都被重置为仓库值，hashFiles 恒等导致 restore 永远精确不匹配，
+          # restore-keys 前缀匹配最近一次构建保存的缓存，从而可靠恢复上次 buildSeq 实现版本号自增
+          key: version-counter-v2-${{ github.run_id }}
           restore-keys: |
             version-counter-v2-
 

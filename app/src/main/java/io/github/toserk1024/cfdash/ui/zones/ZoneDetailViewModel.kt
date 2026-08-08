@@ -46,6 +46,9 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     private val _uiState = MutableStateFlow(ZoneDetailUiState())
     val uiState: StateFlow<ZoneDetailUiState> = _uiState
 
+    /** 域名级统计缓存（按时间范围，切换不重复请求） */
+    private val statsCache = mutableMapOf<AnalyticsRange, StatsData>()
+
     init {
         load()
     }
@@ -102,10 +105,10 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
 
     // ===== 域名级统计 =====
 
-    /** 重试域名级统计加载 */
+    /** 重试域名级统计加载（强制重新请求并更新缓存） */
     fun refreshStats() {
         _uiState.update { it.copy(statsError = null) }
-        viewModelScope.launch { loadStats() }
+        viewModelScope.launch { loadStats(force = true) }
     }
 
     /** 切换统计时间范围并重新拉取 */
@@ -115,27 +118,36 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         viewModelScope.launch { loadStats() }
     }
 
-    /** 加载域名级统计（不阻塞页面主内容；汇总必须成功，趋势/维度分布并行加载且单项失败降级） */
-    private suspend fun loadStats() {
+    /** 加载域名级统计（不阻塞页面主内容；命中缓存直接展示，force=true 时重新请求；汇总必须成功，趋势/维度分布单项失败降级） */
+    private suspend fun loadStats(force: Boolean = false) {
+        val range = _uiState.value.statsRange
+        if (!force) {
+            statsCache[range]?.let { cached ->
+                _uiState.update { it.copy(statsData = cached, statsLoading = false, statsError = null, statsPartError = null) }
+                return
+            }
+        }
         _uiState.update { it.copy(statsLoading = true, statsError = null, statsPartError = null) }
         try {
             val failures = mutableListOf<String>()
             coroutineScope {
-                val summary = async { runCatching { AppContainer.repository.getZoneAnalytics(zoneId, _uiState.value.statsRange) } }
-                val series = async { loadStatsPart("趋势", failures) { AppContainer.repository.getZoneAnalyticsSeries(zoneId, _uiState.value.statsRange) } }
-                val dist = async { loadStatsPart("维度分布", failures) { AppContainer.repository.getZoneDistributions(zoneId, _uiState.value.statsRange) } }
+                val summary = async { runCatching { AppContainer.repository.getZoneAnalytics(zoneId, range) } }
+                val series = async { loadStatsPart("趋势", failures) { AppContainer.repository.getZoneAnalyticsSeries(zoneId, range) } }
+                val dist = async { loadStatsPart("维度分布", failures) { AppContainer.repository.getZoneDistributions(zoneId, range) } }
                 // 汇总失败 → 统计整体失败（其他 async 由 coroutineScope 取消）
                 val sum = summary.await().getOrElse { throw it }
                 val distributions = dist.await()
+                val statsData = StatsData(
+                    summary = sum,
+                    series = series.await(),
+                    country = distributions?.country,
+                    status = distributions?.status,
+                    cache = buildCacheBreakdown(sum)
+                )
+                statsCache[range] = statsData
                 _uiState.update {
                     it.copy(
-                        statsData = StatsData(
-                            summary = sum,
-                            series = series.await(),
-                            country = distributions?.country,
-                            status = distributions?.status,
-                            cache = buildCacheBreakdown(sum)
-                        ),
+                        statsData = statsData,
                         statsLoading = false,
                         statsError = null,
                         statsPartError = failures.takeIf { f -> f.isNotEmpty() }?.joinToString("；")

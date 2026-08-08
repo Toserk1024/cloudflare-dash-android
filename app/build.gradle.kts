@@ -106,6 +106,8 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // 排除 kotlinx-coroutines 协程调试探针（仅 IDE 调试用，release 不激活，避免 APK 内出现碍眼的 .bin）
+            excludes += "**/DebugProbesKt.bin"
         }
     }
 }
