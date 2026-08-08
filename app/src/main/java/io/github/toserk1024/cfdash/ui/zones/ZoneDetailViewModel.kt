@@ -4,8 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.toserk1024.cfdash.AppContainer
+import io.github.toserk1024.cfdash.data.model.AnalyticsBreakdown
 import io.github.toserk1024.cfdash.data.model.AnalyticsRange
-import io.github.toserk1024.cfdash.data.model.BreakdownDimension
+import io.github.toserk1024.cfdash.data.model.AnalyticsSum
 import io.github.toserk1024.cfdash.data.model.Zone
 import io.github.toserk1024.cfdash.data.model.ZoneSetting
 import io.github.toserk1024.cfdash.ui.stats.StatsData
@@ -114,7 +115,7 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         viewModelScope.launch { loadStats() }
     }
 
-    /** 加载域名级统计（不阻塞页面主内容；汇总必须成功，趋势/维度并行加载且单项失败降级） */
+    /** 加载域名级统计（不阻塞页面主内容；汇总必须成功，趋势/维度分布并行加载且单项失败降级） */
     private suspend fun loadStats() {
         _uiState.update { it.copy(statsLoading = true, statsError = null, statsPartError = null) }
         try {
@@ -122,19 +123,18 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
             coroutineScope {
                 val summary = async { runCatching { AppContainer.repository.getZoneAnalytics(zoneId, _uiState.value.statsRange) } }
                 val series = async { loadStatsPart("趋势", failures) { AppContainer.repository.getZoneAnalyticsSeries(zoneId, _uiState.value.statsRange) } }
-                val country = async { loadStatsPart("国家/地区", failures) { AppContainer.repository.getZoneBreakdown(zoneId, _uiState.value.statsRange, BreakdownDimension.COUNTRY) } }
-                val status = async { loadStatsPart("状态码", failures) { AppContainer.repository.getZoneBreakdown(zoneId, _uiState.value.statsRange, BreakdownDimension.STATUS) } }
-                val cache = async { loadStatsPart("缓存", failures) { AppContainer.repository.getZoneBreakdown(zoneId, _uiState.value.statsRange, BreakdownDimension.CACHE) } }
+                val dist = async { loadStatsPart("维度分布", failures) { AppContainer.repository.getZoneDistributions(zoneId, _uiState.value.statsRange) } }
                 // 汇总失败 → 统计整体失败（其他 async 由 coroutineScope 取消）
                 val sum = summary.await().getOrElse { throw it }
+                val distributions = dist.await()
                 _uiState.update {
                     it.copy(
                         statsData = StatsData(
                             summary = sum,
                             series = series.await(),
-                            country = country.await(),
-                            status = status.await(),
-                            cache = cache.await()
+                            country = distributions?.country,
+                            status = distributions?.status,
+                            cache = buildCacheBreakdown(sum)
                         ),
                         statsLoading = false,
                         statsError = null,
@@ -145,6 +145,16 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         } catch (e: Exception) {
             _uiState.update { it.copy(statsLoading = false, statsError = e.message ?: "加载统计失败") }
         }
+    }
+
+    /** 缓存状态分布：Groups 无 cacheStatus 维度，由 cachedRequests/requests 计算"命中/未命中"两切片 */
+    private fun buildCacheBreakdown(sum: AnalyticsSum): List<AnalyticsBreakdown> {
+        val cached = sum.cachedRequests
+        val uncached = (sum.requests - cached).coerceAtLeast(0)
+        return listOf(
+            AnalyticsBreakdown("命中", cached),
+            AnalyticsBreakdown("未命中", uncached)
+        ).filter { it.value > 0 }
     }
 
     /** 统计单项加载：失败时记录提示并返回 null（该区块降级显示） */

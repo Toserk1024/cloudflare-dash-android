@@ -6,12 +6,11 @@ import io.github.toserk1024.cfdash.data.api.CloudflareClient
 import io.github.toserk1024.cfdash.data.api.CloudflareException
 import io.github.toserk1024.cfdash.data.model.ApiResponse
 import io.github.toserk1024.cfdash.data.model.AccountRef
-import io.github.toserk1024.cfdash.data.model.AnalyticsBreakdown
+import io.github.toserk1024.cfdash.data.model.AnalyticsDistributions
 import io.github.toserk1024.cfdash.data.model.AnalyticsParser
 import io.github.toserk1024.cfdash.data.model.AnalyticsRange
 import io.github.toserk1024.cfdash.data.model.AnalyticsSeries
 import io.github.toserk1024.cfdash.data.model.AnalyticsSum
-import io.github.toserk1024.cfdash.data.model.BreakdownDimension
 import io.github.toserk1024.cfdash.data.model.DnsRecord
 import io.github.toserk1024.cfdash.data.model.DnsRecordRequest
 import io.github.toserk1024.cfdash.data.model.TokenVerifyResult
@@ -115,27 +114,19 @@ class CloudflareRepository(private val client: CloudflareClient) {
         return AnalyticsParser.parseAccountSeries(resp, range)
     }
 
-    /** 获取域名级维度分布（国家/状态码/缓存状态 Top N） */
-    suspend fun getZoneBreakdown(
-        zoneId: String,
-        range: AnalyticsRange,
-        dimension: BreakdownDimension
-    ): List<AnalyticsBreakdown> {
-        val resp = client.graphql(AnalyticsParser.zoneBreakdownQuery(zoneId, range, dimension))
-        return AnalyticsParser.parseZoneBreakdown(resp, range, dimension)
+    /** 获取域名级维度分布（国家/状态码，Groups sum 的 countryMap/responseStatusMap，支持 7d/30d） */
+    suspend fun getZoneDistributions(zoneId: String, range: AnalyticsRange): AnalyticsDistributions {
+        val resp = client.graphql(AnalyticsParser.zoneDistributionsQuery(zoneId, range))
+        return AnalyticsParser.parseZoneDistributions(resp, range)
     }
 
     /** 获取账号级维度分布（各域名同名维度合并） */
-    suspend fun getAccountBreakdown(
-        accountId: String,
-        range: AnalyticsRange,
-        dimension: BreakdownDimension
-    ): List<AnalyticsBreakdown> {
-        val resp = client.graphql(AnalyticsParser.accountBreakdownQuery(accountId, range, dimension))
-        return AnalyticsParser.parseAccountBreakdown(resp, range, dimension)
+    suspend fun getAccountDistributions(accountId: String, range: AnalyticsRange): AnalyticsDistributions {
+        val resp = client.graphql(AnalyticsParser.accountDistributionsQuery(accountId, range))
+        return AnalyticsParser.parseAccountDistributions(resp, range)
     }
 
-    /** 获取账号级域名拆分（各域名请求量，按请求量降序） */
+    /** 获取账号级域名拆分（各域名 host 请求量，按请求量降序；AdaptiveGroups 仅支持 24h 范围） */
     suspend fun getAccountZoneBreakdown(accountId: String, range: AnalyticsRange): List<ZoneAnalyticsItem> {
         val resp = client.graphql(AnalyticsParser.accountZoneBreakdownQuery(accountId, range))
         return AnalyticsParser.parseZoneItems(resp, range)

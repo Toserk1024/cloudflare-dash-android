@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -76,16 +78,20 @@ fun TrendLineChart(
     valueSelector: (AnalyticsSeriesPoint) -> Long,
     modifier: Modifier = Modifier,
     height: Dp = 200.dp,
-    lineColor: Color = CloudflareOrange
+    lineColor: Color = CloudflareOrange,
+    valueFormatter: (Long) -> String = ::formatCount
 ) {
     if (points.isEmpty()) {
         EmptyChartBox(modifier)
         return
     }
     val modelProducer = remember { CartesianChartModelProducer() }
-    LaunchedEffect(points, valueSelector) {
+    // valueSelector/valueFormatter 是 lambda（每次重组新实例），用 rememberUpdatedState 保证 LaunchedEffect 仅在数据变化时触发
+    val currentSelector by rememberUpdatedState(valueSelector)
+    val currentFormatter by rememberUpdatedState(valueFormatter)
+    LaunchedEffect(points) {
         modelProducer.runTransaction {
-            lineModel { series(y = points.map { valueSelector(it).toFloat() }) }
+            lineModel { series(y = points.map { currentSelector(it).toFloat() }) }
             extras { it[labelListKey] = points.map { p -> p.label } }
         }
     }
@@ -99,7 +105,7 @@ fun TrendLineChart(
                 )
             ),
             startAxis = VerticalAxis.rememberStart(
-                valueFormatter = CartesianValueFormatter { _, y, _ -> formatCount(y.toLong()) }
+                valueFormatter = CartesianValueFormatter { _, y, _ -> currentFormatter(y.toLong()) }
             ),
             bottomAxis = HorizontalAxis.rememberBottom(
                 valueFormatter = CartesianValueFormatter { context, x, _ ->

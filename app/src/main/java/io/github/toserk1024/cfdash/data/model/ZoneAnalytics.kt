@@ -61,41 +61,47 @@ data class AnalyticsSeries(
     val isEmpty: Boolean get() = points.isEmpty()
 }
 
-/** 维度分布项（国家/状态码/缓存状态等） */
+/** 维度分布项（国家/状态码等） */
 data class AnalyticsBreakdown(
     val name: String,
     val value: Long
 )
 
-/** 账号级域名拆分项（各域名请求量） */
+/** 维度分布（国家 + 状态码）：来自 Groups sum 的 countryMap / responseStatusMap，一次查询返回，支持 7d/30d */
+data class AnalyticsDistributions(
+    val country: List<AnalyticsBreakdown> = emptyList(),
+    val status: List<AnalyticsBreakdown> = emptyList()
+)
+
+/** 账号级域名拆分项（各 host 请求量） */
 data class ZoneAnalyticsItem(
     val zoneId: String,
     val zoneName: String,
     val sum: AnalyticsSum
 )
 
-/** 维度分布类型（GraphQL groups 的 dimensions 分组字段，配合 orderBy: [count_DESC] 取 Top N） */
-enum class BreakdownDimension(val field: String) {
-    COUNTRY("clientCountryName"),
-    STATUS("edgeResponseStatus"),
-    CACHE("cacheStatus")
-}
-
-/** GraphQL Analytics 查询构建与响应解析（GraphQL 响应为 data/errors 结构，非 ApiResponse 包装） */
+/**
+ * GraphQL Analytics 查询构建与响应解析（GraphQL 响应为 data/errors 结构，非 ApiResponse 包装）。
+ * schema 结论（第三方 schema 文档反查）：
+ * - 1d/1h Groups（预聚合）：dimensions 仅 date(1d)/datetime(1h)；orderBy 无 count_DESC；维度分布用 sum 的 countryMap/responseStatusMap（支持 7d/30d）
+ * - httpRequestsAdaptiveGroups（自适应采样）：支持 clientCountryName/edgeResponseStatus/cacheStatus/clientRequestHTTPHost，orderBy 支持 count_DESC，
+ *   但查询时间范围**不能超过 1 天**（7d/30d 报 "cannot request a time range wider than 1d"）→ 仅用于 24h 域名拆分
+ * - zones 节点无 name 字段
+ */
 object AnalyticsParser {
 
-    /** 自适应采样 HTTP 数据集（维度分布/域名拆分用：支持 clientCountryName/edgeResponseStatus/cacheStatus/clientRequestHTTPHost，orderBy 支持 count_DESC） */
+    /** 自适应采样 HTTP 数据集（仅 24h 域名拆分用：clientRequestHTTPHost 维度） */
     private const val ADAPTIVE_DATASET = "httpRequestsAdaptiveGroups"
 
-    // ===== 汇总查询（原有，仅做总量累加）=====
+    // ===== 汇总查询（含 uniq，独立访客）=====
 
-    /** 构建域名级统计查询（不排序：只做总量累加，orderBy 对 Groups 数据集仅支持聚合字段，规避排序错误） */
+    /** 构建域名级统计查询（不排序：只做总量累加，orderBy 对 Groups 数据集仅支持聚合字段） */
     fun zoneQuery(zoneId: String, range: AnalyticsRange): String = buildString {
         append("query {\n viewer {\n zones(filter: {zoneTag: \"$zoneId\"}) {\n ")
         append(range.dataset)
         append("(limit: ").append(range.limit)
         append(", filter: {").append(filterField(range))
-        append("}) {\n sum { requests threats bytes cachedRequests cachedBytes }\n }\n }\n }\n }")
+        append("}) {\n sum { requests threats bytes cachedRequests cachedBytes }\n uniq { uniques }\n }\n }\n }\n }")
     }
 
     /** 构建账号级统计查询（遍历账号下所有域名） */
@@ -104,7 +110,7 @@ object AnalyticsParser {
         append(range.dataset)
         append("(limit: ").append(range.limit)
         append(", filter: {").append(filterField(range))
-        append("}) {\n sum { requests threats bytes cachedRequests cachedBytes }\n }\n }\n }\n }\n }")
+        append("}) {\n sum { requests threats bytes cachedRequests cachedBytes }\n uniq { uniques }\n }\n }\n }\n }\n }")
     }
 
     // ===== 趋势查询（时间序列：dimensions + sum + uniq）=====
@@ -129,39 +135,38 @@ object AnalyticsParser {
         append(" }\n sum { requests threats bytes cachedRequests cachedBytes }\n uniq { uniques }\n }\n }\n }\n }\n }")
     }
 
-    // ===== 维度分布查询（AdaptiveGroups：count + dimensions，orderBy 聚合字段取 Top N）=====
-    // 说明：1d/1h Groups 的 dimensions 仅有 date/datetime，国家/状态码/缓存维度需用 httpRequestsAdaptiveGroups
-    // （自适应采样，支持 clientCountryName/edgeResponseStatus/cacheStatus，orderBy 支持 count_DESC）
+    // ===== 维度分布查询（Groups sum 的 countryMap/responseStatusMap，支持全部时间范围）=====
 
-    /** 构建域名级维度分布查询 */
-    fun zoneBreakdownQuery(zoneId: String, range: AnalyticsRange, dimension: BreakdownDimension): String = buildString {
+    /** 构建域名级维度分布查询（countryMap + responseStatusMap 一次返回） */
+    fun zoneDistributionsQuery(zoneId: String, range: AnalyticsRange): String = buildString {
         append("query {\n viewer {\n zones(filter: {zoneTag: \"$zoneId\"}) {\n ")
-        append(ADAPTIVE_DATASET)
-        append("(limit: 15, filter: {").append(adaptiveFilterField(range))
-        append("}, orderBy: [count_DESC]) {\n count\n dimensions { ").append(dimension.field)
-        append(" }\n }\n }\n }\n }")
+        append(range.dataset)
+        append("(limit: ").append(range.limit)
+        append(", filter: {").append(filterField(range))
+        append("}) {\n sum { requests\n countryMap { clientCountryName requests }\n responseStatusMap { edgeResponseStatus requests } }\n }\n }\n }\n }")
     }
 
     /** 构建账号级维度分布查询（各域名的分布合并累加） */
-    fun accountBreakdownQuery(accountId: String, range: AnalyticsRange, dimension: BreakdownDimension): String = buildString {
+    fun accountDistributionsQuery(accountId: String, range: AnalyticsRange): String = buildString {
         append("query {\n viewer {\n accounts(filter: {accountTag: \"$accountId\"}) {\n zones {\n ")
-        append(ADAPTIVE_DATASET)
-        append("(limit: 15, filter: {").append(adaptiveFilterField(range))
-        append("}, orderBy: [count_DESC]) {\n count\n dimensions { ").append(dimension.field)
-        append(" }\n }\n }\n }\n }\n }")
+        append(range.dataset)
+        append("(limit: ").append(range.limit)
+        append(", filter: {").append(filterField(range))
+        append("}) {\n sum { requests\n countryMap { clientCountryName requests }\n responseStatusMap { edgeResponseStatus requests } }\n }\n }\n }\n }\n }")
     }
 
-    // ===== 账号级域名拆分查询（AdaptiveGroups 按 clientRequestHTTPHost 分组，规避 zones 节点无 name 字段）=====
+    // ===== 账号级域名拆分查询（AdaptiveGroups 按 clientRequestHTTPHost 分组，仅 24h 可用）=====
 
-    /** 构建账号级域名拆分查询（各域名的 host 请求量，客户端按 host 合并累加） */
+    /** 构建账号级域名拆分查询（各域名 host 请求量，客户端按 host 合并） */
     fun accountZoneBreakdownQuery(accountId: String, range: AnalyticsRange): String = buildString {
         append("query {\n viewer {\n accounts(filter: {accountTag: \"$accountId\"}) {\n zones {\n ")
         append(ADAPTIVE_DATASET)
-        append("(limit: 15, filter: {").append(adaptiveFilterField(range))
-        append("}, orderBy: [count_DESC]) {\n count\n dimensions { clientRequestHTTPHost }\n }\n }\n }\n }\n }")
+        append("(limit: 15, filter: {datetime_geq: \"").append(isoUtc(System.currentTimeMillis() - 24 * 3600_000L))
+        append("\", datetime_leq: \"").append(isoUtc(System.currentTimeMillis()))
+        append("\"}, orderBy: [count_DESC]) {\n count\n dimensions { clientRequestHTTPHost }\n }\n }\n }\n }\n }")
     }
 
-    // ===== 汇总解析（原有）=====
+    // ===== 汇总解析（含 uniques）=====
 
     /** 解析域名级统计：data.viewer.zones[0][dataset][] 累加 */
     fun parseZone(root: JsonElement, range: AnalyticsRange): AnalyticsSum {
@@ -211,26 +216,47 @@ object AnalyticsParser {
         return AnalyticsSeries(byLabel.values.sortedBy { it.label })
     }
 
-    // ===== 维度分布解析 =====
+    // ===== 维度分布解析（countryMap / responseStatusMap）=====
 
-    /** 解析域名级维度分布（AdaptiveGroups） */
-    fun parseZoneBreakdown(root: JsonElement, range: AnalyticsRange, dimension: BreakdownDimension): List<AnalyticsBreakdown> {
+    /** 解析域名级维度分布 */
+    fun parseZoneDistributions(root: JsonElement, range: AnalyticsRange): AnalyticsDistributions {
         val zones = root.jsonObject["data"]?.jsonObject?.get("viewer")?.jsonObject?.get("zones") as? JsonArray
-            ?: return emptyList()
-        return parseGroups(zones.firstOrNull()?.jsonObject?.get(ADAPTIVE_DATASET) as? JsonArray, dimension)
+            ?: return AnalyticsDistributions()
+        val groups = zones.firstOrNull()?.jsonObject?.get(range.dataset) as? JsonArray ?: return AnalyticsDistributions()
+        return mergeDistributions(groups.mapNotNull { it.jsonObject })
     }
 
     /** 解析账号级维度分布（各域名同名维度合并累加） */
-    fun parseAccountBreakdown(root: JsonElement, range: AnalyticsRange, dimension: BreakdownDimension): List<AnalyticsBreakdown> {
-        val zones = accountZones(root) ?: return emptyList()
-        val map = LinkedHashMap<String, Long>()
+    fun parseAccountDistributions(root: JsonElement, range: AnalyticsRange): AnalyticsDistributions {
+        val zones = accountZones(root) ?: return AnalyticsDistributions()
+        val allGroups = mutableListOf<JsonObject>()
         zones.forEach { zone ->
-            (zone.jsonObject[ADAPTIVE_DATASET] as? JsonArray)?.forEach { g ->
-                val name = dimensionName(g.jsonObject, dimension) ?: return@forEach
-                map[name] = (map[name] ?: 0L) + (g.jsonObject["count"]?.jsonPrimitive?.longOrNull ?: 0L)
+            (zone.jsonObject[range.dataset] as? JsonArray)?.forEach { allGroups.add(it.jsonObject) }
+        }
+        return mergeDistributions(allGroups)
+    }
+
+    /** 合并多个 group 的 countryMap/responseStatusMap（跨天/跨域名累加，按值降序） */
+    private fun mergeDistributions(groups: List<JsonObject>): AnalyticsDistributions {
+        val countryMap = LinkedHashMap<String, Long>()
+        val statusMap = LinkedHashMap<String, Long>()
+        groups.forEach { g ->
+            val s = g["sum"] as? JsonObject ?: return@forEach
+            (s["countryMap"] as? JsonArray)?.forEach { e ->
+                val name = e.jsonObject["clientCountryName"]?.jsonPrimitive?.content ?: return@forEach
+                if (name.isNotBlank()) {
+                    countryMap[name] = (countryMap[name] ?: 0L) + (e.jsonObject["requests"]?.jsonPrimitive?.longOrNull ?: 0L)
+                }
+            }
+            (s["responseStatusMap"] as? JsonArray)?.forEach { e ->
+                val status = e.jsonObject["edgeResponseStatus"]?.jsonPrimitive?.content ?: return@forEach
+                statusMap[status] = (statusMap[status] ?: 0L) + (e.jsonObject["requests"]?.jsonPrimitive?.longOrNull ?: 0L)
             }
         }
-        return map.entries.sortedByDescending { it.value }.map { AnalyticsBreakdown(it.key, it.value) }
+        return AnalyticsDistributions(
+            country = countryMap.entries.sortedByDescending { it.value }.map { AnalyticsBreakdown(it.key, it.value) },
+            status = statusMap.entries.sortedByDescending { it.value }.map { AnalyticsBreakdown(it.key, it.value) }
+        )
     }
 
     // ===== 账号级域名拆分解析 =====
@@ -260,17 +286,19 @@ object AnalyticsParser {
         root.jsonObject["data"]?.jsonObject?.get("viewer")?.jsonObject?.get("accounts")
             ?.jsonArray?.firstOrNull()?.jsonObject?.get("zones") as? JsonArray
 
-    /** 累加单个节点的数据集 sum */
+    /** 累加单个节点的数据集 sum（含 uniques） */
     private fun accumulate(container: JsonObject, dataset: String): AnalyticsSum {
         var sum = AnalyticsSum()
         (container[dataset] as? JsonArray)?.forEach { g ->
             val s = g.jsonObject["sum"] as? JsonObject ?: return@forEach
+            val u = g.jsonObject["uniq"] as? JsonObject
             sum += AnalyticsSum(
                 requests = s["requests"]?.jsonPrimitive?.longOrNull ?: 0,
                 threats = s["threats"]?.jsonPrimitive?.longOrNull ?: 0,
                 bytes = s["bytes"]?.jsonPrimitive?.longOrNull ?: 0,
                 cachedRequests = s["cachedRequests"]?.jsonPrimitive?.longOrNull ?: 0,
-                cachedBytes = s["cachedBytes"]?.jsonPrimitive?.longOrNull ?: 0
+                cachedBytes = s["cachedBytes"]?.jsonPrimitive?.longOrNull ?: 0,
+                uniques = u?.get("uniques")?.jsonPrimitive?.longOrNull ?: 0
             )
         }
         return sum
@@ -294,54 +322,9 @@ object AnalyticsParser {
         )
     }
 
-    /** 解析维度分组数组（count + dimensions[field]），按值降序 */
-    private fun parseGroups(groups: JsonArray?, dimension: BreakdownDimension): List<AnalyticsBreakdown> {
-        if (groups == null) return emptyList()
-        return groups.mapNotNull { g ->
-            val name = dimensionName(g.jsonObject, dimension) ?: return@mapNotNull null
-            AnalyticsBreakdown(name, g.jsonObject["count"]?.jsonPrimitive?.longOrNull ?: 0L)
-        }.sortedByDescending { it.value }
-    }
-
-    /** 提取维度名（空值统一为"未知"，状态码保留原值，缓存状态映射中文） */
-    private fun dimensionName(g: JsonObject, dimension: BreakdownDimension): String? {
-        val dims = g["dimensions"] as? JsonObject ?: return null
-        val v = dims[dimension.field]?.jsonPrimitive ?: return null
-        val raw = v.content
-        if (raw.isBlank()) return "未知"
-        return when (dimension) {
-            BreakdownDimension.COUNTRY -> raw
-            BreakdownDimension.STATUS -> raw
-            BreakdownDimension.CACHE -> cacheStatusLabels[raw.lowercase()] ?: raw
-        }
-    }
-
-    /** cacheStatus 英文值 → 中文（官方值：hit/miss/dynamic/expired/bypass/revalidated/stale 等） */
-    private val cacheStatusLabels = mapOf(
-        "hit" to "命中",
-        "miss" to "未命中",
-        "dynamic" to "动态",
-        "expired" to "过期",
-        "bypass" to "绕过",
-        "revalidated" to "重新验证",
-        "stale" to "过期",
-        "unknown" to "未知"
-    )
-
     /** 趋势时间字段：24h 用 datetime（1hGroups 按小时），7d/30d 用 date（1dGroups 按天） */
     private fun seriesDimensionField(range: AnalyticsRange): String =
         if (range == AnalyticsRange.H24) "datetime" else "date"
-
-    /** 维度分布/域名拆分（AdaptiveGroups）时间过滤：统一 datetime_geq/leq（UTC ISO），窗口随 range */
-    private fun adaptiveFilterField(range: AnalyticsRange): String {
-        val now = System.currentTimeMillis()
-        val days = when (range) {
-            AnalyticsRange.H24 -> 1
-            AnalyticsRange.D7 -> 7
-            AnalyticsRange.D30 -> 30
-        }
-        return "datetime_geq: \"${isoUtc(now - days * 24 * 3600_000L)}\", datetime_leq: \"${isoUtc(now)}\""
-    }
 
     /** 时间窗过滤字段：24h → datetime_geq/leq；7d/30d → date_geq/leq（UTC） */
     private fun filterField(range: AnalyticsRange): String {

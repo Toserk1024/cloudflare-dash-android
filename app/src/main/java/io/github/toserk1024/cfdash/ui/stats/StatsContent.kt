@@ -123,7 +123,7 @@ fun StatsContent(
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         ChartCard(title = "带宽趋势") {
-                            TrendLineChart(points = series.points, valueSelector = { it.bytes })
+                            TrendLineChart(points = series.points, valueSelector = { it.bytes }, valueFormatter = ::formatBytes)
                         }
                     }
                 }
