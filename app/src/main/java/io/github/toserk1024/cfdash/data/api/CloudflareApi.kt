@@ -12,6 +12,9 @@ object CloudflareApi {
     const val ZONES = "/zones"
     const val ZONE = "/zones/%s"
 
+    // Zone 设置（/zones/{id}/settings/{name}）
+    const val ZONE_SETTING = "/zones/%s/settings/%s"
+
     // 账号
     const val ACCOUNTS = "/accounts"
 

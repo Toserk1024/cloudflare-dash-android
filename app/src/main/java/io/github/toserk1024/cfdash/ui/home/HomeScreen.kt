@@ -1,9 +1,11 @@
 package io.github.toserk1024.cfdash.ui.home
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -22,7 +24,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.toserk1024.cfdash.data.model.DnsRecord
@@ -31,11 +35,12 @@ import io.github.toserk1024.cfdash.ui.dns.DnsRecordsContent
 import io.github.toserk1024.cfdash.ui.dns.DnsViewModel
 import io.github.toserk1024.cfdash.ui.profile.ProfileScreen
 import io.github.toserk1024.cfdash.ui.zones.ZonesScreen
+import kotlin.math.roundToInt
 
 /**
  * 主界面：底部导航（域名 / DNS / 我的）。
  *
- * 卡顿优化：三个 Tab 首次访问后常驻组合，切换时仅做透明度过渡（GPU 合成，开销极小），
+ * 卡顿优化：三个 Tab 首次访问后常驻组合，切换时仅做水平平移过渡（offset 位移，GPU 合成，开销极小），
  * 避免 AnimatedContent 每次切换都销毁/重建整页（LazyColumn 全量重建 + 滚动位置丢失）造成的掉帧。
  */
 @Composable
@@ -54,6 +59,10 @@ fun HomeScreen(
     LaunchedEffect(selectedTab) {
         visitedMask = visitedMask or (1 shl selectedTab)
     }
+
+    // 水平平移动画所需的屏幕宽度（px），用于计算 Tab 移出屏幕的偏移量
+    val configuration = LocalConfiguration.current
+    val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.toPx() }
 
     Scaffold(
         bottomBar = {
@@ -82,13 +91,19 @@ fun HomeScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             // 域名 Tab（常驻）
             if ((visitedMask and 0b001) != 0) {
-                FadeTab(selected = selectedTab == 0) {
+                SlidingTab(
+                    selected = selectedTab == 0,
+                    targetOffset = slideOffsetFor(selectedTab, 0, screenWidthPx)
+                ) {
                     ZonesScreen(onZoneClick = onZoneClick)
                 }
             }
             // DNS Tab（常驻）
             if ((visitedMask and 0b010) != 0) {
-                FadeTab(selected = selectedTab == 1) {
+                SlidingTab(
+                    selected = selectedTab == 1,
+                    targetOffset = slideOffsetFor(selectedTab, 1, screenWidthPx)
+                ) {
                     // 仅 DNS Tab 显示时才收集 DNS 状态，减少无关重组
                     val dnsState by dnsViewModel.uiState.collectAsState()
                     DnsRecordsContent(
@@ -102,7 +117,10 @@ fun HomeScreen(
             }
             // 我的 Tab（常驻）
             if ((visitedMask and 0b100) != 0) {
-                FadeTab(selected = selectedTab == 2) {
+                SlidingTab(
+                    selected = selectedTab == 2,
+                    targetOffset = slideOffsetFor(selectedTab, 2, screenWidthPx)
+                ) {
                     ProfileScreen(
                         uiState = homeState,
                         onRetry = homeViewModel::loadUser,
@@ -115,25 +133,33 @@ fun HomeScreen(
 }
 
 /**
- * 常驻 Tab 容器：页面保持组合不销毁，切换时仅透明度过渡（150ms，GPU 合成）。
- * 不可见 Tab 置于底层（zIndex=0），可见 Tab 置于顶层（zIndex=1）并填满区域，天然拦截触摸。
+ * 常驻 Tab 容器：页面保持组合不销毁，切换时仅做水平平移过渡（250ms，FastOutSlowIn，GPU 合成）。
+ * 未选中 Tab 平移到屏幕外（左侧/右侧），选中 Tab 停在原位；选中 Tab 置于顶层（zIndex=1）并填满区域，天然拦截触摸。
  */
 @Composable
-private fun FadeTab(
+private fun SlidingTab(
     selected: Boolean,
+    targetOffset: Float,
     content: @Composable () -> Unit
 ) {
-    val alpha by animateFloatAsState(
-        targetValue = if (selected) 1f else 0f,
-        animationSpec = tween(150),
-        label = "tabFade"
+    val offsetX by animateFloatAsState(
+        targetValue = targetOffset,
+        animationSpec = tween(250, easing = FastOutSlowInEasing),
+        label = "tabSlide"
     )
     Box(
         modifier = Modifier
             .fillMaxSize()
             .zIndex(if (selected) 1f else 0f)
-            .alpha(alpha)
+            .offset { IntOffset(offsetX.roundToInt(), 0) }
     ) {
         content()
     }
+}
+
+/** 计算 Tab 的目标水平偏移（px）：位于选中 Tab 左侧的移出左屏，右侧的移出右屏，选中的归位 */
+private fun slideOffsetFor(selectedTab: Int, tabIndex: Int, width: Float): Float = when {
+    tabIndex < selectedTab -> -width
+    tabIndex > selectedTab -> width
+    else -> 0f
 }

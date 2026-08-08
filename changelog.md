@@ -9,6 +9,16 @@
 - **v1.4**：Tab/导航过渡动画（AnimatedContent + NavHost transitions）、修复请求体序列化（reified BodyT）
 - **v1.5**：移除本地构建环境（ARM64 AAPT2 hack、setup_android_env.sh、tools/、gradle wrapper 本地 distributionUrl），改用 GitHub Actions CI 构建（手动触发）
 
+## 2026-08-08 · 图标库扩展 + 域名详情高级设置 + Tab 水平平移动画
+
+- **图标**：引入 `material-icons-extended` 完整图标库（release 开启 R8，未引用图标被裁剪，APK 体积几乎无增量）；移除「我的」页自定义 `WebIcon`（ImageVector + PathParser 手写 pathData），开源仓库图标改用标准库 `Icons.Filled.Web`
+- **域名详情页新增「高级」设置卡片**（Zone Settings API：`GET/PATCH /zones/{id}/settings/{name}`，需 Token 具备 Zone Settings 权限）：
+  - **开发模式**：`development_mode` on/off 开关，副标题动态显示剩余时间（`time_remaining`，3 小时自动关闭）
+  - **五秒盾模式**（Under Attack Mode）：`security_level=under_attack` 开启，关闭恢复 `medium`（Cloudflare 默认安全级别）
+  - **IPv6 兼容性**：`ipv6` on/off 开关
+  - 三个设置并行加载（单项失败不阻塞其他）；切换防连点（settingsBusy 禁用全部开关）、失败保留原值并红色文字提示
+- **Tab 切换动画**：透明度过渡（150ms）→ **水平平移过渡**（250ms FastOutSlowInEasing，offset 位移 GPU 合成，方向跟随 Tab 位置：右侧 Tab 从右滑入、左侧 Tab 从左滑入），保持常驻组合不销毁重建（LazyColumn 不重建、滚动位置不丢失）
+
 ## 2026-08-05 · 本次构建改造
 
 - 包名定稿为 `io.github.toserk1024.cfdash`（规避商标风险；此前曾迁移至 com.cloudflare.dash3rd）

@@ -30,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -85,8 +86,17 @@ fun ZoneDetailScreen(
                 state.zone != null -> ZoneDetailContent(
                     zone = state.zone!!,
                     deleting = state.deleting,
+                    devMode = state.devMode,
+                    devModeRemaining = state.devModeRemaining,
+                    underAttack = state.underAttack,
+                    ipv6 = state.ipv6,
+                    settingsBusy = state.settingsBusy,
+                    settingsError = state.settingsError,
                     onManageDns = { onManageDns(state.zone!!.id, state.zone!!.name) },
-                    onDelete = viewModel::deleteZone
+                    onDelete = viewModel::deleteZone,
+                    onSetDevMode = viewModel::setDevelopmentMode,
+                    onSetUnderAttack = viewModel::setUnderAttack,
+                    onSetIpv6 = viewModel::setIpv6
                 )
                 else -> Column(
                     modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -110,8 +120,17 @@ fun ZoneDetailScreen(
 private fun ZoneDetailContent(
     zone: Zone,
     deleting: Boolean,
+    devMode: Boolean?,
+    devModeRemaining: Long,
+    underAttack: Boolean?,
+    ipv6: Boolean?,
+    settingsBusy: String?,
+    settingsError: String?,
     onManageDns: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onSetDevMode: (Boolean) -> Unit,
+    onSetUnderAttack: (Boolean) -> Unit,
+    onSetIpv6: (Boolean) -> Unit
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -179,6 +198,63 @@ private fun ZoneDetailContent(
             }
             Spacer(modifier = Modifier.height(12.dp))
         }
+
+        // 高级设置卡片
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("高级", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 开发模式
+                AdvancedSwitchRow(
+                    title = "开发模式",
+                    subtitle = when {
+                        devMode == null -> "加载中…"
+                        devMode && devModeRemaining > 0 ->
+                            "已开启，剩余 ${formatRemaining(devModeRemaining)}（到期自动关闭）"
+                        devMode -> "已开启（3 小时自动关闭）"
+                        else -> "绕过缓存直接访问源站"
+                    },
+                    checked = devMode == true,
+                    enabled = settingsBusy == null && devMode != null,
+                    busy = settingsBusy == "development_mode",
+                    onCheckedChange = onSetDevMode
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                // 五秒盾模式
+                AdvancedSwitchRow(
+                    title = "五秒盾模式",
+                    subtitle = "开启后所有访客需通过 5 秒安全挑战",
+                    checked = underAttack == true,
+                    enabled = settingsBusy == null && underAttack != null,
+                    busy = settingsBusy == "security_level",
+                    onCheckedChange = onSetUnderAttack
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                // IPv6 兼容性
+                AdvancedSwitchRow(
+                    title = "IPv6 兼容性",
+                    subtitle = "自动处理 IPv6 流量",
+                    checked = ipv6 == true,
+                    enabled = settingsBusy == null && ipv6 != null,
+                    busy = settingsBusy == "ipv6",
+                    onCheckedChange = onSetIpv6
+                )
+
+                settingsError?.let {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         // 操作按钮
         Button(
@@ -255,4 +331,47 @@ private fun PlanRow(plan: ZonePlan) {
     InfoRow("价格", if (plan.price > 0) "${plan.currency} ${plan.price}" else "免费")
     InfoRow("周期", plan.frequency)
     InfoRow("订阅状态", if (plan.is_subscribed) "已订阅" else "未订阅")
+}
+
+/** 高级设置开关行（标题 + 副标题 + Switch / 切换中 loading） */
+@Composable
+private fun AdvancedSwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean,
+    busy: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            if (subtitle.isNotBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        if (busy) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+        } else {
+            Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+        }
+    }
+}
+
+/** 秒数格式化为"X小时Y分钟/Z分钟" */
+private fun formatRemaining(seconds: Long): String {
+    val totalMin = seconds / 60
+    return when {
+        totalMin >= 60 -> "${totalMin / 60}小时${totalMin % 60}分钟"
+        totalMin > 0 -> "$totalMin 分钟"
+        else -> "$seconds 秒"
+    }
 }

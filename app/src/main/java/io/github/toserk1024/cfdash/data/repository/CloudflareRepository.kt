@@ -9,6 +9,8 @@ import io.github.toserk1024.cfdash.data.model.DnsRecordRequest
 import io.github.toserk1024.cfdash.data.model.TokenVerifyResult
 import io.github.toserk1024.cfdash.data.model.User
 import io.github.toserk1024.cfdash.data.model.Zone
+import io.github.toserk1024.cfdash.data.model.ZoneSetting
+import io.github.toserk1024.cfdash.data.model.ZoneSettingRequest
 import kotlinx.serialization.json.JsonElement
 
 /** 业务仓储层：封装所有 Cloudflare API 调用 */
@@ -53,6 +55,18 @@ class CloudflareRepository(private val client: CloudflareClient) {
     suspend fun deleteZone(zoneId: String) {
         client.delete<JsonElement>(CloudflareApi.ZONE.format(zoneId))
     }
+
+    /** 获取 Zone 设置（如 development_mode / security_level / ipv6） */
+    suspend fun getZoneSetting(zoneId: String, setting: String): ZoneSetting =
+        client.get<ZoneSetting>(CloudflareApi.ZONE_SETTING.format(zoneId, setting)).result
+            ?: throw CloudflareException("获取设置 $setting 失败")
+
+    /** 更新 Zone 设置（PATCH {"value": ...}） */
+    suspend fun updateZoneSetting(zoneId: String, setting: String, value: String): ZoneSetting =
+        client.patch<ZoneSetting, ZoneSettingRequest>(
+            CloudflareApi.ZONE_SETTING.format(zoneId, setting),
+            ZoneSettingRequest(value)
+        ).result ?: throw CloudflareException("更新设置 $setting 失败")
 
     /** 分页获取 DNS 记录（type/name 支持筛选） */
     suspend fun getDnsRecords(
