@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
@@ -132,7 +133,7 @@ fun TrendLineChart(
                         val target = targets.firstOrNull() ?: return@ValueFormatter ""
                         val xLabel = context.model.extraStore[labelListKey].getOrNull(target.x.toInt()) ?: ""
                         val yText = (target as? LineCartesianLayerMarkerTarget)
-                            ?.points.firstOrNull()?.entry?.y?.toLong()?.let { currentFormatter(it) } ?: ""
+                            ?.points?.firstOrNull()?.entry?.y?.toLong()?.let { currentFormatter(it) } ?: ""
                         if (xLabel.isNotBlank()) "$xLabel\n$yText" else yText
                     }
                 }
@@ -264,7 +265,7 @@ fun ZoneBarChart(
                         val target = targets.firstOrNull() ?: return@ValueFormatter ""
                         val xLabel = context.model.extraStore[labelListKey].getOrNull(target.x.toInt()) ?: ""
                         val yText = (target as? ColumnCartesianLayerMarkerTarget)
-                            ?.columns.firstOrNull()?.entry?.y?.toLong()?.let { formatCount(it) } ?: ""
+                            ?.columns?.firstOrNull()?.entry?.y?.toLong()?.let { formatCount(it) } ?: ""
                         if (xLabel.isNotBlank()) "$xLabel\n$yText" else yText
                     }
                 }
