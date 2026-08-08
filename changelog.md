@@ -9,6 +9,20 @@
 - **v1.4**：Tab/导航过渡动画（AnimatedContent + NavHost transitions）、修复请求体序列化（reified BodyT）
 - **v1.5**：移除本地构建环境（ARM64 AAPT2 hack、setup_android_env.sh、tools/、gradle wrapper 本地 distributionUrl），改用 GitHub Actions CI 构建（手动触发）
 
+## 2026-08-08 · 侧边栏导航 + 统计数据 + 构建优化
+
+- **侧边栏导航**：底栏 NavigationBar → **ModalNavigationDrawer 侧边栏**（用户信息卡 + 域名/DNS/统计数据/我的 + 退出登录），为未来更多功能预留扩展位；主内容区第 4 个 Tab「统计数据」，沿用 visitedMask 常驻 + SlidingTab 水平平移过渡
+- **统计数据（GraphQL Analytics）**：按官方文档实现 `POST /graphql` 查询（`httpRequests1hGroups`/`httpRequests1dGroups`，`sum{requests, threats, bytes, cachedRequests, cachedBytes}`）：
+  - **账号级**（侧边栏「统计数据」Tab，遍历账号下所有域名累加）+ **域名级**（域名详情页统计卡片）
+  - 时间范围 **24小时 / 7天 / 30天** SegmentedButton 切换（数据集/limit 映射，UTC 时间窗）
+  - 指标：请求数、威胁数、带宽、缓存命中率（万/亿、KB/MB/GB 格式化）
+  - 可复用 `StatsContent` 组件；`User` 模型新增 `accounts`（账号级统计需要 accountTag）
+  - Token 权限要求新增 **Zone → Analytics → Read**（登录页权限列表/readme 同步）
+- **构建优化**：
+  - `defaultConfig.ndk.abiFilters` 仅打包 `armeabi-v7a` + `arm64-v8a`（排除 x86/x86_64）
+  - `gradle.properties`：`org.gradle.caching=true`（Gradle Build Cache 跨构建复用任务输出）+ `-Xmx4096m`
+- **文档**：agent.md（34 文件结构/GraphQL 端点/权限/注意点/速查表）、readme.md（功能/权限表）同步
+
 ## 2026-08-08 · 高级设置修复 + Global API Key 登录 + Token 权限提示
 
 - **高级设置加载修复**：域名详情与三个高级设置（开发模式/五秒盾/IPv6）改为**并发请求**（页面 loading 动画期间即开始，单项失败不阻塞其他）；加载失败不再静默吞掉（显示错误原因 + 「重试」按钮，仅重刷设置不打断页面）；开发模式文案调整：默认「开启后绕过CDN缓存」，仅确认开启时显示「剩余时间：X」

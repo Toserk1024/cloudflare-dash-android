@@ -5,7 +5,7 @@
 ## 1. 项目概览
 
 基于 **Jetpack Compose + Material 3** 的 Cloudflare 第三方 Android 客户端（包名 `io.github.toserk1024.cfdash`）。
-当前已实现：**API Token 初始化验证、域名管理（列表/搜索/详情/删除）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、用户信息与退出登录**。
+当前已实现：**双认证登录（Global API Key / API Token，Global 默认优先）、侧边栏导航（域名/DNS/统计/我的）、域名管理（列表/搜索/详情/删除）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、域名高级设置（开发模式 / 五秒盾 / IPv6）、统计数据（账号级/域名级，24h/7d/30d 切换）、用户信息与退出登录**。
 
 **已移除功能**：添加域名（用户要求删除，相关代码已清理干净，如需恢复参考 §8.3）。
 **未开发**：Workers、Zero Trust 等高级功能（用户明确暂不开发）。
@@ -22,13 +22,13 @@
 | 导航 | Navigation Compose | 2.8.5 |
 | 存储 | EncryptedSharedPreferences (security-crypto) | 1.1.0-alpha06 |
 | 协程 | kotlinx-coroutines-android | 1.9.0 |
-| 图标 | material-icons-core（注意：仅 core，很多图标不可用！） | BOM 管理 |
+| 图标 | material-icons-extended（完整图标库，release R8 裁剪未引用图标，体积几乎无增量） | BOM 管理 |
 | ViewModel | lifecycle-viewmodel-compose | 2.8.7 |
 
 依赖定义位置：`gradle/libs.versions.toml` + `app/build.gradle.kts`。
 仓库镜像：阿里云/华为云优先（`settings.gradle.kts`），离线环境可构建。
 
-## 3. 完整代码结构（29 个 Kotlin 文件）
+## 3. 完整代码结构（34 个 Kotlin 文件）
 
 ```
 app/src/main/java/io/github/toserk1024/cfdash/
@@ -39,22 +39,26 @@ app/src/main/java/io/github/toserk1024/cfdash/
 │   └── AppNavHost.kt             # NavHost：6 个目的地 + 全局转场动画
 ├── data/
 │   ├── api/
-│   │   ├── CloudflareApi.kt      # BASE_URL + 端点路径常量
-│   │   └── CloudflareClient.kt   # ★核心：OkHttp 封装 + inline reified 序列化/反序列化
+│   │   ├── CloudflareApi.kt      # BASE_URL + 端点路径常量（含 /graphql）
+│   │   ├── AuthCredential.kt     # 认证凭据：sealed interface（Token / GlobalKey）
+│   │   └── CloudflareClient.kt   # ★核心：OkHttp 封装 + inline reified 序列化 + 双认证头 + graphql()
 │   ├── model/
 │   │   ├── ApiResponse.kt        # 通用包装 success/errors/result/result_info + TokenVerifyResult
 │   │   ├── Zone.kt               # Zone + ZonePlan
+│   │   ├── ZoneSetting.kt        # Zone 设置项（id/value/editable/time_remaining）+ 更新请求体
+│   │   ├── ZoneAnalytics.kt      # 统计：AnalyticsRange/AnalyticsSum + AnalyticsParser（GraphQL 查询/解析）
 │   │   ├── DnsRecord.kt          # DnsRecord + DnsRecordRequest + DnsRecordTypes(常量)
-│   │   └── User.kt               # 用户信息
+│   │   └── User.kt               # 用户信息 + AccountRef（账号级统计用）
 │   ├── repository/
-│   │   └── CloudflareRepository.kt  # 业务层：verifyToken/getUser/getZones/getZone/deleteZone/getDnsRecords/createDnsRecord/updateDnsRecord/deleteDnsRecord
+│   │   └── CloudflareRepository.kt  # 业务层：verifyCredential/getUser/getZones/getZone/deleteZone/getZoneSetting/updateZoneSetting/getZoneAnalytics/getAccountAnalytics/getDnsRecords/createDnsRecord/updateDnsRecord/deleteDnsRecord
 │   └── storage/
-│       └── TokenStore.kt         # EncryptedSharedPreferences 读写 Token
+│       └── TokenStore.kt         # EncryptedSharedPreferences 双凭据存储（authMode + token/email+key）
 └── ui/
     ├── theme/                    # Color/Theme/Type（Cloudflare 橙 #F6821F）
-    ├── onboarding/               # OnboardingScreen + OnboardingViewModel（Token 验证）
-    ├── home/                     # HomeScreen（底部导航+AnimatedContent）+ HomeViewModel（用户信息）
-    ├── zones/                    # ZonesScreen + ZonesViewModel（域名列表）+ ZoneDetailScreen + ZoneDetailViewModel
+    ├── onboarding/               # OnboardingScreen + OnboardingViewModel（双认证：Global 默认 / Token）
+    ├── home/                     # HomeScreen（侧边栏导航 + 水平平移过渡）+ HomeViewModel（用户信息）
+    ├── stats/                    # StatsViewModel + StatsContent（可复用统计组件，作为 Home 第 4 个 Tab）
+    ├── zones/                    # ZonesScreen + ZonesViewModel（域名列表）+ ZoneDetailScreen + ZoneDetailViewModel（含高级设置 + 域名统计）
     ├── dns/                      # DnsRecordsContent（复用组件）+ DnsRecordsScreen + DnsRecordEditScreen + DnsViewModel + DnsEditViewModel
     └── profile/                  # ProfileScreen（我的）
 ```
@@ -93,7 +97,7 @@ UI(Composable) ⇄ ViewModel(StateFlow) ⇄ Repository ⇄ CloudflareClient(OkHt
 ### 4.5 导航
 - 单 Activity，路由见 `Routes.kt`：onboarding / home / zone_detail / dns_records / dns_edit
 - `AppNavHost` 配置了全局转场动画（fadeIn + slideInHorizontally 1/4 屏）
-- HomeScreen 底部三 Tab（域名/DNS/我的）：首次访问后常驻组合（visitedMask 懒加载），切换仅透明度过渡（FadeTab，GPU 合成），避免重建卡顿
+- HomeScreen 底部三 Tab（域名/DNS/我的）：首次访问后常驻组合（visitedMask 懒加载），切换仅水平平移过渡（SlidingTab，250ms FastOutSlowIn，offset 位移 GPU 合成，方向跟随 Tab 位置），避免重建卡顿
 - 带参路由：`zone_detail/{zoneId}?zoneName={zoneName}`（可选参数有 defaultValue=""）
 - ViewModel 从 `SavedStateHandle` 读参数（如 DnsEditViewModel 的 zoneId/recordId、DnsViewModel 的 zoneId）
 - **注意**：`SavedStateHandle["key"]` 泛型推断可能失败，用 `savedStateHandle.get<String>("key")` 显式类型
@@ -113,12 +117,17 @@ FAB 已内置在 Content 中，DnsRecordsScreen 不再自带 FAB。
 | 域名列表 | GET `/zones?page=&per_page=&name=&status=` | |
 | 域名详情 | GET `/zones/{zone_id}` | |
 | 删除域名 | DELETE `/zones/{zone_id}` | |
+| 获取 Zone 设置 | GET `/zones/{zone_id}/settings/{name}` | development_mode / security_level / ipv6 等 |
+| 更新 Zone 设置 | PATCH `/zones/{zone_id}/settings/{name}` | body: {"value": ...}，需 Zone Settings 权限 |
+| 统计数据 | POST `/graphql` | GraphQL Analytics（httpRequests1dGroups/1hGroups），需 Analytics Read |
 | DNS 记录列表 | GET `/zones/{zone_id}/dns_records?page=&per_page=` | 拉全量翻页 |
 | 新建记录 | POST `/zones/{zone_id}/dns_records` | body: DnsRecordRequest |
 | 更新记录 | PATCH `/zones/{zone_id}/dns_records/{id}` | body: DnsRecordRequest |
 | 删除记录 | DELETE `/zones/{zone_id}/dns_records/{id}` | |
 
-Token 权限要求：Zone Read/Edit、DNS Read/Edit、User Details Read（Account Settings Read 仅在添加域名时需要，已无此功能）。
+Token 权限要求：Zone Read/Edit、DNS Read/Edit、Zone Settings Read/Edit（高级设置）、Analytics Read（统计数据）、User Details Read（Account Settings Read 仅在添加域名时需要，已无此功能）。
+
+认证方式：**双凭据**（`AuthCredential`）——Global API Key（`X-Auth-Email`/`X-Auth-Key`，`GET /user` 验证）与 API Token（`Authorization: Bearer`，`/user/tokens/verify` 验证），登录页 Global 默认优先；凭据存 EncryptedSharedPreferences（`authMode` 区分 token/global）。
 
 ## 6. 构建与部署
 
@@ -132,6 +141,9 @@ Token 权限要求：Zone Read/Edit、DNS Read/Edit、User Details Read（Accoun
 
 构建环境：`ubuntu-latest`（x86_64）+ JDK 17（temurin）+ platform-35 + build-tools 35.0.0；`gradle-wrapper.properties` 使用官方 distributionUrl。**注意：不要把 distributionUrl 再改成本地路径（如 file:///root/...），CI 无法访问。**
 
+- **ABI 过滤**：`defaultConfig.ndk.abiFilters` 仅打包 `armeabi-v7a` + `arm64-v8a`（排除 x86/x86_64，当前纯 Kotlin 无 .so，属防御性声明）
+- **构建提速**：`gradle.properties` 开启 `org.gradle.caching=true`（Gradle Build Cache，复用任务输出）+ `org.gradle.jvmargs=-Xmx4096m`；CI 由 `gradle/actions/setup-gradle@v4` 自动缓存 Gradle 依赖（无需额外 actions/cache）
+
 ### 6.2 安装到设备（Shizuku/ADB）
 ```bash
 # 终端（proot）把 APK 复制到 sdcard
@@ -144,7 +156,7 @@ pm install -r /data/local/tmp/cf-app.apk
 
 ## 7. 已知问题与注意事项
 
-1. **material-icons-core 图标受限**：core 只含 ~50 个常用图标（Home/List/Person/Delete/Edit/Add/Search/Clear/Refresh/ArrowDropDown/ExitToApp/Lock 可用）。`Visibility/VisibilityOff/Dns` 等**不在 core**（在 extended，需另加依赖），已用文本按钮/替代图标处理。新增图标前先确认是否在 core，否则报 Unresolved reference。
+1. **图标库已升级 material-icons-extended**：完整 ~2000 图标可用（release R8 裁剪未引用，体积几乎无增量）。新增图标直接 `import androidx.compose.material.icons.filled.XXX`（如 `Public`/`Web`），无需自定义 ImageVector；已移除旧的 core 限制与自定义 WebIcon。
 2. **inline reified 约束**：`decodeApiResponse` 是 @PublishedApi internal inline；`CloudflareJson` 也需 @PublishedApi。新增泛型 API 方法时遵循同样模式，否则 "Public-API inline function cannot access non-public-API"。
 3. **allWarningsAsErrors 疑似开启**：deprecated API 调用会被当作编译错误（如 HttpUrl.get、Icons.Default.List），务必用新 API（toHttpUrl、AutoMirrored）。
 4. **EncryptedSharedPreferences**：首次创建 MasterKey 可能稍慢，用 lazy 延迟初始化。
@@ -153,6 +165,8 @@ pm install -r /data/local/tmp/cf-app.apk
 7. **删除域名/记录**：均有 AlertDialog 二次确认；删除后本地缓存同步移除。
 8. **DNS 记录类型**：MX/URI 显示 priority 字段；A/AAAA/CNAME 显示 proxied 开关；SRV/CAA 等用 content 文本（Cloudflare 接受 content 格式）。
 9. **ProfileScreen 中 HomeUiState 是 HomeViewModel 嵌套类**，import 需写 `io.github.toserk1024.cfdash.ui.home.HomeViewModel.HomeUiState`。
+10. **双认证头**：`CloudflareClient.requestRaw` 按 `AuthCredential` 类型添加请求头（Token → `Authorization: Bearer`；GlobalKey → `X-Auth-Email` + `X-Auth-Key`），均校验 ASCII 可打印字符；验证走 `verifyCredential()`（Token → `/user/tokens/verify`，GlobalKey → `GET /user`）。修改 Zone 设置需 Token 具备 **Zone Settings Read/Edit** 权限，否则 403（高级卡片会显示错误 + 重试按钮）。
+11. **GraphQL Analytics**：`client.graphql()` POST `/graphql`，响应为 data/errors 结构（非 ApiResponse 包装），errors 非空抛 CloudflareException；查询构建与解析统一在 `AnalyticsParser`（时间窗口 UTC、数据集映射 24h/7d/30d）；统计需 Token 具备 **Zone Analytics Read**（域名级）/ **Account Analytics Read**（账号级）权限，否则 403。
 
 ## 8. 二次开发指南
 
@@ -166,11 +180,13 @@ pm install -r /data/local/tmp/cf-app.apk
 | 需求 | 修改文件 |
 |---|---|
 | 改主题色 | ui/theme/Color.kt |
-| 加底部 Tab | ui/home/HomeScreen.kt（AnimatedContent 分支） |
+| 加底部 Tab / 改 Tab 动画 | ui/home/HomeScreen.kt（SlidingTab，visitedMask 常驻 + 水平平移） |
 | 加路由 | navigation/Routes.kt + AppNavHost.kt |
 | 加 API 端点 | data/api/CloudflareApi.kt + Repository |
+| 加 Zone 设置开关 | data/model/ZoneSetting.kt + CloudflareApi/Repository + ZoneDetailViewModel/Screen |
+| 加统计数据 | data/model/ZoneAnalytics.kt + Repository.getZoneAnalytics/getAccountAnalytics + ui/stats/ + HomeScreen/ZoneDetailScreen |
 | 改 DNS 记录字段 | data/model/DnsRecord.kt |
-| 改验证逻辑 | ui/onboarding/OnboardingViewModel.kt |
+| 改认证逻辑 | ui/onboarding/OnboardingViewModel.kt + AuthCredential.kt + TokenStore.kt |
 
 ### 8.3 恢复"添加域名"功能（如需）
 1. 恢复 data/model/Zone.kt 中的 `CreateZoneRequest`/`AccountRef`，新建 Account.kt

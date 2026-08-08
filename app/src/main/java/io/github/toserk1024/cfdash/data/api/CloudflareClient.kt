@@ -5,7 +5,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.content
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.parseToJsonElement
+import kotlinx.serialization.json.put
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -78,6 +86,27 @@ class CloudflareClient(private val credentialProvider: () -> AuthCredential?) {
         query: Map<String, String> = emptyMap(),
         credentialOverride: AuthCredential? = null
     ): ApiResponse<RespT> = decodeApiResponse(requestRaw("DELETE", path, null, query, credentialOverride))
+
+    /**
+     * GraphQL 查询（POST /graphql）
+     * GraphQL 响应不是 REST 的 ApiResponse 包装（data/errors 结构），返回原始解析结果；
+     * errors 数组非空时抛出 CloudflareException。
+     */
+    internal suspend fun graphql(
+        query: String,
+        credentialOverride: AuthCredential? = null
+    ): JsonElement {
+        val body = buildJsonObject { put("query", query) }.toString()
+        val raw = requestRaw("POST", CloudflareApi.GRAPHQL, body, emptyMap(), credentialOverride)
+        val parsed = CloudflareJson.parseToJsonElement(raw)
+        (parsed.jsonObject["errors"] as? JsonArray)?.takeIf { it.isNotEmpty() }?.let { errs ->
+            val msg = errs.joinToString("；") {
+                it.jsonObject["message"]?.jsonPrimitive?.content ?: "GraphQL 查询失败"
+            }
+            throw CloudflareException(msg)
+        }
+        return parsed
+    }
 
     /** 执行请求并返回原始响应体字符串 */
     internal suspend fun requestRaw(

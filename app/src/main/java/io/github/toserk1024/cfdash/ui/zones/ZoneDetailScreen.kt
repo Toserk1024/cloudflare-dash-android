@@ -47,8 +47,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.toserk1024.cfdash.data.model.AnalyticsRange
+import io.github.toserk1024.cfdash.data.model.AnalyticsSum
 import io.github.toserk1024.cfdash.data.model.Zone
 import io.github.toserk1024.cfdash.data.model.ZonePlan
+import io.github.toserk1024.cfdash.ui.stats.StatsContent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,12 +95,18 @@ fun ZoneDetailScreen(
                     ipv6 = state.ipv6,
                     settingsBusy = state.settingsBusy,
                     settingsError = state.settingsError,
+                    stats = state.stats,
+                    statsRange = state.statsRange,
+                    statsLoading = state.statsLoading,
+                    statsError = state.statsError,
                     onManageDns = { onManageDns(state.zone!!.id, state.zone!!.name) },
                     onDelete = viewModel::deleteZone,
                     onSetDevMode = viewModel::setDevelopmentMode,
                     onSetUnderAttack = viewModel::setUnderAttack,
                     onSetIpv6 = viewModel::setIpv6,
-                    onRetrySettings = viewModel::refreshSettings
+                    onRetrySettings = viewModel::refreshSettings,
+                    onStatsRangeChange = viewModel::setStatsRange,
+                    onRetryStats = viewModel::refreshStats
                 )
                 else -> Column(
                     modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -127,12 +136,18 @@ private fun ZoneDetailContent(
     ipv6: Boolean?,
     settingsBusy: String?,
     settingsError: String?,
+    stats: AnalyticsSum?,
+    statsRange: AnalyticsRange,
+    statsLoading: Boolean,
+    statsError: String?,
     onManageDns: () -> Unit,
     onDelete: () -> Unit,
     onSetDevMode: (Boolean) -> Unit,
     onSetUnderAttack: (Boolean) -> Unit,
     onSetIpv6: (Boolean) -> Unit,
-    onRetrySettings: () -> Unit
+    onRetrySettings: () -> Unit,
+    onStatsRangeChange: (AnalyticsRange) -> Unit,
+    onRetryStats: () -> Unit
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -257,6 +272,24 @@ private fun ZoneDetailContent(
                         }
                     }
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 统计数据卡片
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("统计数据", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(8.dp))
+                StatsContent(
+                    summary = stats,
+                    loading = statsLoading,
+                    error = statsError,
+                    range = statsRange,
+                    onRangeChange = onStatsRangeChange,
+                    onRetry = onRetryStats
+                )
             }
         }
 

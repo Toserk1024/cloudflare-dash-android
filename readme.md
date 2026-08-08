@@ -10,12 +10,14 @@
 
 ## ✨ 功能
 
-- **初始化向导**：输入 API Token → 调用 `GET /user/tokens/verify` 验证 → 成功进入主界面
+- **认证登录**：支持 **Global API Key**（默认优先）与 **API Token** 双方式，验证通过后进入主界面；Token 模式展示所需权限清单
+- **侧边栏导航**：域名 / DNS / 统计数据 / 我的 四个入口，未来可扩展更多功能项
 - **域名管理**：列表（全量缓存 + 本地搜索 + 下拉刷新）/ 详情（NS、状态、套餐）/ 删除域名
 - **DNS 记录管理**：按域名查看（全量缓存 + 类型筛选 + 本地搜索 + 下拉刷新）/ 新建 / 编辑 / 删除，支持 A、AAAA、CNAME、MX、TXT、NS、SRV、CAA 等类型
+- **统计数据**：账号级（侧边栏入口）与域名级（域名详情）双维度，请求数 / 威胁数 / 带宽 / 缓存命中率，支持 24小时 / 7天 / 30天 切换
 - **我的**：用户信息展示、版本号、开源地址、退出登录
-- **安全**：API Token 使用 EncryptedSharedPreferences（Android Keystore）加密存储，仅保存在本机
-- **性能**：API 数据首次/下拉刷新时缓存到内存，搜索筛选纯本地完成；三个 Tab 常驻组合，切换仅透明度过渡，流畅无重建
+- **安全**：凭据使用 EncryptedSharedPreferences（Android Keystore）加密存储，仅保存在本机
+- **性能**：API 数据首次/下拉刷新时缓存到内存，搜索筛选纯本地完成；四个 Tab 常驻组合，切换仅水平平移过渡，流畅无重建
 
 ## 🔒 需要的 API Token 权限
 
@@ -26,6 +28,7 @@
 | Zone → Zone → Read / Edit | 域名列表、详情、删除 |
 | Zone → DNS → Read / Edit | DNS 记录查看与增删改 |
 | Zone → Zone Settings → Read / Edit | 高级设置（开发模式 / 五秒盾 / IPv6） |
+| Zone → Analytics → Read | 统计数据（请求/威胁/带宽/缓存命中率） |
 | User → User Details → Read | 验证与用户信息 |
 
 > 也支持 **Global API Key**（邮箱 + API Key，`X-Auth-Email` / `X-Auth-Key`）登录，拥有账号全部权限，请谨慎保管。

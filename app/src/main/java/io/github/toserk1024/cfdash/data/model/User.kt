@@ -14,5 +14,13 @@ data class User(
     val two_factor_authentication_enabled: Boolean = false,
     val created_on: String? = null,
     val modified_on: String? = null,
-    val api_support: Boolean = false
+    val api_support: Boolean = false,
+    val accounts: List<AccountRef> = emptyList()
+)
+
+/** 用户所属账号（GraphQL Analytics 账号级统计需要 accountTag） */
+@Serializable
+data class AccountRef(
+    val id: String = "",
+    val name: String = ""
 )

@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.toserk1024.cfdash.AppContainer
+import io.github.toserk1024.cfdash.data.model.AnalyticsRange
+import io.github.toserk1024.cfdash.data.model.AnalyticsSum
 import io.github.toserk1024.cfdash.data.model.Zone
 import io.github.toserk1024.cfdash.data.model.ZoneSetting
 import kotlinx.coroutines.async
@@ -30,7 +32,12 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         val ipv6: Boolean? = null,
         // 正在切换的 setting 名（防连点，非 null 时禁用全部开关）
         val settingsBusy: String? = null,
-        val settingsError: String? = null
+        val settingsError: String? = null,
+        // ===== 域名级统计 =====
+        val stats: AnalyticsSum? = null,
+        val statsRange: AnalyticsRange = AnalyticsRange.D7,
+        val statsLoading: Boolean = false,
+        val statsError: String? = null
     )
 
     private val _uiState = MutableStateFlow(ZoneDetailUiState())
@@ -43,7 +50,7 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     fun load() {
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, settingsError = null) }
-            // 域名详情与三个高级设置并发请求（页面 loading 动画期间即开始）
+            // 域名详情、高级设置、域名统计并发请求（页面 loading 动画期间即开始）
             coroutineScope {
                 async {
                     runCatching { AppContainer.repository.getZone(zoneId) }
@@ -51,6 +58,7 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
                         .onFailure { e -> _uiState.update { it.copy(loading = false, error = e.message) } }
                 }
                 async { loadSettings() }
+                async { loadStats() }
             }
         }
     }
@@ -87,6 +95,33 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     fun refreshSettings() {
         _uiState.update { it.copy(settingsError = null) }
         viewModelScope.launch { loadSettings() }
+    }
+
+    // ===== 域名级统计 =====
+
+    /** 重试域名级统计加载 */
+    fun refreshStats() {
+        _uiState.update { it.copy(statsError = null) }
+        viewModelScope.launch { loadStats() }
+    }
+
+    /** 切换统计时间范围并重新拉取 */
+    fun setStatsRange(range: AnalyticsRange) {
+        if (_uiState.value.statsRange == range) return
+        _uiState.update { it.copy(statsRange = range) }
+        viewModelScope.launch { loadStats() }
+    }
+
+    /** 加载域名级统计（不阻塞页面主内容） */
+    private suspend fun loadStats() {
+        _uiState.update { it.copy(statsLoading = true, statsError = null) }
+        runCatching { AppContainer.repository.getZoneAnalytics(zoneId, _uiState.value.statsRange) }
+            .onSuccess { s ->
+                _uiState.update { it.copy(stats = s, statsLoading = false, statsError = null) }
+            }
+            .onFailure { e ->
+                _uiState.update { it.copy(statsLoading = false, statsError = e.message) }
+            }
     }
 
     fun setDevelopmentMode(on: Boolean) =

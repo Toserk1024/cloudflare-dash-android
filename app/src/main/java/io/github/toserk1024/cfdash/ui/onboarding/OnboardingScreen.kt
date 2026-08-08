@@ -192,6 +192,7 @@ fun OnboardingScreen(
                             "Zone → Zone → Read / Edit（域名管理）",
                             "Zone → DNS → Read / Edit（DNS 记录）",
                             "Zone → Zone Settings → Read / Edit（高级设置）",
+                            "Zone → Analytics → Read（统计数据）",
                             "User → User Details → Read（验证与用户信息）"
                         ).forEach { perm ->
                             Text(

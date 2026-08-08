@@ -5,6 +5,9 @@ import io.github.toserk1024.cfdash.data.api.CloudflareApi
 import io.github.toserk1024.cfdash.data.api.CloudflareClient
 import io.github.toserk1024.cfdash.data.api.CloudflareException
 import io.github.toserk1024.cfdash.data.model.ApiResponse
+import io.github.toserk1024.cfdash.data.model.AnalyticsParser
+import io.github.toserk1024.cfdash.data.model.AnalyticsRange
+import io.github.toserk1024.cfdash.data.model.AnalyticsSum
 import io.github.toserk1024.cfdash.data.model.DnsRecord
 import io.github.toserk1024.cfdash.data.model.DnsRecordRequest
 import io.github.toserk1024.cfdash.data.model.TokenVerifyResult
@@ -78,6 +81,18 @@ class CloudflareRepository(private val client: CloudflareClient) {
             CloudflareApi.ZONE_SETTING.format(zoneId, setting),
             ZoneSettingRequest(value)
         ).result ?: throw CloudflareException("更新设置 $setting 失败")
+
+    /** 获取域名级统计（GraphQL Analytics，需 Analytics Read 权限） */
+    suspend fun getZoneAnalytics(zoneId: String, range: AnalyticsRange): AnalyticsSum {
+        val resp = client.graphql(AnalyticsParser.zoneQuery(zoneId, range))
+        return AnalyticsParser.parseZone(resp, range)
+    }
+
+    /** 获取账号级统计（遍历账号下所有域名累加，需 Account Analytics Read 权限） */
+    suspend fun getAccountAnalytics(accountId: String, range: AnalyticsRange): AnalyticsSum {
+        val resp = client.graphql(AnalyticsParser.accountQuery(accountId, range))
+        return AnalyticsParser.parseAccount(resp, range)
+    }
 
     /** 分页获取 DNS 记录（type/name 支持筛选） */
     suspend fun getDnsRecords(

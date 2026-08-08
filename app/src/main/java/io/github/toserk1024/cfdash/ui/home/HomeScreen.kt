@@ -4,28 +4,49 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -35,27 +56,34 @@ import io.github.toserk1024.cfdash.data.model.Zone
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordsContent
 import io.github.toserk1024.cfdash.ui.dns.DnsViewModel
 import io.github.toserk1024.cfdash.ui.profile.ProfileScreen
+import io.github.toserk1024.cfdash.ui.stats.StatsContent
+import io.github.toserk1024.cfdash.ui.stats.StatsViewModel
+import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
 import io.github.toserk1024.cfdash.ui.zones.ZonesScreen
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 /**
- * 主界面：底部导航（域名 / DNS / 我的）。
+ * 主界面：侧边栏导航（域名 / DNS / 统计 / 我的）。
  *
- * 卡顿优化：三个 Tab 首次访问后常驻组合，切换时仅做水平平移过渡（offset 位移，GPU 合成，开销极小），
+ * 卡顿优化：四个 Tab 首次访问后常驻组合，切换时仅做水平平移过渡（offset 位移，GPU 合成，开销极小），
  * 避免 AnimatedContent 每次切换都销毁/重建整页（LazyColumn 全量重建 + 滚动位置丢失）造成的掉帧。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onZoneClick: (Zone) -> Unit,
     onDnsEdit: (String, String?) -> Unit,
     onLogout: () -> Unit,
     homeViewModel: HomeViewModel = viewModel(),
-    dnsViewModel: DnsViewModel = viewModel()
+    dnsViewModel: DnsViewModel = viewModel(),
+    statsViewModel: StatsViewModel = viewModel()
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val homeState by homeViewModel.uiState.collectAsState()
+    val statsState by statsViewModel.uiState.collectAsState()
 
-    // 已访问过的 Tab 位掩码（bit0=域名, bit1=DNS, bit2=我的）：懒加载，首次访问后才组合并常驻
+    // 已访问过的 Tab 位掩码（bit0=域名, bit1=DNS, bit2=统计, bit3=我的）：懒加载，首次访问后才组合并常驻
     var visitedMask by rememberSaveable { mutableIntStateOf(1) }
     LaunchedEffect(selectedTab) {
         visitedMask = visitedMask or (1 shl selectedTab)
@@ -65,68 +93,169 @@ fun HomeScreen(
     val configuration = LocalConfiguration.current
     val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.toPx() }
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val tabTitles = listOf("域名", "DNS", "统计数据", "我的")
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                // 用户信息
+                val user = homeState.user
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Surface(shape = CircleShape, color = CloudflareOrange) {
+                        Box(
+                            modifier = Modifier.size(48.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = user?.username?.firstOrNull()?.uppercase() ?: "C",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = user?.username?.ifBlank { "Cloudflare 用户" } ?: "Cloudflare 用户",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = user?.email ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                HorizontalDivider()
+
+                // 导航项
+                NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    label = { Text("域名") }
+                    label = { Text("域名") },
+                    selected = selectedTab == 0,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        selectedTab = 0
+                    }
                 )
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
+                NavigationDrawerItem(
                     icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
-                    label = { Text("DNS") }
+                    label = { Text("DNS") },
+                    selected = selectedTab == 1,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        selectedTab = 1
+                    }
                 )
-                NavigationBarItem(
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
+                    label = { Text("统计数据") },
                     selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        selectedTab = 2
+                    }
+                )
+                NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Person, contentDescription = null) },
-                    label = { Text("我的") }
+                    label = { Text("我的") },
+                    selected = selectedTab == 3,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        selectedTab = 3
+                    }
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+                HorizontalDivider()
+                NavigationDrawerItem(
+                    icon = {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    label = { Text("退出登录", color = MaterialTheme.colorScheme.error) },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        onLogout()
+                    }
                 )
             }
         }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // 域名 Tab（常驻）
-            if ((visitedMask and 0b001) != 0) {
-                SlidingTab(
-                    selected = selectedTab == 0,
-                    targetOffset = slideOffsetFor(selectedTab, 0, screenWidthPx)
-                ) {
-                    ZonesScreen(onZoneClick = onZoneClick)
-                }
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(tabTitles[selectedTab], maxLines = 1) },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "菜单")
+                        }
+                    }
+                )
             }
-            // DNS Tab（常驻）
-            if ((visitedMask and 0b010) != 0) {
-                SlidingTab(
-                    selected = selectedTab == 1,
-                    targetOffset = slideOffsetFor(selectedTab, 1, screenWidthPx)
-                ) {
-                    // 仅 DNS Tab 显示时才收集 DNS 状态，减少无关重组
-                    val dnsState by dnsViewModel.uiState.collectAsState()
-                    DnsRecordsContent(
-                        onEditRecord = { record: DnsRecord ->
-                            onDnsEdit(dnsState.selectedZone?.id.orEmpty(), record.id)
-                        },
-                        onAddRecord = { onDnsEdit(dnsState.selectedZone?.id.orEmpty(), null) },
-                        viewModel = dnsViewModel
-                    )
+        ) { padding ->
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                // 域名 Tab（常驻）
+                if ((visitedMask and 0b001) != 0) {
+                    SlidingTab(
+                        selected = selectedTab == 0,
+                        targetOffset = slideOffsetFor(selectedTab, 0, screenWidthPx)
+                    ) {
+                        ZonesScreen(onZoneClick = onZoneClick)
+                    }
                 }
-            }
-            // 我的 Tab（常驻）
-            if ((visitedMask and 0b100) != 0) {
-                SlidingTab(
-                    selected = selectedTab == 2,
-                    targetOffset = slideOffsetFor(selectedTab, 2, screenWidthPx)
-                ) {
-                    ProfileScreen(
-                        uiState = homeState,
-                        onRetry = homeViewModel::loadUser,
-                        onLogout = onLogout
-                    )
+                // DNS Tab（常驻）
+                if ((visitedMask and 0b010) != 0) {
+                    SlidingTab(
+                        selected = selectedTab == 1,
+                        targetOffset = slideOffsetFor(selectedTab, 1, screenWidthPx)
+                    ) {
+                        // 仅 DNS Tab 显示时才收集 DNS 状态，减少无关重组
+                        val dnsState by dnsViewModel.uiState.collectAsState()
+                        DnsRecordsContent(
+                            onEditRecord = { record: DnsRecord ->
+                                onDnsEdit(dnsState.selectedZone?.id.orEmpty(), record.id)
+                            },
+                            onAddRecord = { onDnsEdit(dnsState.selectedZone?.id.orEmpty(), null) },
+                            viewModel = dnsViewModel
+                        )
+                    }
+                }
+                // 统计 Tab（常驻）
+                if ((visitedMask and 0b100) != 0) {
+                    SlidingTab(
+                        selected = selectedTab == 2,
+                        targetOffset = slideOffsetFor(selectedTab, 2, screenWidthPx)
+                    ) {
+                        StatsContent(
+                            summary = statsState.summary,
+                            loading = statsState.loading,
+                            error = statsState.error,
+                            range = statsState.range,
+                            onRangeChange = statsViewModel::setRange,
+                            onRetry = statsViewModel::load
+                        )
+                    }
+                }
+                // 我的 Tab（常驻）
+                if ((visitedMask and 0b1000) != 0) {
+                    SlidingTab(
+                        selected = selectedTab == 3,
+                        targetOffset = slideOffsetFor(selectedTab, 3, screenWidthPx)
+                    ) {
+                        ProfileScreen(
+                            uiState = homeState,
+                            onRetry = homeViewModel::loadUser,
+                            onLogout = onLogout
+                        )
+                    }
                 }
             }
         }

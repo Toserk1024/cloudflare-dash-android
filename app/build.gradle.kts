@@ -54,6 +54,10 @@ android {
         versionName = "${buildDate}_$buildSeq"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        ndk {
+            // 仅打包 armeabi-v7a + arm64-v8a（排除 x86/x86_64 等，减小 APK 体积）
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+        }
         vectorDrawables {
             useSupportLibrary = true
         }

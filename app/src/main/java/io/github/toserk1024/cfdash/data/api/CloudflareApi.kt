@@ -15,6 +15,9 @@ object CloudflareApi {
     // Zone 设置（/zones/{id}/settings/{name}）
     const val ZONE_SETTING = "/zones/%s/settings/%s"
 
+    // GraphQL Analytics API
+    const val GRAPHQL = "/graphql"
+
     // 账号
     const val ACCOUNTS = "/accounts"
 
