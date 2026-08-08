@@ -10,7 +10,7 @@
 - [x] **侧边栏宽度收窄**：打开时占用水平空间小一点（当前 ModalDrawerSheet 默认宽度偏大，实施时调小宽度如 280~320dp）— 2026-08-08（批次1已完成：300dp）
 - [x] **点击页面空白处关闭侧边栏**：打开侧边栏后点击 scrim/空白区域应关闭（当前 gesturesEnabled=false，需确认 scrim 点击关闭是否生效，若被禁用则恢复 tap-to-close）— 2026-08-08（批次1已完成：ModalNavigationDrawer 内置 scrim tap-to-close，与 gesturesEnabled 无关）
 - [x] **域名详情页三个高级设置开关单独禁用**：当前 `settingsBusy` 非 null 时三个开关（开发模式/五秒盾/IPv6）一起禁用；改为仅正在切换的那个开关禁用/转圈，其余保持可用（ZoneDetailScreen `AdvancedSwitchRow` 的 enabled/busy 逻辑调整）— 2026-08-08（批次1已完成）
-- [ ] **多用户功能**：支持多个 Cloudflare 账号并存；新建用户与切换用户入口均在**侧边栏上部**（用户信息卡区域）——涉及 TokenStore 多凭据存储（按用户隔离）、Onboarding 新建流程、侧边栏用户卡 + 新建/切换入口，实施时需详细设计— 2026-08-08
+- [x] **多用户功能**：支持多个 Cloudflare 账号并存；新建用户与切换用户入口均在**侧边栏上部**（用户信息卡区域）——涉及 TokenStore 多凭据存储（按用户隔离）、Onboarding 新建流程、侧边栏用户卡 + 新建/切换入口，实施时需详细设计— 2026-08-08（批次4已完成：TokenStore多用户/Onboarding saveUser/侧边栏切换+新建/退出删除激活用户）
 - [x] **TTL 显示可读化（时分秒）**：DNS 记录 TTL（秒）展示为友好格式（如 300→5分钟、3600→1小时、86400→1天；复用现有 formatRemaining 类逻辑，实施时定位 DnsRecord 相关展示处统一格式化）— 2026-08-08（批次1已完成：新增 formatTtl，列表/编辑页/TTL 下拉均应用）
 - [x] **DNS 记录列表批量操作（候选框）**：每条记录前加**复选框**，支持批量：
   - **批量删除**（二次确认，逐条 DELETE 并本地同步移除）
@@ -38,6 +38,9 @@
 - [ ] **点击空白关闭侧边栏未实现**：批次1 的 #4 声称"ModalNavigationDrawer 内置 scrim tap-to-close 已支持"，但实测点击空白不关闭——需排查是否为 `gesturesEnabled=false` 连带禁用了 scrim 点击，或 SlidingTab/内容层拦截了点击事件（修复方向：改用带 scrim 点击处理的方案，或恢复 `gesturesEnabled` 的 tap 部分）— 2026-08-08 用户反馈
 - [ ] **批量代理确认对话框按钮文案不当**：批量开/关代理的 AlertDialog 确认按钮当前显示"开启"/"关闭"，应统一为 **"确定" / "取消"**（DnsRecordsContent 批量代理对话框 confirmButton/dismissButton 文案）— 2026-08-08 用户反馈
 - [ ] **DNS 候选框常显拥挤，改为图标按钮启用**：候选框/复选框一直显示显得拥挤——改为**顶栏右侧加 check-all 图标按钮**点击后启用候选功能；批量操作栏的**文字按钮加边框**（当前无边框太虚，用 OutlinedButton 或 border 修饰）— 2026-08-08 用户反馈
+- [ ] **DNS 编辑页说明"[标签]"动态替换（新建随输入、编辑按已有内容回填）**：编辑页顶部说明文案中的 `[名称]`、`[目标]` 等占位符需替换为实际值——**新建**：随输入实时替换（name/target 等字段）；**编辑已有记录**（从 DNS 记录页点进编辑页时）：用**回填的实际记录内容**（name/content/data）替换占位符，而非一直显示"[名称]""[目标]"字面占位符（DnsRecordEditScreen 说明卡 + DnsEditViewModel 回填后生成说明）— 2026-08-08 用户反馈
+- [ ] **饼图点击预览功能不成功**：批次1 实现的"图例点击显示详情行"（BreakdownPieChart 选中高亮 + 详情）未生效/体验不佳——需排查图例点击事件是否被卡片/容器拦截，或改用扇区点击 + 弹出详情（实施时验证交互）— 2026-08-08 用户反馈
+- [ ] **折线统计图 marker 展示框过小**：点击拐点显示的数值只能显示约三个字符（marker label 默认组件过窄，大数值被截断）——建议用 **Card/clip 等有底容器**承接 marker label 内容，设置合适宽度/内边距（TrendLineChart 的 rememberDefaultCartesianMarker label 组件改造）— 2026-08-08 用户反馈
 
 ## 已实施（历史，仅供参考）
 

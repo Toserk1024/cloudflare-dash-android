@@ -37,6 +37,12 @@
     - 新增 `DnsRecordFieldDefs`（12 种类型字段模板 + 顶部说明文案，如 CNAME"[名称] 是 [目标] 的别名"）
     - 新增 `DnsEditViewModel` 重构：字段 Map 状态、编辑回填（record.data/content 解析）、按类型序列化 `data`（JsonObject：SRV/DNSKEY/CAA/SVCB/HTTPS/SSHFP/TLSA/NAPTR/URI）与 `content`（RFC 组合）、数字键盘与必填校验
     - `DnsRecordEditScreen` 重写：类型选择 + 顶部说明卡 + 名称 + 动态字段表单 + TTL + 代理开关（仅可代理类型）+ 备注
+  - **多用户功能（todo.md 批次4，#6）**：支持多个 Cloudflare 账号并存，**新建/切换入口在侧边栏上部**（用户卡区）：
+    - `TokenStore` 重构为多用户存储：每用户一组凭据（`cf_user_{id}_mode/token/email/key`）+ 激活用户 id；新增 `UserAccount`、`saveUser/getUsers/getActiveUser/setActiveUser/deleteUser`；GlobalKey 用户 id=邮箱、Token 用户 id=内容 hash
+    - `OnboardingViewModel`：验证成功改为 `saveUser`（保存为新用户并激活）
+    - `MainActivity`：登录态=存在任意用户；`homeKey` 刷新键驱动 Home 重载用户数据；退出登录=删除激活用户（有剩余自动切换回 Home，无则回初始化）
+    - `AppNavHost`：Home→Onboarding 新增用户（成功后 popBackStack 回 Home）、`onNewUser/onUserSwitched/homeKey` 回调
+    - `HomeScreen` 侧边栏用户卡：显示激活用户 + **"切换用户"（DropdownMenu 列出全部用户）/ "新建用户"**；切换后重载用户数据
 - **打包清理**：`packaging.resources.excludes` 追加 `**/DebugProbesKt.bin`（kotlinx-coroutines 协程调试探针，仅 IDE 调试用，release 不激活，避免 APK 内出现无用 .bin 文件）
 - **文档**：agent.md（统计模块/依赖/注意点/速查表）、readme.md（功能/技术栈）同步更新
 

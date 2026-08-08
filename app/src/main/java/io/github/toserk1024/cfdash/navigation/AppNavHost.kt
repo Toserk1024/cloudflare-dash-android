@@ -21,7 +21,10 @@ import io.github.toserk1024.cfdash.ui.zones.ZoneDetailScreen
 @Composable
 fun AppNavHost(
     startDestination: String,
+    homeKey: Int = 0,
     onLoggedOut: () -> Unit,
+    onNewUser: () -> Unit = {},
+    onUserSwitched: () -> Unit = {},
     navController: NavHostController
 ) {
     NavHost(
@@ -33,12 +36,17 @@ fun AppNavHost(
         popExitTransition = { fadeOut(tween(180)) + slideOutHorizontally { it / 4 } }
     ) {
 
-        // 初始化（Token 验证）
+        // 初始化（Token 验证 / 新增用户）
         composable(Routes.ONBOARDING) {
             OnboardingScreen(
                 onSuccess = {
-                    navController.navigate(Routes.HOME) {
-                        popUpTo(Routes.ONBOARDING) { inclusive = true }
+                    // 从 Home 进入（新增用户）：验证成功返回 Home；否则（首次登录）导航 Home
+                    if (navController.previousBackStackEntry?.destination?.route == Routes.HOME) {
+                        navController.popBackStack()
+                    } else {
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(Routes.ONBOARDING) { inclusive = true }
+                        }
                     }
                 }
             )
@@ -47,6 +55,7 @@ fun AppNavHost(
         // 主界面
         composable(Routes.HOME) {
             HomeScreen(
+                homeKey = homeKey,
                 onZoneClick = { zone ->
                     navController.navigate(Routes.zoneDetail(zone.id, zone.name))
                 },
@@ -55,12 +64,9 @@ fun AppNavHost(
                         navController.navigate(Routes.dnsEdit(zoneId, recordId))
                     }
                 },
-                onLogout = {
-                    onLoggedOut()
-                    navController.navigate(Routes.ONBOARDING) {
-                        popUpTo(Routes.HOME) { inclusive = true }
-                    }
-                }
+                onNewUser = onNewUser,
+                onUserSwitched = onUserSwitched,
+                onLogout = onLoggedOut
             )
         }
 

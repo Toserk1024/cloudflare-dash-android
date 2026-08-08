@@ -39,7 +39,7 @@ class OnboardingViewModel : ViewModel() {
         _showPassword.value = !_showPassword.value
     }
 
-    /** 验证并保存 Global API Key */
+    /** 验证并保存 Global API Key（保存为新用户并设为激活） */
     fun verifyGlobalKey(email: String, apiKey: String) {
         if (email.isBlank()) {
             _state.value = OnboardingState.Error("请输入邮箱")
@@ -50,18 +50,18 @@ class OnboardingViewModel : ViewModel() {
             return
         }
         verify(AuthCredential.GlobalKey(email.trim(), apiKey.trim())) {
-            AppContainer.tokenStore.saveGlobalKey(it.email, it.apiKey)
+            AppContainer.tokenStore.saveUser(it)
         }
     }
 
-    /** 验证并保存 API Token */
+    /** 验证并保存 API Token（保存为新用户并设为激活） */
     fun verifyToken(token: String) {
         if (token.isBlank()) {
             _state.value = OnboardingState.Error("请输入 API Token")
             return
         }
         verify(AuthCredential.Token(token.trim())) {
-            AppContainer.tokenStore.saveToken(it.value)
+            AppContainer.tokenStore.saveUser(it)
         }
     }
 

@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -33,6 +35,7 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -40,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -52,6 +56,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.data.model.DnsRecord
 import io.github.toserk1024.cfdash.data.model.Zone
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordsContent
@@ -76,6 +81,9 @@ fun HomeScreen(
     onZoneClick: (Zone) -> Unit,
     onDnsEdit: (String, String?) -> Unit,
     onLogout: () -> Unit,
+    homeKey: Int = 0,
+    onNewUser: () -> Unit = {},
+    onUserSwitched: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(),
     dnsViewModel: DnsViewModel = viewModel(),
     statsViewModel: StatsViewModel = viewModel()
@@ -83,6 +91,11 @@ fun HomeScreen(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val homeState by homeViewModel.uiState.collectAsState()
     val statsState by statsViewModel.uiState.collectAsState()
+
+    // 多用户：切换/退出后 homeKey 变化 → 重新加载当前激活用户数据
+    LaunchedEffect(homeKey) {
+        homeViewModel.loadUser()
+    }
 
     // 已访问过的 Tab 位掩码（bit0=域名, bit1=DNS, bit2=统计, bit3=我的）：懒加载，首次访问后才组合并常驻
     var visitedMask by rememberSaveable { mutableIntStateOf(1) }
@@ -107,8 +120,11 @@ fun HomeScreen(
                 // 侧边栏宽度收窄（默认偏大，改 300dp）
                 modifier = Modifier.width(300.dp)
             ) {
-                // 用户信息
+                // 用户信息（多用户：显示激活用户 + 切换/新建入口）
                 val user = homeState.user
+                val activeUser = remember(homeKey) { AppContainer.tokenStore.getActiveUser() }
+                val allUsers = remember(homeKey) { AppContainer.tokenStore.getUsers() }
+                var switchMenu by remember { mutableStateOf(false) }
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                     Surface(shape = CircleShape, color = CloudflareOrange) {
                         Box(
@@ -116,7 +132,8 @@ fun HomeScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = user?.username?.firstOrNull()?.uppercase() ?: "C",
+                                text = user?.username?.firstOrNull()?.uppercase()
+                                    ?: activeUser?.label?.firstOrNull()?.uppercase() ?: "C",
                                 style = MaterialTheme.typography.titleLarge,
                                 color = MaterialTheme.colorScheme.onPrimary,
                                 fontWeight = FontWeight.Bold
@@ -125,7 +142,8 @@ fun HomeScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = user?.username?.ifBlank { "Cloudflare 用户" } ?: "Cloudflare 用户",
+                        text = user?.username?.ifBlank { "Cloudflare 用户" }
+                            ?: activeUser?.label ?: "Cloudflare 用户",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -134,6 +152,24 @@ fun HomeScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // 多用户入口：切换用户 / 新建用户
+                    Row {
+                        TextButton(onClick = { switchMenu = true }) { Text("切换用户") }
+                        TextButton(onClick = onNewUser) { Text("新建用户") }
+                    }
+                    DropdownMenu(expanded = switchMenu, onDismissRequest = { switchMenu = false }) {
+                        allUsers.forEach { u ->
+                            DropdownMenuItem(
+                                text = { Text(u.label) },
+                                onClick = {
+                                    AppContainer.tokenStore.setActiveUser(u.id)
+                                    switchMenu = false
+                                    onUserSwitched()
+                                }
+                            )
+                        }
+                    }
                 }
                 HorizontalDivider()
 

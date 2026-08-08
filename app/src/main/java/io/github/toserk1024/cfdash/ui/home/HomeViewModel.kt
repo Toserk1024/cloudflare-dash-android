@@ -40,8 +40,8 @@ class HomeViewModel : ViewModel() {
         _uiState.update { it.copy(error = null) }
     }
 
-    /** 退出登录：清除 Token 并返回初始化界面 */
+    /** 退出当前激活用户（多用户：仅删除当前用户，剩余用户保留） */
     fun logout() {
-        AppContainer.tokenStore.clear()
+        AppContainer.tokenStore.getActiveUser()?.id?.let { AppContainer.tokenStore.deleteUser(it) }
     }
 }
