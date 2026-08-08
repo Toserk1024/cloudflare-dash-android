@@ -37,9 +37,8 @@ class StatsViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null) }
             try {
-                // 账号级统计：取用户第一个账号的 accountTag
-                val user = AppContainer.repository.getUser()
-                val accountId = user.accounts.firstOrNull()?.id
+                // 账号级统计：GET /accounts 取第一个账号的 accountTag（比 /user.accounts 更可靠）
+                val accountId = AppContainer.repository.getAccounts().firstOrNull()?.id
                     ?: throw IllegalStateException("账号信息缺失，无法加载统计数据")
                 val sum = AppContainer.repository.getAccountAnalytics(accountId, _uiState.value.range)
                 _uiState.update { it.copy(summary = sum, loading = false, error = null) }
