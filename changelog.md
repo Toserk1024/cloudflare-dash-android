@@ -43,6 +43,14 @@
     - `MainActivity`：登录态=存在任意用户；`homeKey` 刷新键驱动 Home 重载用户数据；退出登录=删除激活用户（有剩余自动切换回 Home，无则回初始化）
     - `AppNavHost`：Home→Onboarding 新增用户（成功后 popBackStack 回 Home）、`onNewUser/onUserSwitched/homeKey` 回调
     - `HomeScreen` 侧边栏用户卡：显示激活用户 + **"切换用户"（DropdownMenu 列出全部用户）/ "新建用户"**；切换后重载用户数据
+  - **Pending 修复（todo.md Pending 队列 7 项全部完成）**：
+    - **点击空白关闭侧边栏**：`HomeScreen` 由 ModalNavigationDrawer 改为**自绘侧边栏**（Box + AnimatedVisibility + scrim 点击关闭，无右滑手势，宽度 300dp）
+    - **批量代理确认按钮文案**：统一为"确定 / 取消"
+    - **DNS 候选框改为图标启用**：域名行右侧 **check-all 图标**（Checklist）控制候选模式；复选框仅启用时显示；批量操作按钮改 **OutlinedButton（带边框）**
+    - **DNS 编辑页说明动态替换**：`[名称]/[目标]/[IPv4/6地址]` 占位符随输入/回填值实时替换
+    - **饼图点击预览**：图例点击改为 **AlertDialog 弹窗**显示"名称：数量 · 占比"
+    - **折线图 marker 展示框**：label 增加 `lineCount=2` + `overflow=Visible`，完整显示"时间 + 数值"
+    - **退出登录按钮失效**：`MainActivity` 用 `LaunchedEffect(loggedIn)` 在无剩余用户时导航回初始化页（NavHost 不监听 startDestination 变化）
 - **打包清理**：`packaging.resources.excludes` 追加 `**/DebugProbesKt.bin`（kotlinx-coroutines 协程调试探针，仅 IDE 调试用，release 不激活，避免 APK 内出现无用 .bin 文件）
 - **文档**：agent.md（统计模块/依赖/注意点/速查表）、readme.md（功能/技术栈）同步更新
 

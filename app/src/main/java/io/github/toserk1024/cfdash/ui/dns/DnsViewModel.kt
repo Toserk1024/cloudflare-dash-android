@@ -40,6 +40,7 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         val showDeleteDialog: DnsRecord? = null,
         val showZonePicker: Boolean = false,
         // ===== 批量操作（候选框）=====
+        val selectionMode: Boolean = false,
         val selectedIds: Set<String> = emptySet(),
         val showBulkDeleteDialog: Boolean = false,
         /** 批量代理确认目标：null=不显示；true=开启代理；false=关闭代理 */
@@ -217,6 +218,11 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     }
 
     // ===== 批量操作（候选框）=====
+
+    /** 切换候选框启用状态（顶栏图标控制，避免常显拥挤） */
+    fun setSelectionMode(enabled: Boolean) {
+        _uiState.update { it.copy(selectionMode = enabled, selectedIds = if (enabled) it.selectedIds else emptySet()) }
+    }
 
     fun toggleSelect(id: String) {
         _uiState.update { s ->

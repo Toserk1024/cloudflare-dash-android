@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -74,21 +75,39 @@ fun DnsRecordsContent(
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // 域名选择器
-            OutlinedButton(
-                onClick = viewModel::showZonePicker,
+            // 域名选择器 + 候选框启用图标（顶栏右侧）
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = state.selectedZone?.name ?: "选择域名",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Start
-                )
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                OutlinedButton(
+                    onClick = viewModel::showZonePicker,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = state.selectedZone?.name ?: "选择域名",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Start
+                    )
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                // check-all 图标：启用/关闭候选框（批量操作）
+                IconButton(onClick = { viewModel.setSelectionMode(!state.selectionMode) }) {
+                    Icon(
+                        Icons.Default.Checklist,
+                        contentDescription = "批量操作",
+                        tint = if (state.selectionMode) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
             }
 
             // 关键字搜索（本地过滤）
@@ -129,8 +148,8 @@ fun DnsRecordsContent(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // 批量操作栏（候选框选中时显示）
-            if (state.selectedIds.isNotEmpty()) {
+            // 批量操作栏（候选框启用时显示）
+            if (state.selectionMode) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -143,11 +162,11 @@ fun DnsRecordsContent(
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f)
                     )
-                    TextButton(onClick = { viewModel.setSelectAll(false) }, enabled = !state.bulkBusy) { Text("取消") }
-                    TextButton(onClick = viewModel::requestBulkDelete, enabled = !state.bulkBusy) { Text("删除") }
+                    OutlinedButton(onClick = { viewModel.setSelectAll(false) }, enabled = !state.bulkBusy) { Text("取消") }
+                    OutlinedButton(onClick = viewModel::requestBulkDelete, enabled = !state.bulkBusy) { Text("删除") }
                     // 批量代理仅对 A/AAAA/CNAME 生效（其余类型选中会被忽略）
-                    TextButton(onClick = { viewModel.requestBulkProxy(true) }, enabled = !state.bulkBusy) { Text("开代理") }
-                    TextButton(onClick = { viewModel.requestBulkProxy(false) }, enabled = !state.bulkBusy) { Text("关代理") }
+                    OutlinedButton(onClick = { viewModel.requestBulkProxy(true) }, enabled = !state.bulkBusy) { Text("开代理") }
+                    OutlinedButton(onClick = { viewModel.requestBulkProxy(false) }, enabled = !state.bulkBusy) { Text("关代理") }
                 }
             }
 
@@ -199,6 +218,7 @@ fun DnsRecordsContent(
                             DnsRecordCard(
                                 record = record,
                                 deleting = state.deletingId == record.id,
+                                selectionMode = state.selectionMode,
                                 selected = record.id in state.selectedIds,
                                 onSelectChange = { viewModel.toggleSelect(record.id) },
                                 onEdit = { onEditRecord(record) },
@@ -301,7 +321,7 @@ fun DnsRecordsContent(
             text = { Text("确定要${if (target) "开启" else "关闭"}选中记录（仅 A/AAAA/CNAME 类型生效）的 Cloudflare 代理吗？") },
             confirmButton = {
                 TextButton(onClick = { viewModel.bulkSetProxy(target) }) {
-                    Text(if (target) "开启" else "关闭")
+                    Text("确定")
                 }
             },
             dismissButton = {
@@ -316,6 +336,7 @@ fun DnsRecordsContent(
 private fun DnsRecordCard(
     record: DnsRecord,
     deleting: Boolean,
+    selectionMode: Boolean = false,
     selected: Boolean = false,
     onSelectChange: (Boolean) -> Unit = {},
     onEdit: () -> Unit,
@@ -329,7 +350,10 @@ private fun DnsRecordCard(
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = selected, onCheckedChange = onSelectChange)
+                // 候选框仅在启用批量模式时显示，避免常显拥挤
+                if (selectionMode) {
+                    Checkbox(checked = selected, onCheckedChange = onSelectChange)
+                }
                 TypeBadge(record.type)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(

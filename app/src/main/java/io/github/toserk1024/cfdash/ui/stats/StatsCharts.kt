@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -31,7 +32,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
@@ -126,7 +129,9 @@ fun TrendLineChart(
             // 点击拐点：显示该点时间与对应数据量
             marker = rememberDefaultCartesianMarker(
                 label = rememberTextComponent(
-                    style = TextStyle(color = Color.White, fontSize = 12.sp, background = Color(0xCC000000))
+                    style = TextStyle(color = Color.White, fontSize = 12.sp, background = Color(0xCC000000)),
+                    lineCount = 2,
+                    overflow = TextOverflow.Visible
                 ),
                 valueFormatter = remember {
                     DefaultCartesianMarker.ValueFormatter { context, targets ->
@@ -165,7 +170,8 @@ fun BreakdownPieChart(
         }
     }
     val total = chartItems.sumOf { it.value }
-    var selectedIndex by remember { mutableIntStateOf(-1) }
+    // 点击图例项 → 弹窗预览该项具体数量与占比（明确反馈）
+    var selectedDetail by remember { mutableStateOf<AnalyticsBreakdown?>(null) }
     Column(modifier = modifier) {
         PieChartHost(
             chart = rememberPieChart(
@@ -179,19 +185,6 @@ fun BreakdownPieChart(
             modelProducer = modelProducer,
             modifier = Modifier.fillMaxWidth().height(200.dp)
         )
-        // 选中项详情：点击图例查看该标签对应的具体数量与占比
-        selectedIndex.takeIf { it in chartItems.indices }?.let { i ->
-            val item = chartItems[i]
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "${item.name}：${formatCount(item.value)} · ${
-                    if (total > 0) "${(item.value * 100.0 / total).roundToInt()}%" else "0%"
-                }",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                color = pieColors[i % pieColors.size]
-            )
-        }
         Spacer(modifier = Modifier.height(8.dp))
         chartItems.forEachIndexed { index, item ->
             LegendRow(
@@ -199,12 +192,28 @@ fun BreakdownPieChart(
                 name = item.name,
                 value = item.value,
                 total = total,
-                selected = index == selectedIndex,
+                selected = item == selectedDetail,
                 onClick = {
-                    selectedIndex = if (selectedIndex == index) -1 else index
+                    selectedDetail = if (selectedDetail == item) null else item
                 }
             )
         }
+    }
+    selectedDetail?.let { item ->
+        AlertDialog(
+            onDismissRequest = { selectedDetail = null },
+            title = { Text(item.name) },
+            text = {
+                Text(
+                    "${item.name}：${formatCount(item.value)} · ${
+                        if (total > 0) "${(item.value * 100.0 / total).roundToInt()}%" else "0%"
+                    }"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedDetail = null }) { Text("确定") }
+            }
+        )
     }
 }
 
@@ -258,7 +267,9 @@ fun ZoneBarChart(
             // 点击柱子：显示该 host 与请求量
             marker = rememberDefaultCartesianMarker(
                 label = rememberTextComponent(
-                    style = TextStyle(color = Color.White, fontSize = 12.sp, background = Color(0xCC000000))
+                    style = TextStyle(color = Color.White, fontSize = 12.sp, background = Color(0xCC000000)),
+                    lineCount = 2,
+                    overflow = TextOverflow.Visible
                 ),
                 valueFormatter = remember {
                     DefaultCartesianMarker.ValueFormatter { context, targets ->

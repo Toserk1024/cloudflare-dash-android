@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +37,15 @@ private fun MainScreen() {
     var loggedIn by remember { mutableStateOf(AppContainer.tokenStore.hasCredential()) }
     // Home 刷新键：切换用户/退出后 +1，触发 HomeScreen 重新加载用户数据
     var homeKey by remember { mutableIntStateOf(0) }
+
+    // 退出到无剩余用户时（loggedIn=false）导航回初始化页（NavHost 不监听 startDestination 变化）
+    LaunchedEffect(loggedIn) {
+        if (!loggedIn) {
+            navController.navigate(Routes.ONBOARDING) {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
 
     AppNavHost(
         startDestination = if (loggedIn) Routes.HOME else Routes.ONBOARDING,

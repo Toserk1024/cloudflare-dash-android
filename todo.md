@@ -35,12 +35,15 @@
 
 ## Pending 队列（用户反馈待修复/优化，先不实施）
 
+（Pending 7 项已于 2026-08-08 全部修复，见 changelog；新反馈继续在此追加）
+
 - [ ] **点击空白关闭侧边栏未实现**：批次1 的 #4 声称"ModalNavigationDrawer 内置 scrim tap-to-close 已支持"，但实测点击空白不关闭——需排查是否为 `gesturesEnabled=false` 连带禁用了 scrim 点击，或 SlidingTab/内容层拦截了点击事件（修复方向：改用带 scrim 点击处理的方案，或恢复 `gesturesEnabled` 的 tap 部分）— 2026-08-08 用户反馈
 - [ ] **批量代理确认对话框按钮文案不当**：批量开/关代理的 AlertDialog 确认按钮当前显示"开启"/"关闭"，应统一为 **"确定" / "取消"**（DnsRecordsContent 批量代理对话框 confirmButton/dismissButton 文案）— 2026-08-08 用户反馈
 - [ ] **DNS 候选框常显拥挤，改为图标按钮启用**：候选框/复选框一直显示显得拥挤——改为**顶栏右侧加 check-all 图标按钮**点击后启用候选功能；批量操作栏的**文字按钮加边框**（当前无边框太虚，用 OutlinedButton 或 border 修饰）— 2026-08-08 用户反馈
 - [ ] **DNS 编辑页说明"[标签]"动态替换（新建随输入、编辑按已有内容回填）**：编辑页顶部说明文案中的 `[名称]`、`[目标]` 等占位符需替换为实际值——**新建**：随输入实时替换（name/target 等字段）；**编辑已有记录**（从 DNS 记录页点进编辑页时）：用**回填的实际记录内容**（name/content/data）替换占位符，而非一直显示"[名称]""[目标]"字面占位符（DnsRecordEditScreen 说明卡 + DnsEditViewModel 回填后生成说明）— 2026-08-08 用户反馈
 - [ ] **饼图点击预览功能不成功**：批次1 实现的"图例点击显示详情行"（BreakdownPieChart 选中高亮 + 详情）未生效/体验不佳——需排查图例点击事件是否被卡片/容器拦截，或改用扇区点击 + 弹出详情（实施时验证交互）— 2026-08-08 用户反馈
 - [ ] **折线统计图 marker 展示框过小**：点击拐点显示的数值只能显示约三个字符（marker label 默认组件过窄，大数值被截断）——建议用 **Card/clip 等有底容器**承接 marker label 内容，设置合适宽度/内边距（TrendLineChart 的 rememberDefaultCartesianMarker label 组件改造）— 2026-08-08 用户反馈
+- [ ] **退出登录按钮失效**：多用户改造后（批次4），侧边栏底部"退出登录"点击无效果——已定位疑似根因：`MainActivity` 中 `loggedIn=false` 时 NavHost 的 `startDestination` 只在首次创建时生效，不会自动切到 Onboarding（NavHost 不监听 startDestination 变化）；且删除激活用户后若无剩余用户需导航回初始化页（修复方向：MainScreen 用 `LaunchedEffect(loggedIn)` 在变 false 时导航 Onboarding，或调整退出逻辑在 AppNavHost 内处理）— 2026-08-08 用户反馈
 
 ## 已实施（历史，仅供参考）
 
