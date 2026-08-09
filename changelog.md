@@ -1,26 +1,35 @@
 # Changelog
 
-## 2026-08-09 · 构建修复：android-37 平台未发布，回退 core/lifecycle（保留其余依赖升级）
+## 2026.08.09
+
+### 新增 GitHub Release 发布 Action + changelog 规范化 + security-crypto 回滚
+
+- **新增 `.github/workflows/release.yml`（手动触发）**：构建方式与 `build.yml` 一致（release + R8 + 正式签名），Release 标题 = `v` + 日期（去掉 `_序号`）；**Release Notes 自动生成**——先 `gh release list` 获取上一个 release 的 tag，再从 `changelog.md` 提取"上次发布日期之前（更新）"的所有子标题（`###`）作为更新内容（**last release 机制，覆盖跨多日的新增更新，保证多日版本发布**），并附 changelog 链接；首次发布提取全部子标题
+- **agent.md**：新增 §6.2 GitHub Release 发布说明（含 Release Notes 自动提取约定）
+- **changelog.md 规范化**：按日期分组（`##日期`）+ 子标题（`###`），新在前旧在后，v1~v1.5 最老移至末尾；日期标题统一**点号格式**（`##2026.08.09`，与 versionName 日期一致）保证 awk 可精确解析
+- **security-crypto 回滚至 1.1.0-alpha06**：1.1.0 整库被官方弃用（无库内替代 API），回滚到原版本
+
+### 构建修复：android-37 平台未发布，回退 core/lifecycle（保留其余依赖升级）
 
 - 尝试升级 AGP 9.1.0 + compileSdk 37 以适配 core-ktx 1.19 / lifecycle 2.11，但 `platforms;android-37` 在 sdkmanager 中不存在（Google 尚未发布 API 37）→ **回退**：core-ktx **1.18.0**、lifecycle **2.10.0**、AGP **9.0.0**、compileSdk **36**、CI 保持 android-36；**其余升级保留**（compose-bom 2026.06.01、navigation 2.9.8、activity 1.13.0、coroutines 1.11.0、serialization 1.11.0、security-crypto 1.1.0）
 
-## 2026-08-09 · 依赖版本更新 + DNS 编辑页名称域名后缀判断
+### 依赖版本更新 + DNS 编辑页名称域名后缀判断
 
 - **依赖版本更新**（9 项）：`security-crypto` 1.1.0-alpha06→**1.1.0**（脱离 alpha）、`core-ktx` 1.10.1→1.19.0、`lifecycle-runtime-ktx` 2.6.1→2.11.0、`lifecycle-viewmodel-compose` 2.8.7→2.11.0、`activity-compose` 1.8.0→1.13.0、`compose-bom` 2026.01.01→2026.06.01、`navigation-compose` 2.8.5→2.9.8、`kotlinx-serialization-json` 1.7.3→1.11.0、`kotlinx-coroutines-android` 1.9.0→1.11.0（AGP/Kotlin/okhttp/vico 大版本未动）
 - **DNS 编辑页名称域名后缀判断**：顶部说明文案的"[名称]"智能展示——`@`→域名本身（根域不加点）；未以当前域名结尾自动补".域名"（如 www→www.a.com）；已以域名结尾直接显示（如 www.a.com）；名称等于域名本身直接显示。为支持此功能，将 `zoneName` 沿调用链传入编辑页（`Routes` / `AppNavHost` / `HomeScreen` / `DnsRecordsScreen` / `DnsRecordEditScreen`）
 
-## 2026-08-09 · 修复退出登录不跳转 bug
+### 修复退出登录不跳转 bug
 
 - **根因**：登录成功后 `MainActivity.loggedIn` 从未更新为 true（始终为启动时初始值），导致单用户退出时 `loggedIn` 无变化、`LaunchedEffect` 不触发导航（表现为"账户已删但界面没反应、不返回登录页"）
 - **修复**：`AppNavHost` 新增 `onLoggedIn` 回调，`OnboardingScreen` 登录成功后调用；`MainActivity` 传 `onLoggedIn = { loggedIn = true }` 同步登录态。修复后：**单用户退出**→删除账户并跳转登录页；**多用户退出当前**→`deleteUser` 自动切到剩余有效账户 + `homeKey++` 重载数据（`MainActivity.kt` / `AppNavHost.kt`）
 
-## 2026-08-09 · 免责声明页优化：状态持久化 + 排版重构 + 启动逻辑
+### 免责声明页优化：状态持久化 + 排版重构 + 启动逻辑
 
 - **免责声明状态持久化**：`TokenStore` 新增 `isDisclaimerAccepted()` / `setDisclaimerAccepted()`（EncryptedSharedPreferences），同意后下次启动不再显示免责声明页
 - **排版重构**：免责声明页重写为「顶部标题区（CF Dash 橙色 + 使用须知）+ 中部声明分节滚动（六小节加粗标题 + 正文）+ 底部复选框与退出/同意并继续按钮组」，层次分明、更优雅整洁
 - **启动逻辑优化**：`MainActivity` `startDestination` 按 `isDisclaimerAccepted()` + 登录态三态判断；免责声明"同意并继续"后持久化状态并按登录态导航（`AppNavHost`）
 
-## 2026-08-09 · 品牌更名 CF Dash + 免责声明独立启动页 + 折线缩放回滚
+### 品牌更名 CF Dash + 免责声明独立启动页 + 折线缩放回滚
 
 - **应用更名 CF Dash**：应用名称与登录页标题由"Cloudflare 客户端"改为"CF Dash"（`strings.xml` `app_name` + `OnboardingScreen`），更低调、规避直呼官方品牌名的招摇感
 - **新增免责声明独立启动页**：新增 `ui/disclaimer/DisclaimerScreen.kt`，作为 `startDestination` 启动页；含完整免责声明（第三方声明 / 风险自担 / API 密钥安全 / 责任限制 / 第三方行为 / 接受条款），须勾选"我已知晓并愿意承担相应风险"才能点"继续"（已登录→主界面，未登录→登录页），另有"退出"退出应用；接入 `Routes` / `AppNavHost` / `MainActivity`
@@ -28,14 +37,16 @@
 - **折线图缩放回滚**：移除 `TrendLineChart` 的 `zoomState = rememberVicoZoomState(zoomEnabled = false)`，恢复默认缩放（回滚批次7的"取消缩放"改动）
 - **登录页重写**：`OnboardingScreen` 移除调试用免责声明弹窗代码，重写为干净登录页（标题 CF Dash）
 
-## 2026-08-08 · todo批次7：域名拆分柱子多彩修复 / 版本号跨天重置 / 30天取消缩放 / 签名v2+v3
+## 2026.08.08
+
+### todo批次7：域名拆分柱子多彩修复 / 版本号跨天重置 / 30天取消缩放 / 签名v2+v3
 
 - **域名拆分柱子颜色修复（pending）**：根因是 `ColumnCartesianLayer.ColumnProvider.series(columns)` 的 columns 按**系列索引**（`entry.seriesIndex`）取色，单系列时恒为 0 导致所有柱子同色。改为**自定义 `ColumnProvider.getColumn(entry)` 按 x 索引返回 `pieColors` 颜色**，与下方图例一一对应（`StatsCharts.kt` `ZoneBarChart`）
 - **版本 name 跨天重置（pending）**：`version.properties` 新增 `lastDate` 字段；`currentBuildSeq()` 判断"上次构建日期 ≠ 今天"时重置为 0，`bumpVersion` 写回 `buildSeq` + `lastDate`，实现跨天序号归零（如 08-08_5 → 08-09_1）（`app/build.gradle.kts`）
 - **30 天折线图取消缩放**：`TrendLineChart` 的 `CartesianChartHost` 设置 `zoomState = rememberVicoZoomState(zoomEnabled = false)`，横轴默认压缩全量显示（`StatsCharts.kt`）
 - **签名方案 v2 + v3**：显式开启 `enableV3Signing = true`（与 v2 并列，v1 关闭）（`app/build.gradle.kts` signingConfigs.release）
 
-## 2026-08-08 · todo批次6：带宽纵轴单位 / 域名拆分多彩去横轴 / 默认24h / 分割线间距 / CNAME文案 / 详情页返回动画
+### todo批次6：带宽纵轴单位 / 域名拆分多彩去横轴 / 默认24h / 分割线间距 / CNAME文案 / 详情页返回动画
 
 - **带宽趋势 Y 轴单位（人类可视化）**：带宽趋势折线图 Y 轴改用 `formatBytes` 自动选取 KB/MB/GB，替代数字单位（`StatsContent.kt` 带宽趋势 `TrendLineChart` 传 `valueFormatter = ::formatBytes`）
 - **域名流量拆分**：移除横坐标（bottomAxis），柱状图柱子改为**多彩**（每根柱子 `LineComponent` 用 `pieColors`），与下方图例颜色**一一对应**；host 名称改由图例列表展示（`StatsCharts.kt` `ZoneBarChart`）
@@ -44,7 +55,7 @@
 - **CNAME 介绍精简**：移除后半段"访问 [名称] 将跳转到 [目标]"，改为「[名称] 是 [目标] 的别名。」（`DnsRecordFieldDefs.kt`）
 - **域名详情页返回动画**：`popExitTransition` 改为向右滑出（`slideOutHorizontally { -it / 4 }`），与进入从右滑入对称，退场动画可见（`navigation/AppNavHost.kt`）
 
-## 2026-08-08 · todo批次5：饼图弹窗移除 + 域名流量拆分列表 + 多修复
+### todo批次5：饼图弹窗移除 + 域名流量拆分列表 + 多修复
 
 - **饼图移除 dialog**：维度分布饼图（国家/状态码/缓存）图例/扇区点击不再弹出 AlertDialog 详情；`LegendRow` 移除选中高亮与点击交互，仅展示色块/名称/数值/占比（`StatsCharts.kt`）
 - **域名流量拆分列表**：账号级「域名流量拆分」柱状图下方新增**图例列表**，像饼图图例一样逐行列出每个 host 的名称/请求量/占比（Top8+其他，柱状图保留；`ZoneBarChart` 外包 `Column` + `LegendRow`）
@@ -52,22 +63,13 @@
 - **高级设置开关独立防抖**：根因①ViewModel `settingsBusy != null` 全局拦截（任一设置切换时其他设置请求被直接忽略）；②Screen 端 `enabled` 条件写反（非正在操作时反而禁用）。修复：`settingsBusy` 改为 `Set<String>`，仅防**同一设置**重复操作，不同设置可**并行独立切换**；Screen 端 `enabled = "xxx" !in settingsBusy`（仅自己忙时禁用/转圈，其余保持可用）（`ZoneDetailViewModel.kt` + `ZoneDetailScreen.kt`）
 - **侧边栏分割线间距**：侧边栏用户区与菜单之间的 `HorizontalDivider` 与菜单项之间增加 8dp 间距（`HomeScreen.kt`）
 
-## 2026-08-08 · 代码清理（移除测试代码与无用文件）
+### 代码清理（移除测试代码与无用文件）
 
 - **移除测试代码**：删除 `app/src/test/`（ExampleUnitTest）与 `app/src/androidTest/`（ExampleInstrumentedTest）整目录（项目无真实测试，纯脚手架示例）
 - **移除测试依赖**：`gradle/libs.versions.toml` 删除 junit / junitVersion / espressoCore 版本号及 junit / androidx-junit / androidx-espresso-core / androidx-ui-test-manifest / androidx-ui-test-junit4 库；`app/build.gradle.kts` 删除 `testImplementation` / `androidTestImplementation` / `debugImplementation(ui-test-manifest)` 及 `testInstrumentationRunner`（保留 debugImplementation ui-tooling，开发预览用）
 - **todo.md 精简**：按用户要求删除全部已实施条目（git 与 changelog 兜底记录），仅保留 4 条未实施需求（饼图移除 dialog、域名流量拆分列表、A/AAAA 编辑页说明异常、高级设置开关独立防抖）
 
-## 历史版本记录（v1 ~ v1.5，迁移自 agent.md）
-
-- **v1**：基础框架（Onboarding 验证 + 域名列表 + DNS CRUD + 我的）→ 构建通过
-- **v1.1**：修复验证流程 Bug（tokenOverride）、Token 格式校验
-- **v1.2**：修复"我的"转圈（状态机）、移除添加域名、修复 DNS 编辑导航
-- **v1.3**：全量缓存 + 本地搜索 + 下拉刷新（PullToRefreshBox）+ DNS FAB
-- **v1.4**：Tab/导航过渡动画（AnimatedContent + NavHost transitions）、修复请求体序列化（reified BodyT）
-- **v1.5**：移除本地构建环境（ARM64 AAPT2 hack、setup_android_env.sh、tools/、gradle wrapper 本地 distributionUrl），改用 GitHub Actions CI 构建（手动触发）
-
-## 2026-08-08 · 统计功能图表化升级（Vico 图表库）
+### 统计功能图表化升级（Vico 图表库）
 
 - **图表库**：接入 **Vico 3.2.3**（Compose 原生图表库，Maven Central 分发；仅依赖 `com.patrykandpatrick.vico:compose`——3.x 已无独立 core 模块；minSdk≥23 满足项目 24）
 - **统计数据全面升级**（账号级「统计数据」Tab + 域名详情页同步升级，`StatsContent` 复用组件统一增强）：
@@ -112,7 +114,7 @@
 - **打包清理**：`packaging.resources.excludes` 追加 `**/DebugProbesKt.bin`（kotlinx-coroutines 协程调试探针，仅 IDE 调试用，release 不激活，避免 APK 内出现无用 .bin 文件）
 - **文档**：agent.md（统计模块/依赖/注意点/速查表）、readme.md（功能/技术栈）同步更新
 
-## 2026-08-08 · 侧边栏导航 + 统计数据 + 构建优化
+### 侧边栏导航 + 统计数据 + 构建优化
 
 - **侧边栏导航**：底栏 NavigationBar → **ModalNavigationDrawer 侧边栏**（用户信息卡 + 域名/DNS/统计数据/我的 + 退出登录），为未来更多功能预留扩展位；主内容区第 4 个 Tab「统计数据」，沿用 visitedMask 常驻 + SlidingTab 水平平移过渡
 - **统计数据（GraphQL Analytics）**：按官方文档实现 `POST /graphql` 查询（`httpRequests1hGroups`/`httpRequests1dGroups`，`sum{requests, threats, bytes, cachedRequests, cachedBytes}`）：
@@ -130,7 +132,7 @@
 - **构建修复**：`getAccounts()` 泛型参数修正为 `client.get<List<AccountRef>>`（`get<T>` 的 T 即 result 类型，勿再嵌套 ApiResponse），修复 CI 编译失败
 - **统计查询修复**：移除 GraphQL 查询中的 `orderBy`（官方文档：预聚合 Groups 数据集排序仅支持聚合字段，如 `sum_bytes_DESC`，不支持时间维度排序，导致三个时间范围全部报 "cannot order by datetime/date"）；只做总量累加与顺序无关；filter 保持官方验证字段（1hGroups → `datetime_geq/leq`，1dGroups → `date_geq/leq`）；limit 加缓冲（48/15/32）防时间边界漏行
 
-## 2026-08-08 · 高级设置修复 + Global API Key 登录 + Token 权限提示
+### 高级设置修复 + Global API Key 登录 + Token 权限提示
 
 - **高级设置加载修复**：域名详情与三个高级设置（开发模式/五秒盾/IPv6）改为**并发请求**（页面 loading 动画期间即开始，单项失败不阻塞其他）；加载失败不再静默吞掉（显示错误原因 + 「重试」按钮，仅重刷设置不打断页面）；开发模式文案调整：默认「开启后绕过CDN缓存」，仅确认开启时显示「剩余时间：X」
 - **Global API Key 登录**：认证链路重构为双凭据（`sealed interface AuthCredential`：Token / GlobalKey）；请求头支持 `Authorization: Bearer` 与 `X-Auth-Email` + `X-Auth-Key` 两种；验证按模式区分（Token 走 `/user/tokens/verify`，Global Key 走 `GET /user`）；TokenStore 加密存储扩展（authMode + email/key）；登录页 SegmentedButton 切换，**Global API Key 默认优先，API Token 其次**
@@ -138,7 +140,7 @@
 - **readme**：权限表补充 Zone Settings Read/Edit，并注明支持 Global API Key 登录
 - **构建修复**：`verify()` 泛型化（`<C : AuthCredential>`），修复 onSave lambda 中无法解析子类属性（email/apiKey/value）导致的 CI 编译失败
 
-## 2026-08-08 · 图标库扩展 + 域名详情高级设置 + Tab 水平平移动画
+### 图标库扩展 + 域名详情高级设置 + Tab 水平平移动画
 
 - **图标**：引入 `material-icons-extended` 完整图标库（release 开启 R8，未引用图标被裁剪，APK 体积几乎无增量）；移除「我的」页自定义 `WebIcon`（ImageVector + PathParser 手写 pathData），开源仓库图标改用标准库 `Icons.Filled.Web`
 - **域名详情页新增「高级」设置卡片**（Zone Settings API：`GET/PATCH /zones/{id}/settings/{name}`，需 Token 具备 Zone Settings 权限）：
@@ -149,7 +151,9 @@
 - **Tab 切换动画**：透明度过渡（150ms）→ **水平平移过渡**（250ms FastOutSlowInEasing，offset 位移 GPU 合成，方向跟随 Tab 位置：右侧 Tab 从右滑入、左侧 Tab 从左滑入），保持常驻组合不销毁重建（LazyColumn 不重建、滚动位置不丢失）
 - **构建修复**：补充 `HomeScreen.kt` 缺失的 `androidx.compose.ui.unit.dp` import（screenWidthDp.dp 计算屏幕宽度），修复 CI release 编译失败
 
-## 2026-08-05 · 本次构建改造
+## 2026.08.05
+
+### 本次构建改造
 
 - 包名定稿为 `io.github.toserk1024.cfdash`（规避商标风险；此前曾迁移至 com.cloudflare.dash3rd）
 - 版本号机制：
@@ -169,3 +173,12 @@
 - **底部导航 Tab 切换卡顿修复**：三个 Tab 首次访问后常驻组合，切换仅做 150ms 透明度过渡（GPU 合成），根治 AnimatedContent 每次切换销毁/重建整页造成的掉帧
 - **DNS 记录编辑/新建后列表自动更新**：新增跨 ViewModel 同步队列（`DnsRecordsSync`），保存成功后本地更新缓存（编辑原位替换、新建追加），无需重新请求 API；删除记录保持本地同步
 - 首次包名迁移（`com.java.myapplication` → `com.cloudflare.dash3rd` → 本次定稿 `io.github.toserk1024.cfdash`）
+
+## 历史版本记录（v1 ~ v1.5，迁移自 agent.md）
+
+- **v1**：基础框架（Onboarding 验证 + 域名列表 + DNS CRUD + 我的）→ 构建通过
+- **v1.1**：修复验证流程 Bug（tokenOverride）、Token 格式校验
+- **v1.2**：修复"我的"转圈（状态机）、移除添加域名、修复 DNS 编辑导航
+- **v1.3**：全量缓存 + 本地搜索 + 下拉刷新（PullToRefreshBox）+ DNS FAB
+- **v1.4**：Tab/导航过渡动画（AnimatedContent + NavHost transitions）、修复请求体序列化（reified BodyT）
+- **v1.5**：移除本地构建环境（ARM64 AAPT2 hack、setup_android_env.sh、tools/、gradle wrapper 本地 distributionUrl），改用 GitHub Actions CI 构建（手动触发）

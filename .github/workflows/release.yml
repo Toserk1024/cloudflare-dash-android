@@ -1,0 +1,90 @@
+name: Release APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Build & Create GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Restore version counter
+        uses: actions/cache@v4
+        with:
+          path: version.properties
+          # key 用 github.run_id（每次构建唯一）而非 hashFiles：
+          # version.properties 每次 checkout 都被重置为仓库值，hashFiles 恒等导致 restore 永远精确不匹配，
+          # restore-keys 前缀匹配最近一次构建保存的缓存，从而可靠恢复上次 buildSeq 实现版本号自增
+          key: version-counter-v2-${{ github.run_id }}
+          restore-keys: |
+            version-counter-v2-
+
+      - name: Prepare release signing keystore
+        env:
+          BUILD_KEYSTORE_BASE64: ${{ secrets.BUILD_KEYSTORE_BASE64 }}
+          BUILD_STORE_PASSWORD: ${{ secrets.BUILD_STORE_PASSWORD }}
+          BUILD_KEY_ALIAS: ${{ secrets.BUILD_KEY_ALIAS }}
+          BUILD_KEY_PASSWORD: ${{ secrets.BUILD_KEY_PASSWORD }}
+        run: |
+          if [ -n "$BUILD_KEYSTORE_BASE64" ]; then
+            echo "$BUILD_KEYSTORE_BASE64" | base64 -d > app/cfdash-release.jks
+            echo "BUILD_STORE_FILE=app/cfdash-release.jks" >> $GITHUB_ENV
+            echo "BUILD_STORE_PASSWORD=$BUILD_STORE_PASSWORD" >> $GITHUB_ENV
+            echo "BUILD_KEY_ALIAS=$BUILD_KEY_ALIAS" >> $GITHUB_ENV
+            echo "BUILD_KEY_PASSWORD=$BUILD_KEY_PASSWORD" >> $GITHUB_ENV
+          fi
+
+      - name: Install required SDK components
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Build release APK
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          AAPT=$ANDROID_HOME/build-tools/36.0.0/aapt
+          # 从 APK 提取 versionName（格式：日期_自增序号，如 2026.08.08_5）
+          VN=$($AAPT dump badging "$APK" | grep -oP "versionName='\K[^']+")
+          # Release 标题：去掉 name 后的 _序号，前面加 v（如 v2026.08.08）
+          REV="${VN%_*}"
+          TAG="v$REV"
+          # 获取上一个 release 的 tag，用于提取"自上次发布以来"的更新（保证多日版本发布）
+          LAST_TAG=$(gh release list --limit 1 --exclude-drafts --exclude-prereleases --json tagName -q '.[0].tagName' 2>/dev/null || true)
+          LAST_REV=""
+          if [ -n "$LAST_TAG" ]; then
+            LAST_REV="${LAST_TAG#v}"
+          fi
+          NOTES=/tmp/release_notes.md
+          {
+            echo "## $TAG 更新内容"
+            echo ""
+            if [ -n "$LAST_REV" ]; then
+              # 提取 changelog 中"上次发布日期之前（更新）"的所有子标题，覆盖跨多日的新增更新
+              awk -v d="$LAST_REV" '/^## /{cur=$0; sub(/^## /,"",cur); if(cur==d) exit} /^### /{print "- " substr($0,5)}' changelog.md
+            else
+              # 首次发布：提取全部子标题
+              awk '/^### /{print "- " substr($0,5)}' changelog.md
+            fi
+            echo ""
+            echo "详见 [changelog.md](https://github.com/Toserk1024/cloudflare-dash-android/blob/main/changelog.md)"
+          } > "$NOTES"
+          gh release create "$TAG" "$APK" --title "$TAG" --notes-file "$NOTES"

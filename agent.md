@@ -146,7 +146,15 @@ Token 权限要求：Zone Read/Edit、DNS Read/Edit、Zone Settings Read/Edit（
 - **ABI 过滤**：`defaultConfig.ndk.abiFilters` 仅打包 `armeabi-v7a` + `arm64-v8a`（排除 x86/x86_64，当前纯 Kotlin 无 .so，属防御性声明）
 - **构建提速**：`gradle.properties` 开启 `org.gradle.caching=true`（Gradle Build Cache，复用任务输出）+ `org.gradle.jvmargs=-Xmx4096m`；CI 由 `gradle/actions/setup-gradle@v4` 自动缓存 Gradle 依赖（无需额外 actions/cache）
 
-### 6.2 安装到设备（Shizuku/ADB）
+### 6.2 GitHub Release 发布（`.github/workflows/release.yml`，仅手动触发）
+
+构建方式与 `build.yml` 完全一致（release + R8 + 正式签名），**仅手动触发**（仓库 → Actions → **Release APK** → Run workflow）。构建完成后自动用 `gh release create` 创建 GitHub Release：
+- **Release 标题 / Tag**：去掉 versionName 的 `_序号` 后加 `v`（如 versionName `2026.08.08_5` → Release `v2026.08.08`），从 APK 用 `aapt dump badging` 提取
+- **Release Notes 自动提取**：先 `gh release list` 获取上一个 release 的 tag，再从 `changelog.md` 提取"上次发布日期之前（更新）"的所有子标题（`###`）作为更新内容（**覆盖跨多日的新增更新，保证多日版本发布**），并附 `changelog.md` 链接（`详见 changelog.md`）；**首次发布**则提取全部子标题。约定：`changelog.md` 日期标题统一为**点号格式**（`##2026.08.09`，与 versionName 日期一致），保证 awk 可精确匹配
+- 上传 `app-release.apk` 到 Release 资产
+- 版本 code / name 逻辑与 `build.yml` 完全一致（`日期_自增序号` / 时间戳前 9 位）
+
+### 6.3 安装到设备（Shizuku/ADB）
 ```bash
 # 终端（proot）把 APK 复制到 sdcard
 cp app/build/outputs/apk/release/app-release.apk /sdcard/Download/cf-app.apk
