@@ -162,7 +162,6 @@ fun DnsRecordsContent(
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f)
                     )
-                    OutlinedButton(onClick = { viewModel.setSelectAll(false) }, enabled = !state.bulkBusy) { Text("取消") }
                     OutlinedButton(onClick = viewModel::requestBulkDelete, enabled = !state.bulkBusy) { Text("删除") }
                     // 批量代理仅对 A/AAAA/CNAME 生效（其余类型选中会被忽略）
                     OutlinedButton(onClick = { viewModel.requestBulkProxy(true) }, enabled = !state.bulkBusy) { Text("开代理") }

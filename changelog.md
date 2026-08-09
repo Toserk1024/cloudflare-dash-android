@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026.08.10
+
+### 修复切换账号后页面不自动重载 + 移除批量操作取消按钮
+
+- **修复切换账号后页面不自动重载（pending）**：根因是 `MainActivity.onUserSwitched` 仅 `homeKey++` 触发 `HomeViewModel.loadUser()`（只刷新"我的"用户信息），而域名 / DNS / 统计等 ViewModel 作用域在 NavBackStackEntry、常驻组合不重建，仍展示旧账号缓存数据。修复：`MainActivity.MainScreen` 引入 `navResetKey`，用 `key(navResetKey)` 包裹 NavController + NavHost——切换账号 / 退出到剩余账号时 `navResetKey++` **整体重建导航栈（重新执行启动流程）**，所有 ViewModel 以新激活账号从空态重新加载；同时新增**全屏加载遮罩**（`switching` + 半透明黑底 `CircularProgressIndicator` 覆盖整个 MainActivity，切换完成后自动关闭），避免切换瞬间闪现旧账号内容（`MainActivity.kt`）
+- **移除 DNS 批量操作栏的"取消"按钮（todo）**：批量栏「已选 X 条」后的「取消」按钮（仅清空选中、保留批量模式）冗余，删除；退出批量模式仍由顶栏 checklist 图标控制（`DnsRecordsContent.kt`）
+
 ## 2026.08.09
 
 ### 新增 GitHub Release 发布 Action + changelog 规范化 + security-crypto 回滚

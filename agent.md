@@ -99,6 +99,7 @@ UI(Composable) ⇄ ViewModel(StateFlow) ⇄ Repository ⇄ CloudflareClient(OkHt
 - 单 Activity，路由见 `Routes.kt`：onboarding / home / zone_detail / dns_records / dns_edit
 - `AppNavHost` 配置了全局转场动画（fadeIn + slideInHorizontally 1/4 屏）
 - HomeScreen 底部三 Tab（域名/DNS/我的）：首次访问后常驻组合（visitedMask 懒加载），切换仅水平平移过渡（SlidingTab，250ms FastOutSlowIn，offset 位移 GPU 合成，方向跟随 Tab 位置），避免重建卡顿
+- **账号切换/退出到剩余账号 = 重建导航栈**：`MainActivity.MainScreen` 用 `key(navResetKey)` 包裹 NavController+NavHost，切换账号或退出到剩余账号时 `navResetKey++` 整体重建导航栈（新 NavController→新 ViewModelStore→所有页面从空态重新加载新账号数据），并显示全屏加载遮罩（`switching`）；避免仅刷新"我的"用户信息而域名/DNS/统计仍滞留旧账号缓存。首次登录/退出到无剩余用户用 `loggedIn` + `LaunchedEffect` 导航
 - 带参路由：`zone_detail/{zoneId}?zoneName={zoneName}`（可选参数有 defaultValue=""）
 - ViewModel 从 `SavedStateHandle` 读参数（如 DnsEditViewModel 的 zoneId/recordId、DnsViewModel 的 zoneId）
 - **注意**：`SavedStateHandle["key"]` 泛型推断可能失败，用 `savedStateHandle.get<String>("key")` 显式类型
