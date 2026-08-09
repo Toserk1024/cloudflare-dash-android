@@ -53,6 +53,7 @@ import io.github.toserk1024.cfdash.data.model.DnsRecordTypes
 fun DnsRecordEditScreen(
     zoneId: String,
     recordId: String?,
+    zoneName: String?,
     onBack: () -> Unit,
     onSaved: () -> Unit,
     viewModel: DnsEditViewModel = viewModel()
@@ -119,8 +120,19 @@ fun DnsRecordEditScreen(
 
             // 顶部直观说明（如 "将 [名称] 指向 [IPv4 地址]"），占位符随实际值动态替换
             Spacer(modifier = Modifier.height(12.dp))
+            // 记录名展示：@ 不加点；已以当前域名结尾则直接展示；否则自动补 ".域名"
+            val displayName = remember(state.name, zoneName) {
+                when {
+                    state.name.isBlank() -> "记录名"
+                    zoneName.isNullOrBlank() -> state.name
+                    state.name == "@" -> zoneName // @ 代表根域：不加点，直接显示域名本身
+                    state.name == zoneName -> state.name
+                    state.name.endsWith(".$zoneName") -> state.name
+                    else -> "${state.name}.$zoneName"
+                }
+            }
             val desc = DnsRecordFieldDefs.description(state.recordType)
-                .replace("[名称]", state.name.ifBlank { "记录名" })
+                .replace("[名称]", displayName)
                 .replace("[目标]", state.fields[DnsRecordFieldDefs.TARGET]?.takeIf { it.isNotBlank() } ?: "目标")
                 .replace("[IPv4 地址]", state.fields[DnsRecordFieldDefs.TARGET]?.takeIf { it.isNotBlank() } ?: "IPv4 地址")
                 .replace("[IPv6 地址]", state.fields[DnsRecordFieldDefs.TARGET]?.takeIf { it.isNotBlank() } ?: "IPv6 地址")

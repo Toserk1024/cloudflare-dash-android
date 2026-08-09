@@ -78,9 +78,9 @@ fun AppNavHost(
                 onZoneClick = { zone ->
                     navController.navigate(Routes.zoneDetail(zone.id, zone.name))
                 },
-                onDnsEdit = { zoneId, recordId ->
+                onDnsEdit = { zoneId, recordId, zoneName ->
                     if (zoneId.isNotBlank()) {
-                        navController.navigate(Routes.dnsEdit(zoneId, recordId))
+                        navController.navigate(Routes.dnsEdit(zoneId, recordId, zoneName))
                     }
                 },
                 onNewUser = onNewUser,
@@ -130,8 +130,8 @@ fun AppNavHost(
                 zoneId = zoneId,
                 zoneName = zoneName,
                 onBack = { navController.popBackStack() },
-                onEditRecord = { zid, rid ->
-                    navController.navigate(Routes.dnsEdit(zid, rid))
+                onEditRecord = { zid, rid, zname ->
+                    navController.navigate(Routes.dnsEdit(zid, rid, zname))
                 }
             )
         }
@@ -144,14 +144,20 @@ fun AppNavHost(
                 navArgument("recordId") {
                     type = NavType.StringType
                     defaultValue = ""
+                },
+                navArgument("zoneName") {
+                    type = NavType.StringType
+                    defaultValue = ""
                 }
             )
         ) { entry ->
             val zoneId = entry.arguments?.getString("zoneId").orEmpty()
             val recordId = entry.arguments?.getString("recordId")?.takeIf { it.isNotBlank() }
+            val zoneName = entry.arguments?.getString("zoneName")?.takeIf { it.isNotBlank() }
             DnsRecordEditScreen(
                 zoneId = zoneId,
                 recordId = recordId,
+                zoneName = zoneName,
                 onBack = { navController.popBackStack() },
                 onSaved = { navController.popBackStack() }
             )

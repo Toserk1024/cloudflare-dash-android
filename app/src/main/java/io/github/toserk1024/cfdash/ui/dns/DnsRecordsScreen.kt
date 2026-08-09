@@ -23,7 +23,7 @@ fun DnsRecordsScreen(
     zoneId: String,
     zoneName: String?,
     onBack: () -> Unit,
-    onEditRecord: (String, String?) -> Unit,
+    onEditRecord: (String, String?, String?) -> Unit,
     viewModel: DnsViewModel = viewModel()
 ) {
     Scaffold(
@@ -40,8 +40,8 @@ fun DnsRecordsScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             DnsRecordsContent(
-                onEditRecord = { record: DnsRecord -> onEditRecord(zoneId, record.id) },
-                onAddRecord = { onEditRecord(zoneId, null) },
+                onEditRecord = { record: DnsRecord -> onEditRecord(zoneId, record.id, zoneName) },
+                onAddRecord = { onEditRecord(zoneId, null, zoneName) },
                 viewModel = viewModel
             )
         }

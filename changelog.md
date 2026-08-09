@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-09 · 依赖版本更新 + DNS 编辑页名称域名后缀判断
+
+- **依赖版本更新**（9 项）：`security-crypto` 1.1.0-alpha06→**1.1.0**（脱离 alpha）、`core-ktx` 1.10.1→1.19.0、`lifecycle-runtime-ktx` 2.6.1→2.11.0、`lifecycle-viewmodel-compose` 2.8.7→2.11.0、`activity-compose` 1.8.0→1.13.0、`compose-bom` 2026.01.01→2026.06.01、`navigation-compose` 2.8.5→2.9.8、`kotlinx-serialization-json` 1.7.3→1.11.0、`kotlinx-coroutines-android` 1.9.0→1.11.0（AGP/Kotlin/okhttp/vico 大版本未动）
+- **DNS 编辑页名称域名后缀判断**：顶部说明文案的"[名称]"智能展示——`@`→域名本身（根域不加点）；未以当前域名结尾自动补".域名"（如 www→www.a.com）；已以域名结尾直接显示（如 www.a.com）；名称等于域名本身直接显示。为支持此功能，将 `zoneName` 沿调用链传入编辑页（`Routes` / `AppNavHost` / `HomeScreen` / `DnsRecordsScreen` / `DnsRecordEditScreen`）
+
 ## 2026-08-09 · 修复退出登录不跳转 bug
 
 - **根因**：登录成功后 `MainActivity.loggedIn` 从未更新为 true（始终为启动时初始值），导致单用户退出时 `loggedIn` 无变化、`LaunchedEffect` 不触发导航（表现为"账户已删但界面没反应、不返回登录页"）

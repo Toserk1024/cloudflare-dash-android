@@ -84,7 +84,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     onZoneClick: (Zone) -> Unit,
-    onDnsEdit: (String, String?) -> Unit,
+    onDnsEdit: (String, String?, String?) -> Unit,
     onLogout: () -> Unit,
     homeKey: Int = 0,
     onNewUser: () -> Unit = {},
@@ -149,9 +149,11 @@ fun HomeScreen(
                         val dnsState by dnsViewModel.uiState.collectAsState()
                         DnsRecordsContent(
                             onEditRecord = { record: DnsRecord ->
-                                onDnsEdit(dnsState.selectedZone?.id.orEmpty(), record.id)
+                                onDnsEdit(dnsState.selectedZone?.id.orEmpty(), record.id, dnsState.selectedZone?.name)
                             },
-                            onAddRecord = { onDnsEdit(dnsState.selectedZone?.id.orEmpty(), null) },
+                            onAddRecord = {
+                                onDnsEdit(dnsState.selectedZone?.id.orEmpty(), null, dnsState.selectedZone?.name)
+                            },
                             viewModel = dnsViewModel
                         )
                     }
