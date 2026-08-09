@@ -1,8 +1,8 @@
 # Changelog
 
-## 2026-08-09 · 构建修复：升级 AGP 9.1.0 + compileSdk 37（适配新依赖）
+## 2026-08-09 · 构建修复：android-37 平台未发布，回退 core/lifecycle（保留其余依赖升级）
 
-- 升级的 `core-ktx` 1.19.0 与 `lifecycle` 2.11.0 要求 compileSdk 37 + AGP 9.1.0 → 升级 AGP 9.0.0→**9.1.0**、compileSdk 36→**37**，CI workflow 同步 `platforms;android-37` + `build-tools;37.0.0`（targetSdk 保持 35）
+- 尝试升级 AGP 9.1.0 + compileSdk 37 以适配 core-ktx 1.19 / lifecycle 2.11，但 `platforms;android-37` 在 sdkmanager 中不存在（Google 尚未发布 API 37）→ **回退**：core-ktx **1.18.0**、lifecycle **2.10.0**、AGP **9.0.0**、compileSdk **36**、CI 保持 android-36；**其余升级保留**（compose-bom 2026.06.01、navigation 2.9.8、activity 1.13.0、coroutines 1.11.0、serialization 1.11.0、security-crypto 1.1.0）
 
 ## 2026-08-09 · 依赖版本更新 + DNS 编辑页名称域名后缀判断
 
