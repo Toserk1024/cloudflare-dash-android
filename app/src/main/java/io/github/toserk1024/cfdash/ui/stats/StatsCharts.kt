@@ -45,7 +45,7 @@ import com.patrykandpatrick.vico.compose.cartesian.marker.DefaultCartesianMarker
 import com.patrykandpatrick.vico.compose.cartesian.marker.LineCartesianLayerMarkerTarget
 import com.patrykandpatrick.vico.compose.cartesian.marker.rememberDefaultCartesianMarker
 import com.patrykandpatrick.vico.compose.common.Fill
-import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
+import com.patrykandpatrick.vico.compose.common.component.LineComponent
 import com.patrykandpatrick.vico.compose.common.component.rememberTextComponent
 import com.patrykandpatrick.vico.compose.common.data.ExtraStore
 import com.patrykandpatrick.vico.compose.pie.PieChart
@@ -225,19 +225,17 @@ fun ZoneBarChart(
         CartesianChartHost(
             chart = rememberCartesianChart(
                 rememberColumnCartesianLayer(
+                    // 每根柱子颜色与下方图例一一对应（多彩）
                     ColumnCartesianLayer.ColumnProvider.series(
-                        rememberLineComponent(Fill(CloudflareOrange), 16.dp)
+                        chartItems.indices.map { i ->
+                            LineComponent(Fill(pieColors[i % pieColors.size]), 16.dp)
+                        }
                     )
                 ),
                 startAxis = VerticalAxis.rememberStart(
                     valueFormatter = CartesianValueFormatter { _, y, _ -> formatCount(y.toLong()) }
                 ),
-                bottomAxis = HorizontalAxis.rememberBottom(
-                    valueFormatter = CartesianValueFormatter { context, x, _ ->
-                        context.model.extraStore[labelListKey].getOrNull(x.toInt()) ?: ""
-                    }
-                ),
-                // 点击柱子：显示该 host 与请求量
+                // 移除底部轴（横坐标），交由下方图例列表展示
                 marker = rememberDefaultCartesianMarker(
                     label = rememberTextComponent(
                         style = TextStyle(color = Color.White, fontSize = 12.sp, background = Color(0xCC000000)),

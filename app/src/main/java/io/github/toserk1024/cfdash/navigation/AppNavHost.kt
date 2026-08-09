@@ -33,7 +33,8 @@ fun AppNavHost(
         enterTransition = { fadeIn(tween(220)) + slideInHorizontally { it / 4 } },
         exitTransition = { fadeOut(tween(180)) },
         popEnterTransition = { fadeIn(tween(180)) },
-        popExitTransition = { fadeOut(tween(180)) + slideOutHorizontally { it / 4 } }
+        // 返回时源页（如域名详情）向右滑出，与进入从右滑入对称，退场动画可见
+        popExitTransition = { fadeOut(tween(180)) + slideOutHorizontally { -it / 4 } }
     ) {
 
         // 初始化（Token 验证 / 新增用户）

@@ -216,7 +216,7 @@ fun HomeScreen(
                     val activeUser = remember(homeKey) { AppContainer.tokenStore.getActiveUser() }
                     val allUsers = remember(homeKey) { AppContainer.tokenStore.getUsers() }
                     var switchMenu by remember { mutableStateOf(false) }
-                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp)) {
                         Surface(shape = CircleShape, color = CloudflareOrange) {
                             Box(
                                 modifier = Modifier.size(48.dp),

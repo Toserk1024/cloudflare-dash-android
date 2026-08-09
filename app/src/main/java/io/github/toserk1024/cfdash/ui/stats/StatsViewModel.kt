@@ -21,7 +21,7 @@ class StatsViewModel : ViewModel() {
 
     data class StatsUiState(
         val data: StatsData = StatsData(),
-        val range: AnalyticsRange = AnalyticsRange.D7,
+        val range: AnalyticsRange = AnalyticsRange.H24,
         val loading: Boolean = true,
         /** 下拉刷新中（保留旧数据展示，仅顶部指示器） */
         val refreshing: Boolean = false,

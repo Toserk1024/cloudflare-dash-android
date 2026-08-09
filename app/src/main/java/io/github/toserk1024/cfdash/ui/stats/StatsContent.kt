@@ -174,8 +174,8 @@ private fun StatsContentBody(
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         ChartCard(title = "带宽趋势") {
-                            // 与请求数趋势完全一致的调用（高度/逻辑统一）
-                            TrendLineChart(points = series.points, valueSelector = { it.bytes })
+                            // 带宽趋势 Y 轴自动选取 KB/MB/GB（人类可视化）
+                            TrendLineChart(points = series.points, valueSelector = { it.bytes }, valueFormatter = ::formatBytes)
                         }
                     }
                 }

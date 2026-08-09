@@ -37,7 +37,7 @@ class ZoneDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         val settingsError: String? = null,
         // ===== 域名级统计 =====
         val statsData: StatsData = StatsData(),
-        val statsRange: AnalyticsRange = AnalyticsRange.D7,
+        val statsRange: AnalyticsRange = AnalyticsRange.H24,
         val statsLoading: Boolean = false,
         val statsError: String? = null,
         val statsPartError: String? = null

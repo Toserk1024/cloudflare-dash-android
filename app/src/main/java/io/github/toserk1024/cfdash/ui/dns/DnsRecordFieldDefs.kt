@@ -104,7 +104,7 @@ object DnsRecordFieldDefs {
     fun description(type: String): String = when (type) {
         "A" -> "将 [名称] 指向 [IPv4 地址]。"
         "AAAA" -> "将 [名称] 指向 [IPv6 地址]。"
-        "CNAME" -> "[名称] 是 [目标] 的别名，访问 [名称] 将跳转到 [目标]。"
+        "CNAME" -> "[名称] 是 [目标] 的别名。"
         "MX" -> "[名称] 的邮件由 [目标] 处理，优先级数字越小越优先。"
         "TXT" -> "为 [名称] 添加任意文本记录（SPF、DKIM、验证等用途）。"
         "NS" -> "将 [名称] 的解析委托给 [目标] 名称服务器。"

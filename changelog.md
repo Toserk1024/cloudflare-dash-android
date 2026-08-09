@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-08-08 · todo批次6：带宽纵轴单位 / 域名拆分多彩去横轴 / 默认24h / 分割线间距 / CNAME文案 / 详情页返回动画
+
+- **带宽趋势 Y 轴单位（人类可视化）**：带宽趋势折线图 Y 轴改用 `formatBytes` 自动选取 KB/MB/GB，替代数字单位（`StatsContent.kt` 带宽趋势 `TrendLineChart` 传 `valueFormatter = ::formatBytes`）
+- **域名流量拆分**：移除横坐标（bottomAxis），柱状图柱子改为**多彩**（每根柱子 `LineComponent` 用 `pieColors`），与下方图例颜色**一一对应**；host 名称改由图例列表展示（`StatsCharts.kt` `ZoneBarChart`）
+- **统计默认 24 小时**：账号级 `StatsViewModel` 与域名级 `ZoneDetailViewModel` 默认时间范围由 7 天（D7）改为 24 小时（H24）
+- **侧边栏分割线间距平均分**：用户区底部 padding 由 16dp 收窄为 8dp，与分割线下方 8dp 对称，消除"上宽下窄"（`HomeScreen.kt`）
+- **CNAME 介绍精简**：移除后半段"访问 [名称] 将跳转到 [目标]"，改为「[名称] 是 [目标] 的别名。」（`DnsRecordFieldDefs.kt`）
+- **域名详情页返回动画**：`popExitTransition` 改为向右滑出（`slideOutHorizontally { -it / 4 }`），与进入从右滑入对称，退场动画可见（`navigation/AppNavHost.kt`）
+
 ## 2026-08-08 · todo批次5：饼图弹窗移除 + 域名流量拆分列表 + 多修复
 
 - **饼图移除 dialog**：维度分布饼图（国家/状态码/缓存）图例/扇区点击不再弹出 AlertDialog 详情；`LegendRow` 移除选中高亮与点击交互，仅展示色块/名称/数值/占比（`StatsCharts.kt`）
