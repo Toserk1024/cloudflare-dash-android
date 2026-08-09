@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-09 · 修复退出登录不跳转 bug
+
+- **根因**：登录成功后 `MainActivity.loggedIn` 从未更新为 true（始终为启动时初始值），导致单用户退出时 `loggedIn` 无变化、`LaunchedEffect` 不触发导航（表现为"账户已删但界面没反应、不返回登录页"）
+- **修复**：`AppNavHost` 新增 `onLoggedIn` 回调，`OnboardingScreen` 登录成功后调用；`MainActivity` 传 `onLoggedIn = { loggedIn = true }` 同步登录态。修复后：**单用户退出**→删除账户并跳转登录页；**多用户退出当前**→`deleteUser` 自动切到剩余有效账户 + `homeKey++` 重载数据（`MainActivity.kt` / `AppNavHost.kt`）
+
 ## 2026-08-09 · 免责声明页优化：状态持久化 + 排版重构 + 启动逻辑
 
 - **免责声明状态持久化**：`TokenStore` 新增 `isDisclaimerAccepted()` / `setDisclaimerAccepted()`（EncryptedSharedPreferences），同意后下次启动不再显示免责声明页

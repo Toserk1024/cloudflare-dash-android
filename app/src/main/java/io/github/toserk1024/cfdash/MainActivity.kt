@@ -76,6 +76,8 @@ private fun MainScreen() {
         onUserSwitched = {
             homeKey++
         },
+        // 登录成功后同步 loggedIn=true（否则退出登录时 loggedIn 无变化导致不跳转）
+        onLoggedIn = { loggedIn = true },
         navController = navController
     )
 }

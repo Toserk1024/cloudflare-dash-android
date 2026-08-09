@@ -27,6 +27,7 @@ fun AppNavHost(
     onLoggedOut: () -> Unit,
     onNewUser: () -> Unit = {},
     onUserSwitched: () -> Unit = {},
+    onLoggedIn: () -> Unit = {},
     navController: NavHostController
 ) {
     NavHost(
@@ -56,6 +57,8 @@ fun AppNavHost(
         composable(Routes.ONBOARDING) {
             OnboardingScreen(
                 onSuccess = {
+                    // 同步登录态（MainActivity loggedIn=true），确保后续退出登录能正确跳转
+                    onLoggedIn()
                     // 从 Home 进入（新增用户）：验证成功返回 Home；否则（首次登录）导航 Home
                     if (navController.previousBackStackEntry?.destination?.route == Routes.HOME) {
                         navController.popBackStack()
