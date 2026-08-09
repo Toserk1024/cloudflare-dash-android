@@ -2,6 +2,7 @@ package io.github.toserk1024.cfdash.navigation
 
 /** 导航路由定义 */
 object Routes {
+    const val DISCLAIMER = "disclaimer"
     const val ONBOARDING = "onboarding"
     const val HOME = "home"
 

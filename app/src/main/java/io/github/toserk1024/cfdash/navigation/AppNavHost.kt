@@ -11,6 +11,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import io.github.toserk1024.cfdash.AppContainer
+import io.github.toserk1024.cfdash.ui.disclaimer.DisclaimerScreen
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordEditScreen
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordsScreen
 import io.github.toserk1024.cfdash.ui.home.HomeScreen
@@ -36,6 +38,18 @@ fun AppNavHost(
         // 返回时源页（如域名详情）向右滑出，与进入从右滑入对称，退场动画可见
         popExitTransition = { fadeOut(tween(180)) + slideOutHorizontally { -it / 4 } }
     ) {
+
+        // 免责声明启动页
+        composable(Routes.DISCLAIMER) {
+            DisclaimerScreen(
+                onAgree = {
+                    val loggedIn = AppContainer.tokenStore.hasCredential()
+                    navController.navigate(if (loggedIn) Routes.HOME else Routes.ONBOARDING) {
+                        popUpTo(Routes.DISCLAIMER) { inclusive = true }
+                    }
+                }
+            )
+        }
 
         // 初始化（Token 验证 / 新增用户）
         composable(Routes.ONBOARDING) {

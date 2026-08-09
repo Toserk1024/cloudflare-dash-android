@@ -43,7 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-/** 初始化界面：选择认证方式（Global API Key / API Token）→ 验证 → 进入主界面 */
+/** 登录页：选择认证方式（Global API Key / API Token）→ 验证 → 进入主界面（免责声明页为独立启动页） */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
@@ -71,7 +71,7 @@ fun OnboardingScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "Cloudflare 客户端",
+                text = "CF Dash",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )

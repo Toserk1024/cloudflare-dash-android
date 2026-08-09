@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-09 · 品牌更名 CF Dash + 免责声明独立启动页 + 折线缩放回滚
+
+- **应用更名 CF Dash**：应用名称与登录页标题由"Cloudflare 客户端"改为"CF Dash"（`strings.xml` `app_name` + `OnboardingScreen`），更低调、规避直呼官方品牌名的招摇感
+- **新增免责声明独立启动页**：新增 `ui/disclaimer/DisclaimerScreen.kt`，作为 `startDestination` 启动页；含完整免责声明（第三方声明 / 风险自担 / API 密钥安全 / 责任限制 / 第三方行为 / 接受条款），须勾选"我已知晓并愿意承担相应风险"才能点"继续"（已登录→主界面，未登录→登录页），另有"退出"退出应用；接入 `Routes` / `AppNavHost` / `MainActivity`
+- **导航逻辑修复**：`MainActivity` 增加 `firstLaunch` 标志，避免首次启动（未登录）时 `LaunchedEffect` 立即跳登录页、覆盖免责声明页；退出登录后仍正常回登录页
+- **折线图缩放回滚**：移除 `TrendLineChart` 的 `zoomState = rememberVicoZoomState(zoomEnabled = false)`，恢复默认缩放（回滚批次7的"取消缩放"改动）
+- **登录页重写**：`OnboardingScreen` 移除调试用免责声明弹窗代码，重写为干净登录页（标题 CF Dash）
+
 ## 2026-08-08 · todo批次7：域名拆分柱子多彩修复 / 版本号跨天重置 / 30天取消缩放 / 签名v2+v3
 
 - **域名拆分柱子颜色修复（pending）**：根因是 `ColumnCartesianLayer.ColumnProvider.series(columns)` 的 columns 按**系列索引**（`entry.seriesIndex`）取色，单系列时恒为 0 导致所有柱子同色。改为**自定义 `ColumnProvider.getColumn(entry)` 按 x 索引返回 `pieColors` 颜色**，与下方图例一一对应（`StatsCharts.kt` `ZoneBarChart`）

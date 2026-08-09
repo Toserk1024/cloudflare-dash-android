@@ -41,7 +41,6 @@ import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
-import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import com.patrykandpatrick.vico.compose.cartesian.marker.ColumnCartesianLayerMarkerTarget
 import com.patrykandpatrick.vico.compose.cartesian.marker.DefaultCartesianMarker
 import com.patrykandpatrick.vico.compose.cartesian.marker.LineCartesianLayerMarkerTarget
@@ -140,8 +139,6 @@ fun TrendLineChart(
             )
         ),
         modelProducer = modelProducer,
-        // 取消缩放/横向滚动：30天折线图横轴默认压缩全量显示
-        zoomState = rememberVicoZoomState(zoomEnabled = false),
         modifier = modifier.height(height)
     )
 }

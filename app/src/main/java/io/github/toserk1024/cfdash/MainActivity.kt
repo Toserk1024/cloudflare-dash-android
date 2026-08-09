@@ -39,7 +39,13 @@ private fun MainScreen() {
     var homeKey by remember { mutableIntStateOf(0) }
 
     // 退出到无剩余用户时（loggedIn=false）导航回初始化页（NavHost 不监听 startDestination 变化）
+    // firstLaunch：首次启动不在此导航（免责声明页作为启动页，同意后由 AppNavHost 按登录态跳转），仅处理"退出登录"后的跳转
+    var firstLaunch by remember { mutableStateOf(true) }
     LaunchedEffect(loggedIn) {
+        if (firstLaunch) {
+            firstLaunch = false
+            return@LaunchedEffect
+        }
         if (!loggedIn) {
             navController.navigate(Routes.ONBOARDING) {
                 popUpTo(0) { inclusive = true }
@@ -48,7 +54,8 @@ private fun MainScreen() {
     }
 
     AppNavHost(
-        startDestination = if (loggedIn) Routes.HOME else Routes.ONBOARDING,
+        // 免责声明页始终作为启动页，同意后根据登录态进入登录页或主界面
+        startDestination = Routes.DISCLAIMER,
         homeKey = homeKey,
         onLoggedOut = {
             // 退出登录：删除当前激活用户；若有剩余用户自动切换并刷新 Home，否则回初始化
