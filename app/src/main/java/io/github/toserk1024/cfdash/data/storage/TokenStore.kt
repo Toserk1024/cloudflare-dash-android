@@ -105,6 +105,13 @@ class TokenStore(context: Context) {
         prefs.edit().clear().apply()
     }
 
+    /** 免责声明：用户是否已同意（持久化，同意后下次启动不再显示） */
+    fun setDisclaimerAccepted(accepted: Boolean) {
+        prefs.edit().putBoolean(KEY_DISCLAIMER_ACCEPTED, accepted).apply()
+    }
+
+    fun isDisclaimerAccepted(): Boolean = prefs.getBoolean(KEY_DISCLAIMER_ACCEPTED, false)
+
     private fun readCredential(id: String): AuthCredential? =
         when (prefs.getString("${KEY_USER_PREFIX}$id${KEY_SUFFIX_MODE}", null)) {
             MODE_TOKEN -> prefs.getString("${KEY_USER_PREFIX}$id${KEY_SUFFIX_TOKEN}", null)
@@ -133,6 +140,7 @@ class TokenStore(context: Context) {
     companion object {
         private const val FILE_NAME = "cf_secure_prefs"
         private const val KEY_ACTIVE_USER = "cf_active_user"
+        private const val KEY_DISCLAIMER_ACCEPTED = "cf_disclaimer_accepted"
         private const val KEY_USER_PREFIX = "cf_user_"
         private const val KEY_SUFFIX_MODE = "_mode"
         private const val KEY_SUFFIX_TOKEN = "_token"

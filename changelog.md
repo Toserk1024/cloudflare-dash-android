@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-09 · 免责声明页优化：状态持久化 + 排版重构 + 启动逻辑
+
+- **免责声明状态持久化**：`TokenStore` 新增 `isDisclaimerAccepted()` / `setDisclaimerAccepted()`（EncryptedSharedPreferences），同意后下次启动不再显示免责声明页
+- **排版重构**：免责声明页重写为「顶部标题区（CF Dash 橙色 + 使用须知）+ 中部声明分节滚动（六小节加粗标题 + 正文）+ 底部复选框与退出/同意并继续按钮组」，层次分明、更优雅整洁
+- **启动逻辑优化**：`MainActivity` `startDestination` 按 `isDisclaimerAccepted()` + 登录态三态判断；免责声明"同意并继续"后持久化状态并按登录态导航（`AppNavHost`）
+
 ## 2026-08-09 · 品牌更名 CF Dash + 免责声明独立启动页 + 折线缩放回滚
 
 - **应用更名 CF Dash**：应用名称与登录页标题由"Cloudflare 客户端"改为"CF Dash"（`strings.xml` `app_name` + `OnboardingScreen`），更低调、规避直呼官方品牌名的招摇感

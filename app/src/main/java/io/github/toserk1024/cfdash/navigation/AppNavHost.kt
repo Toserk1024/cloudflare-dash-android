@@ -43,6 +43,7 @@ fun AppNavHost(
         composable(Routes.DISCLAIMER) {
             DisclaimerScreen(
                 onAgree = {
+                    AppContainer.tokenStore.setDisclaimerAccepted(true)
                     val loggedIn = AppContainer.tokenStore.hasCredential()
                     navController.navigate(if (loggedIn) Routes.HOME else Routes.ONBOARDING) {
                         popUpTo(Routes.DISCLAIMER) { inclusive = true }

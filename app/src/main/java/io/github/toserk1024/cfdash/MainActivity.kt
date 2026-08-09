@@ -54,8 +54,12 @@ private fun MainScreen() {
     }
 
     AppNavHost(
-        // 免责声明页始终作为启动页，同意后根据登录态进入登录页或主界面
-        startDestination = Routes.DISCLAIMER,
+        // 启动逻辑：未同意免责声明→免责声明页；已同意→按登录态进主界面或登录页
+        startDestination = when {
+            !AppContainer.tokenStore.isDisclaimerAccepted() -> Routes.DISCLAIMER
+            loggedIn -> Routes.HOME
+            else -> Routes.ONBOARDING
+        },
         homeKey = homeKey,
         onLoggedOut = {
             // 退出登录：删除当前激活用户；若有剩余用户自动切换并刷新 Home，否则回初始化
