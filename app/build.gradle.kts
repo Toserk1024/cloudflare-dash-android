@@ -44,8 +44,8 @@ tasks.matching { it.name.startsWith("assemble") }.configureEach {
 
 android {
     namespace = "io.github.toserk1024.cfdash"
-    // Vico 3.2.3 要求 compileSdk >= 36（其 AAR 元数据声明），targetSdk 保持 35
-    compileSdk = 36
+    // Vico 3.2.3 要求 compileSdk >= 36；升级后的 androidx.core/lifecycle 需要 compileSdk 37，targetSdk 保持 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "io.github.toserk1024.cfdash"
