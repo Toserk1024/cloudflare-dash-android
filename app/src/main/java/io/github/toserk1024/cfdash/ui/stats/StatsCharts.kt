@@ -231,6 +231,9 @@ fun ZoneBarChart(
                 val idx = ((entry.x.toInt() % pieColors.size) + pieColors.size) % pieColors.size
                 return LineComponent(Fill(pieColors[idx]), 16.dp)
             }
+
+            override fun getWidestSeriesColumn(seriesKey: Any, seriesIndex: Int, extraStore: ExtraStore): LineComponent =
+                LineComponent(Fill(pieColors[seriesIndex % pieColors.size]), 16.dp)
         }
     }
     Column(modifier = modifier) {
