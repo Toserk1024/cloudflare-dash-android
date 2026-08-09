@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-08 · todo批次7：域名拆分柱子多彩修复 / 版本号跨天重置 / 30天取消缩放 / 签名v2+v3
+
+- **域名拆分柱子颜色修复（pending）**：根因是 `ColumnCartesianLayer.ColumnProvider.series(columns)` 的 columns 按**系列索引**（`entry.seriesIndex`）取色，单系列时恒为 0 导致所有柱子同色。改为**自定义 `ColumnProvider.getColumn(entry)` 按 x 索引返回 `pieColors` 颜色**，与下方图例一一对应（`StatsCharts.kt` `ZoneBarChart`）
+- **版本 name 跨天重置（pending）**：`version.properties` 新增 `lastDate` 字段；`currentBuildSeq()` 判断"上次构建日期 ≠ 今天"时重置为 0，`bumpVersion` 写回 `buildSeq` + `lastDate`，实现跨天序号归零（如 08-08_5 → 08-09_1）（`app/build.gradle.kts`）
+- **30 天折线图取消缩放**：`TrendLineChart` 的 `CartesianChartHost` 设置 `zoomState = rememberVicoZoomState(zoomEnabled = false)`，横轴默认压缩全量显示（`StatsCharts.kt`）
+- **签名方案 v2 + v3**：显式开启 `enableV3Signing = true`（与 v2 并列，v1 关闭）（`app/build.gradle.kts` signingConfigs.release）
+
 ## 2026-08-08 · todo批次6：带宽纵轴单位 / 域名拆分多彩去横轴 / 默认24h / 分割线间距 / CNAME文案 / 详情页返回动画
 
 - **带宽趋势 Y 轴单位（人类可视化）**：带宽趋势折线图 Y 轴改用 `formatBytes` 自动选取 KB/MB/GB，替代数字单位（`StatsContent.kt` 带宽趋势 `TrendLineChart` 传 `valueFormatter = ::formatBytes`）

@@ -36,10 +36,12 @@ import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.compose.cartesian.data.columnModel
 import com.patrykandpatrick.vico.compose.cartesian.data.lineModel
 import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import com.patrykandpatrick.vico.compose.cartesian.marker.ColumnCartesianLayerMarkerTarget
 import com.patrykandpatrick.vico.compose.cartesian.marker.DefaultCartesianMarker
 import com.patrykandpatrick.vico.compose.cartesian.marker.LineCartesianLayerMarkerTarget
@@ -138,10 +140,11 @@ fun TrendLineChart(
             )
         ),
         modelProducer = modelProducer,
+        // 取消缩放/横向滚动：30天折线图横轴默认压缩全量显示
+        zoomState = rememberVicoZoomState(zoomEnabled = false),
         modifier = modifier.height(height)
     )
 }
-
 /** 维度分布饼图（Top N + 其他归并，下方图例展示名称/值/占比） */
 @Composable
 fun BreakdownPieChart(
@@ -221,17 +224,19 @@ fun ZoneBarChart(
         }
     }
     val total = chartItems.sumOf { it.sum.requests }
+    // 自定义 ColumnProvider：按 x 索引（数据点）返回颜色，使每根柱子颜色与下方图例一一对应
+    val columnProvider = remember(chartItems) {
+        object : ColumnCartesianLayer.ColumnProvider {
+            override fun getColumn(entry: ColumnCartesianLayerModel.Entry, extraStore: ExtraStore): LineComponent {
+                val idx = ((entry.x.toInt() % pieColors.size) + pieColors.size) % pieColors.size
+                return LineComponent(Fill(pieColors[idx]), 16.dp)
+            }
+        }
+    }
     Column(modifier = modifier) {
         CartesianChartHost(
             chart = rememberCartesianChart(
-                rememberColumnCartesianLayer(
-                    // 每根柱子颜色与下方图例一一对应（多彩）
-                    ColumnCartesianLayer.ColumnProvider.series(
-                        chartItems.indices.map { i ->
-                            LineComponent(Fill(pieColors[i % pieColors.size]), 16.dp)
-                        }
-                    )
-                ),
+                rememberColumnCartesianLayer(columnProvider),
                 startAxis = VerticalAxis.rememberStart(
                     valueFormatter = CartesianValueFormatter { _, y, _ -> formatCount(y.toLong()) }
                 ),

@@ -14,24 +14,26 @@ plugins {
 // ===== 动态版本号（构建时生成）=====
 val versionPropsFile = File(rootProject.projectDir, "version.properties")
 
-fun currentBuildSeq(): Int = try {
-    Properties().apply { load(versionPropsFile.inputStream()) }
-        .getProperty("buildSeq")?.toInt() ?: 0
-} catch (e: Exception) {
-    0
-}
-
 // 构建日期按 UTC+8（Asia/Shanghai）计算，CI 构建机默认 UTC
 val buildDate = SimpleDateFormat("yyyy.MM.dd", Locale.US).apply {
     timeZone = TimeZone.getTimeZone("Asia/Shanghai")
 }.format(Date())
+
+// 读取 buildSeq：跨天（上次构建日期 ≠ 今天）时重置为 0（日期变化序号归零），同一天内继续累加
+fun currentBuildSeq(): Int = try {
+    val props = Properties().apply { load(versionPropsFile.inputStream()) }
+    if (props.getProperty("lastDate") == buildDate) props.getProperty("buildSeq")?.toInt() ?: 0 else 0
+} catch (e: Exception) {
+    0
+}
 val buildSeq = currentBuildSeq() + 1
 
-// 每次构建后序号 +1 写回 version.properties（CI 用 actions/cache 持久化跨构建保留）
+// 每次构建后序号 +1 写回 version.properties，并记录本次构建日期（CI 用 actions/cache 持久化跨构建保留）
 tasks.register("bumpVersion") {
     doLast {
         Properties().apply {
             setProperty("buildSeq", (currentBuildSeq() + 1).toString())
+            setProperty("lastDate", buildDate)
             store(versionPropsFile.outputStream(), "auto-increment build sequence")
         }
     }
@@ -72,9 +74,10 @@ android {
             storePassword = System.getenv("BUILD_STORE_PASSWORD")
             keyAlias = System.getenv("BUILD_KEY_ALIAS")
             keyPassword = System.getenv("BUILD_KEY_PASSWORD")
-            // 仅 v2+v3（v1 关闭；v3 由 AGP 8+ 默认开启）
+            // 仅 v2+v3（v1 关闭；显式开启 v2 与 v3）
             enableV1Signing = false
             enableV2Signing = true
+            enableV3Signing = true
         }
     }
 
