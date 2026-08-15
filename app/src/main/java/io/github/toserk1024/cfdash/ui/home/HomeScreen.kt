@@ -33,7 +33,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -177,7 +177,7 @@ fun HomeScreen(
                             }
                             // 域名选择按钮（始终，在切换按钮内侧）
                             IconButton(onClick = { showZonePicker = true }) {
-                                Icon(Icons.Default.Public, contentDescription = "选择域名")
+                                Icon(Icons.Default.SwapHoriz, contentDescription = "选择域名")
                             }
                         }
                     }
@@ -208,6 +208,7 @@ fun HomeScreen(
                             onAddRecord = {
                                 onDnsEdit(dnsState.selectedZone?.id.orEmpty(), null, dnsState.selectedZone?.name)
                             },
+                            onOpenZonePicker = { showZonePicker = true },
                             viewModel = dnsViewModel
                         )
                     }
@@ -233,7 +234,7 @@ fun HomeScreen(
                 // 缓存 Tab（常驻）
                 if ((visitedMask and 0b1000) != 0) {
                     SlidingTab(selected = selectedTab == 3, targetOffset = slideOffsetFor(selectedTab, 3, screenWidthPx)) {
-                        CacheContent(viewModel = cacheViewModel)
+                        CacheContent(viewModel = cacheViewModel, onOpenZonePicker = { showZonePicker = true })
                     }
                 }
                 // 我的 Tab（常驻）
@@ -241,10 +242,29 @@ fun HomeScreen(
                     SlidingTab(selected = selectedTab == 4, targetOffset = slideOffsetFor(selectedTab, 4, screenWidthPx)) {
                         ProfileScreen(
                             uiState = homeState,
-                            onRetry = homeViewModel::loadUser,
-                            onLogout = onLogout
+                            onRetry = homeViewModel::loadUser
                         )
                     }
+                }
+
+                // 域名选择器覆盖层（位于横栏下方，进出带动画）
+                AnimatedVisibility(
+                    visible = showZonePicker,
+                    enter = fadeIn(tween(200)),
+                    exit = fadeOut(tween(150)),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    ZonePicker(
+                        zones = zoneState.zones,
+                        loading = zoneState.loading,
+                        error = zoneState.error,
+                        selectedZone = zoneState.selectedZone,
+                        onSelect = { zone ->
+                            zoneViewModel.selectZone(zone)
+                            showZonePicker = false
+                        },
+                        onDismiss = { showZonePicker = false }
+                    )
                 }
             }
         }
@@ -355,19 +375,6 @@ fun HomeScreen(
             }
         }
 
-        // ===== 域名选择器覆盖层 =====
-        if (showZonePicker) {
-            ZonePicker(
-                zones = zoneState.zones,
-                loading = zoneState.loading,
-                error = zoneState.error,
-                selectedZone = zoneState.selectedZone,
-                onSelect = { zone ->
-                    zoneViewModel.selectZone(zone)
-                    showZonePicker = false
-                },
-                onDismiss = { showZonePicker = false }
-            )
         }
     }
 }

@@ -2,6 +2,17 @@
 
 ## 2026.08.15
 
+### 域名选择器/我的页面/文档 体验优化（8 项）
+
+- **域名选择器高度与横栏持平**：`ZonePicker` 由覆盖整个页面改为置于 Scaffold 内容区（横栏下方），不再顶到状态栏（`HomeScreen.kt`）
+- **域名选择器进出动画**：改用 `AnimatedVisibility`（fadeIn/fadeOut），进出更柔和不生硬（`HomeScreen.kt`）
+- **域名选择器布局优化**：标题栏显示域名计数 + 底部水平分隔线；列表选中行加圆角背景与点击反馈（`ZonePicker.kt`）
+- **其他 Tab 点击域名文字打开选择器**：DNS / 缓存 Tab 的当前域名文字可点击（`onOpenZonePicker` 回调），点击直接进入域名选择器，文字 UI 不变（`HomeScreen.kt` / `DnsRecordsContent.kt` / `CacheScreen.kt`）
+- **"我的"关于介绍优化**：重写关于卡片（图标标题 + 功能简介列表 + 数据安全说明 + 版本 + 开源仓库），排版更清晰（`ProfileScreen.kt`）
+- **"我的"移除退出登录**：删除底部退出登录按钮与确认对话框（侧边栏已有退出入口）（`ProfileScreen.kt`）
+- **readme.md 更新**：同步新架构（统一域名选择器、五 Tab、账户/域名统计切换、缓存清除、代码结构）（`readme.md`）
+- **域名选择器图标改为 domain-switch**：横栏域名按钮图标由 Public（地球）改为 `SwapHoriz`（水平切换箭头）（`HomeScreen.kt`）
+
 ### 新增缓存清除功能 + 切换账号重载体验优化
 
 - **新增「缓存」清除功能（侧边栏 → 缓存清除页）**：侧边栏新增「缓存」菜单项（AutoDelete 图标），进入独立缓存清除页 `CacheScreen`。支持 Cloudflare `POST /zones/{id}/purge_cache` 的 **5 种清除方式**（单选互斥）：① 清除所有（`purge_everything:true`）；② 按 URL 清除（`files`，精确匹配）；③ 按主机名清除（`hosts`）；④ 按标签清除（`tags`，Cache-Tag）；⑤ 按前缀清除（`prefixes`）。页面含域名选择器（复用域名列表）、方式说明、按行输入内容（"清除所有"无需输入）、二次确认对话框、清除结果/错误提示（`CacheScreen.kt` / `CacheViewModel.kt`）

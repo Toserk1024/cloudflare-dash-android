@@ -32,6 +32,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 /** 缓存清除内容（内嵌于 HomeScreen 侧边栏 Tab，无独立 Scaffold） */
 @Composable
 fun CacheContent(
+    onOpenZonePicker: () -> Unit = {},
     viewModel: CacheViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -48,7 +49,8 @@ fun CacheContent(
         Text(
             text = state.selectedZone?.name ?: "请先选择域名",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.clickable(onClick = onOpenZonePicker)
         )
 
         Spacer(Modifier.height(20.dp))

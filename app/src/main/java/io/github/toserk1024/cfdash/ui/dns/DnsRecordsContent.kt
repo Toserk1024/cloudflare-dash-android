@@ -1,5 +1,6 @@
 package io.github.toserk1024.cfdash.ui.dns
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +64,7 @@ fun DnsRecordsContent(
     onEditRecord: (DnsRecord) -> Unit,
     onAddRecord: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenZonePicker: () -> Unit = {},
     viewModel: DnsViewModel
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -85,7 +87,7 @@ fun DnsRecordsContent(
                     text = state.selectedZone?.name ?: "请先选择域名",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).clickable(onClick = onOpenZonePicker),
                     textAlign = TextAlign.Start
                 )
                 Spacer(modifier = Modifier.width(8.dp))
