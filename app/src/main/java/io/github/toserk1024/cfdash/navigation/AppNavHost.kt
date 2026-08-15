@@ -12,7 +12,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import io.github.toserk1024.cfdash.AppContainer
-import io.github.toserk1024.cfdash.ui.cache.CacheScreen
 import io.github.toserk1024.cfdash.ui.disclaimer.DisclaimerScreen
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordEditScreen
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordsScreen
@@ -88,7 +87,6 @@ fun AppNavHost(
                         navController.navigate(Routes.dnsEdit(zoneId, recordId, zoneName))
                     }
                 },
-                onOpenCache = { navController.navigate(Routes.CACHE) },
                 onNewUser = onNewUser,
                 onUserSwitched = onUserSwitched,
                 onLogout = onLoggedOut
@@ -169,11 +167,5 @@ fun AppNavHost(
             )
         }
 
-        // 缓存清除
-        composable(Routes.CACHE) {
-            CacheScreen(
-                onBack = { navController.popBackStack() }
-            )
-        }
     }
 }

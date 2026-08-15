@@ -67,6 +67,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.data.model.DnsRecord
 import io.github.toserk1024.cfdash.data.model.Zone
+import io.github.toserk1024.cfdash.ui.cache.CacheContent
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordsContent
 import io.github.toserk1024.cfdash.ui.dns.DnsViewModel
 import io.github.toserk1024.cfdash.ui.profile.ProfileScreen
@@ -90,7 +91,6 @@ fun HomeScreen(
     homeKey: Int = 0,
     initialTab: Int = 0,
     onTabChange: (Int) -> Unit = {},
-    onOpenCache: () -> Unit = {},
     onNewUser: () -> Unit = {},
     onUserSwitched: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(),
@@ -120,7 +120,7 @@ fun HomeScreen(
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val tabTitles = listOf("域名", "DNS", "统计数据", "我的")
+    val tabTitles = listOf("域名", "DNS", "统计数据", "缓存", "我的")
 
     Box(modifier = Modifier.fillMaxSize()) {
         // ===== 主内容 =====
@@ -185,11 +185,20 @@ fun HomeScreen(
                         )
                     }
                 }
-                // 我的 Tab（常驻）
-                if ((visitedMask and 0b1000) != 0) {
+                // 缓存 Tab（常驻）
+                if ((visitedMask and 0b10000) != 0) {
                     SlidingTab(
                         selected = selectedTab == 3,
                         targetOffset = slideOffsetFor(selectedTab, 3, screenWidthPx)
+                    ) {
+                        CacheContent()
+                    }
+                }
+                // 我的 Tab（常驻）
+                if ((visitedMask and 0b100000) != 0) {
+                    SlidingTab(
+                        selected = selectedTab == 4,
+                        targetOffset = slideOffsetFor(selectedTab, 4, screenWidthPx)
                     ) {
                         ProfileScreen(
                             uiState = homeState,
@@ -300,8 +309,8 @@ fun HomeScreen(
                         }
                     )
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Person, contentDescription = null) },
-                        label = { Text("我的") },
+                        icon = { Icon(Icons.Default.AutoDelete, contentDescription = null) },
+                        label = { Text("缓存") },
                         selected = selectedTab == 3,
                         onClick = {
                             scope.launch { drawerState.close() }
@@ -309,12 +318,12 @@ fun HomeScreen(
                         }
                     )
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.AutoDelete, contentDescription = null) },
-                        label = { Text("缓存") },
-                        selected = false,
+                        icon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        label = { Text("我的") },
+                        selected = selectedTab == 4,
                         onClick = {
                             scope.launch { drawerState.close() }
-                            onOpenCache()
+                            selectedTab = 4
                         }
                     )
 

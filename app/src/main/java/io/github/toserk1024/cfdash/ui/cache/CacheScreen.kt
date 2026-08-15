@@ -1,5 +1,6 @@
 package io.github.toserk1024.cfdash.ui.cache
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,22 +13,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,117 +34,103 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-/** 缓存清除页：选择域名 + 清除方式 + 输入内容 + 执行清除 */
-@OptIn(ExperimentalMaterial3Api::class)
+/** 缓存清除内容（内嵌于 HomeScreen 侧边栏 Tab，无独立 Scaffold） */
 @Composable
-fun CacheScreen(
-    onBack: () -> Unit,
+fun CacheContent(
     viewModel: CacheViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("缓存清除") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
+        // 域名选择
+        Text("选择域名", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = viewModel::showZonePicker,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = state.selectedZone?.name ?: "选择域名",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // 清除方式（整行可点击选择）
+        Text("清除方式", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        PurgeMode.values().forEach { mode ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { viewModel.setMode(mode) }
+            ) {
+                RadioButton(
+                    selected = state.mode == mode,
+                    onClick = { viewModel.setMode(mode) }
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(mode.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    Text(
+                        mode.hint,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
+            }
+        }
+
+        // 输入内容（"清除所有"无需输入）
+        if (state.mode != PurgeMode.EVERYTHING) {
+            Spacer(Modifier.height(16.dp))
+            Text("要清除的内容", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = state.input,
+                onValueChange = viewModel::setInput,
+                placeholder = { Text(state.mode.placeholder) },
+                minLines = 4,
+                modifier = Modifier.fillMaxWidth()
             )
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+
+        Spacer(Modifier.height(20.dp))
+
+        // 清除按钮
+        Button(
+            onClick = viewModel::requestPurge,
+            enabled = !state.busy,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            // 域名选择
-            Text("选择域名", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = viewModel::showZonePicker,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = state.selectedZone?.name ?: "选择域名",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
-                )
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+            if (state.busy) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else {
+                Text("清除缓存")
             }
+        }
 
-            Spacer(Modifier.height(20.dp))
-
-            // 清除方式
-            Text("清除方式", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            PurgeMode.values().forEach { mode ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    RadioButton(
-                        selected = state.mode == mode,
-                        onClick = { viewModel.setMode(mode) }
-                    )
-                    Column(Modifier.weight(1f)) {
-                        Text(mode.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                        Text(
-                            mode.hint,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // 输入内容（"清除所有"无需输入）
-            if (state.mode != PurgeMode.EVERYTHING) {
-                Spacer(Modifier.height(16.dp))
-                Text("要清除的内容", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = state.input,
-                    onValueChange = viewModel::setInput,
-                    placeholder = { Text(state.mode.placeholder) },
-                    minLines = 4,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // 清除按钮
-            Button(
-                onClick = viewModel::requestPurge,
-                enabled = !state.busy,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (state.busy) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Text("清除缓存")
-                }
-            }
-
-            // 错误 / 结果提示
-            state.error?.let {
-                Spacer(Modifier.height(12.dp))
-                Text("⚠ $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-            }
-            state.resultMessage?.let {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    it,
-                    color = if (state.resultSuccess == true) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+        // 错误 / 结果提示
+        state.error?.let {
+            Spacer(Modifier.height(12.dp))
+            Text("⚠ $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+        }
+        state.resultMessage?.let {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                it,
+                color = if (state.resultSuccess == true) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
     }
 

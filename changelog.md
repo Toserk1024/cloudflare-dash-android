@@ -9,6 +9,12 @@
 - **切换账号重载遮罩全不透明（todo）**：切换账号/退出到剩余账号时的全屏加载遮罩由半透明黑（alpha 0.5）改为**纯不透明黑**（`Color.Black`），完全遮住旧界面，避免闪现旧账号内容（`MainActivity.kt`）
 - **切换账号重载后保持所在页面（todo）**：`MainActivity` 新增 `currentTab` 记录当前 Home Tab，重建导航栈后通过 `initialTab`/`onTabChange` 透传（`AppNavHost` → `HomeScreen`），`HomeScreen` 初始 Tab 用 `initialTab`，切换 Tab 时回调 `onTabChange`；账号切换/重建后停留在原所在 Tab 而非跳回「域名」（`MainActivity.kt` / `AppNavHost.kt` / `HomeScreen.kt`）
 
+### 缓存清除改为侧边栏 Tab + 侧边栏顺序调整
+
+- **缓存清除改为侧边栏内嵌 Tab（todo）**：移除独立缓存清除路由（Routes.CACHE / AppNavHost composable / onOpenCache），改为 HomeScreen 第 4 个常驻 Tab（侧边栏「缓存」菜单项直接切换）；`CacheScreen` 重构为无 Scaffold 的 `CacheContent` 供 Tab 内嵌（域名选择/方式/输入/按钮/对话框逻辑不变）（`CacheScreen.kt` / `HomeScreen.kt` / `AppNavHost.kt` / `Routes.kt`）
+- **清除方式整行点击选择（todo）**：缓存清除方式列表由仅点候选框选中改为**整行（Row + clickable）点击即可选择**（`CacheScreen.kt`）
+- **侧边栏菜单顺序调整（todo）**：「我的」移到「缓存」下方，顺序为 域名 / DNS / 统计数据 / 缓存 / 我的（索引 0/1/2/3/4）（`HomeScreen.kt`）
+
 ## 2026.08.10
 
 ### 修复切换账号后页面不自动重载 + 移除批量操作取消按钮
