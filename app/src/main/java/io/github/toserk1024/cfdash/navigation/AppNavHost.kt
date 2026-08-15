@@ -14,10 +14,8 @@ import androidx.navigation.navArgument
 import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.ui.disclaimer.DisclaimerScreen
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordEditScreen
-import io.github.toserk1024.cfdash.ui.dns.DnsRecordsScreen
 import io.github.toserk1024.cfdash.ui.home.HomeScreen
 import io.github.toserk1024.cfdash.ui.onboarding.OnboardingScreen
-import io.github.toserk1024.cfdash.ui.zones.ZoneDetailScreen
 
 /** 应用导航图 */
 @Composable
@@ -79,9 +77,6 @@ fun AppNavHost(
                 homeKey = homeKey,
                 initialTab = initialTab,
                 onTabChange = onTabChange,
-                onZoneClick = { zone ->
-                    navController.navigate(Routes.zoneDetail(zone.id, zone.name))
-                },
                 onDnsEdit = { zoneId, recordId, zoneName ->
                     if (zoneId.isNotBlank()) {
                         navController.navigate(Routes.dnsEdit(zoneId, recordId, zoneName))
@@ -90,53 +85,6 @@ fun AppNavHost(
                 onNewUser = onNewUser,
                 onUserSwitched = onUserSwitched,
                 onLogout = onLoggedOut
-            )
-        }
-
-        // 域名详情
-        composable(
-            route = Routes.ZONE_DETAIL,
-            arguments = listOf(
-                navArgument("zoneId") { type = NavType.StringType },
-                navArgument("zoneName") {
-                    type = NavType.StringType
-                    defaultValue = ""
-                }
-            )
-        ) { entry ->
-            val zoneId = entry.arguments?.getString("zoneId").orEmpty()
-            val zoneName = entry.arguments?.getString("zoneName")?.takeIf { it.isNotBlank() }
-            ZoneDetailScreen(
-                zoneId = zoneId,
-                zoneName = zoneName,
-                onBack = { navController.popBackStack() },
-                onManageDns = { zid, zname ->
-                    navController.navigate(Routes.dnsRecords(zid, zname))
-                },
-                onDeleted = { navController.popBackStack() }
-            )
-        }
-
-        // DNS 记录列表（独立页面）
-        composable(
-            route = Routes.DNS_RECORDS,
-            arguments = listOf(
-                navArgument("zoneId") { type = NavType.StringType },
-                navArgument("zoneName") {
-                    type = NavType.StringType
-                    defaultValue = ""
-                }
-            )
-        ) { entry ->
-            val zoneId = entry.arguments?.getString("zoneId").orEmpty()
-            val zoneName = entry.arguments?.getString("zoneName")?.takeIf { it.isNotBlank() }
-            DnsRecordsScreen(
-                zoneId = zoneId,
-                zoneName = zoneName,
-                onBack = { navController.popBackStack() },
-                onEditRecord = { zid, rid, zname ->
-                    navController.navigate(Routes.dnsEdit(zid, rid, zname))
-                }
             )
         }
 

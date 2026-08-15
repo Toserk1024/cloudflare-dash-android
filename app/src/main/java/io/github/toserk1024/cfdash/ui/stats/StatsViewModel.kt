@@ -13,29 +13,34 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** 统计数据模式：账户级 / 域名级 */
+enum class StatsMode { ACCOUNT, ZONE }
+
 /**
- * 统计数据页 ViewModel（账号级汇总，支持 24h/7d/30d 切换）。
- * 全量缓存：按时间范围缓存 StatsData，首次加载/切换范围请求一次后走缓存，下拉刷新才重新请求。
+ * 统计数据页 ViewModel（账户级 / 域名级，支持 24h/7d/30d 切换）。
+ * 全量缓存：按 模式-时间范围（域名级含 zoneId）缓存 StatsData，切换/加载一次后走缓存，下拉刷新才重新请求。
  */
 class StatsViewModel : ViewModel() {
 
     data class StatsUiState(
         val data: StatsData = StatsData(),
         val range: AnalyticsRange = AnalyticsRange.H24,
+        /** 默认账户级 */
+        val mode: StatsMode = StatsMode.ACCOUNT,
         val loading: Boolean = true,
-        /** 下拉刷新中（保留旧数据展示，仅顶部指示器） */
         val refreshing: Boolean = false,
         val error: String? = null,
-        /** 部分图表区块加载失败的提示（如"趋势；国家/地区"），不阻塞其他区块 */
         val partError: String? = null
     )
 
     private val _uiState = MutableStateFlow(StatsUiState())
     val uiState: StateFlow<StatsUiState> = _uiState
 
-    /** 按时间范围的全量缓存（首次/切换加载后缓存，避免反复请求） */
-    private val dataCache = mutableMapOf<AnalyticsRange, StatsData>()
-    private val partErrorCache = mutableMapOf<AnalyticsRange, String?>()
+    /** 当前域名级统计使用的 zoneId */
+    private var currentZoneId: String? = null
+
+    private val dataCache = mutableMapOf<String, StatsData>()
+    private val partErrorCache = mutableMapOf<String, String?>()
 
     init {
         load()
@@ -47,70 +52,95 @@ class StatsViewModel : ViewModel() {
         load()
     }
 
-    /** 加载当前时间范围：优先命中缓存（避免重复请求），无缓存才请求 */
+    /** 切换账户级 / 域名级 */
+    fun setMode(mode: StatsMode) {
+        if (_uiState.value.mode == mode) return
+        _uiState.update { it.copy(mode = mode) }
+        load()
+    }
+
+    /** 设置域名级统计的选中域名（由 HomeScreen 响应全局选中域名变化时调用） */
+    fun setZone(zoneId: String?) {
+        if (currentZoneId == zoneId) return
+        currentZoneId = zoneId
+        if (_uiState.value.mode == StatsMode.ZONE) load()
+    }
+
+    private fun cacheKey(mode: StatsMode, range: AnalyticsRange, zoneId: String?) =
+        "${mode.name}-${range.name}-${zoneId.orEmpty()}"
+
     fun load() {
         val range = _uiState.value.range
-        dataCache[range]?.let { cached ->
+        val mode = _uiState.value.mode
+        val zoneId = if (mode == StatsMode.ZONE) currentZoneId else null
+
+        // 域名级未选域名 → 提示
+        if (mode == StatsMode.ZONE && zoneId.isNullOrBlank()) {
+            _uiState.update { it.copy(data = StatsData(), loading = false, refreshing = false, error = "请先在右上角选择域名", partError = null) }
+            return
+        }
+
+        val key = cacheKey(mode, range, zoneId)
+        dataCache[key]?.let { cached ->
             _uiState.update {
-                it.copy(data = cached, loading = false, refreshing = false, error = null, partError = partErrorCache[range])
+                it.copy(data = cached, loading = false, refreshing = false, error = null, partError = partErrorCache[key])
             }
             return
         }
         _uiState.update { it.copy(loading = true, refreshing = false, error = null, partError = null) }
-        fetchAndCache(range)
+        fetchAndCache(key, mode, range, zoneId)
     }
 
-    /** 下拉刷新：强制重新请求当前时间范围并更新缓存 */
     fun refresh() {
         val range = _uiState.value.range
+        val mode = _uiState.value.mode
+        val zoneId = if (mode == StatsMode.ZONE) currentZoneId else null
+        if (mode == StatsMode.ZONE && zoneId.isNullOrBlank()) {
+            _uiState.update { it.copy(refreshing = false, error = "请先选择域名") }
+            return
+        }
+        val key = cacheKey(mode, range, zoneId)
         _uiState.update { it.copy(refreshing = true, error = null, partError = null) }
-        fetchAndCache(range, refreshing = true)
+        fetchAndCache(key, mode, range, zoneId, refreshing = true)
     }
 
-    private fun fetchAndCache(range: AnalyticsRange, refreshing: Boolean = false) {
+    private fun fetchAndCache(key: String, mode: StatsMode, range: AnalyticsRange, zoneId: String?, refreshing: Boolean = false) {
         viewModelScope.launch {
             try {
-                val accountId = AppContainer.repository.getAccounts().firstOrNull()?.id
-                    ?: throw IllegalStateException("账号信息缺失，无法加载统计数据")
-                val result = fetchAll(accountId, range)
-                dataCache[range] = result.data
-                partErrorCache[range] = result.partError
+                val result = when (mode) {
+                    StatsMode.ACCOUNT -> {
+                        val accountId = AppContainer.repository.getAccounts().firstOrNull()?.id
+                            ?: throw IllegalStateException("账号信息缺失，无法加载统计数据")
+                        fetchAllAccount(accountId, range)
+                    }
+                    StatsMode.ZONE -> {
+                        val zid = zoneId ?: throw IllegalStateException("请先选择域名")
+                        fetchAllZone(zid, range)
+                    }
+                }
+                dataCache[key] = result.data
+                partErrorCache[key] = result.partError
                 _uiState.update {
-                    it.copy(
-                        data = result.data,
-                        loading = false,
-                        refreshing = false,
-                        error = null,
-                        partError = result.partError
-                    )
+                    it.copy(data = result.data, loading = false, refreshing = false, error = null, partError = result.partError)
                 }
             } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(loading = false, refreshing = false, error = e.message ?: "加载统计失败")
-                }
+                _uiState.update { it.copy(loading = false, refreshing = false, error = e.message ?: "加载统计失败") }
             }
         }
     }
 
-    /**
-     * 并行拉取当前时间范围的全部统计：汇总必须成功（失败 → 整体错误），
-     * 趋势/维度分布（国家+状态码）/域名拆分（仅 24h）单项失败降级。
-     */
-    private suspend fun fetchAll(accountId: String, range: AnalyticsRange): FetchResult {
+    /** 账户级并行拉取：汇总 + 趋势 + 维度 + 域名拆分（仅 24h） */
+    private suspend fun fetchAllAccount(accountId: String, range: AnalyticsRange): FetchResult {
         val failures = mutableListOf<String>()
         return coroutineScope {
             val summary = async { runCatching { AppContainer.repository.getAccountAnalytics(accountId, range) } }
             val series = async { loadPart("趋势", failures) { AppContainer.repository.getAccountAnalyticsSeries(accountId, range) } }
             val dist = async { loadPart("维度分布", failures) { AppContainer.repository.getAccountDistributions(accountId, range) } }
-            // 域名拆分：AdaptiveGroups 仅支持 24h 范围，7d/30d 不请求
             val zones = async {
                 if (range == AnalyticsRange.H24) {
                     loadPart("域名拆分", failures) { AppContainer.repository.getAccountZoneBreakdown(accountId, range) }
-                } else {
-                    null
-                }
+                } else null
             }
-            // 汇总失败 → 整体失败（其他 async 由 coroutineScope 取消）
             val sum: AnalyticsSum = summary.await().getOrElse { throw it }
             val distributions = dist.await()
             FetchResult(
@@ -127,9 +157,30 @@ class StatsViewModel : ViewModel() {
         }
     }
 
+    /** 域名级并行拉取：汇总 + 趋势 + 维度（无域名拆分） */
+    private suspend fun fetchAllZone(zoneId: String, range: AnalyticsRange): FetchResult {
+        val failures = mutableListOf<String>()
+        return coroutineScope {
+            val summary = async { runCatching { AppContainer.repository.getZoneAnalytics(zoneId, range) } }
+            val series = async { loadPart("趋势", failures) { AppContainer.repository.getZoneAnalyticsSeries(zoneId, range) } }
+            val dist = async { loadPart("维度分布", failures) { AppContainer.repository.getZoneDistributions(zoneId, range) } }
+            val sum: AnalyticsSum = summary.await().getOrElse { throw it }
+            val distributions = dist.await()
+            FetchResult(
+                data = StatsData(
+                    summary = sum,
+                    series = series.await(),
+                    country = distributions?.country,
+                    status = distributions?.status,
+                    cache = buildCacheBreakdown(sum)
+                ),
+                partError = failures.takeIf { f -> f.isNotEmpty() }?.joinToString("；")
+            )
+        }
+    }
+
     private data class FetchResult(val data: StatsData, val partError: String?)
 
-    /** 单项加载：失败时记录提示并返回 null（该区块降级显示） */
     private suspend fun <T> loadPart(label: String, failures: MutableList<String>, block: suspend () -> T): T? =
         try {
             block()
@@ -138,7 +189,6 @@ class StatsViewModel : ViewModel() {
             null
         }
 
-    /** 缓存状态分布：Groups 无 cacheStatus 维度，由 cachedRequests/requests 计算"命中/未命中"两切片 */
     private fun buildCacheBreakdown(sum: AnalyticsSum): List<AnalyticsBreakdown> {
         val cached = sum.cachedRequests
         val uncached = (sum.requests - cached).coerceAtLeast(0)

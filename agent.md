@@ -5,7 +5,7 @@
 ## 1. 项目概览
 
 基于 **Jetpack Compose + Material 3** 的 Cloudflare 第三方 Android 客户端（包名 `io.github.toserk1024.cfdash`）。
-当前已实现：**双认证登录（Global API Key / API Token，Global 默认优先）、侧边栏导航（域名/DNS/统计/我的/缓存）、域名管理（列表/搜索/详情/删除）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、域名高级设置（开发模式 / 五秒盾 / IPv6）、统计数据（账号级/域名级，24h/7d/30d 切换，Vico 图表化：汇总卡 + 时间趋势折线图 + 国家/状态码/缓存维度饼图 + 账号级域名流量拆分柱状图）、缓存清除（侧边栏「缓存」页，支持全部/URL/主机名/标签/前缀 5 种方式）、用户信息与退出登录**。
+当前已实现：**双认证登录（Global API Key / API Token，Global 默认优先）、侧边栏导航（域名/DNS/统计/缓存/我的）、统一域名选择器（全局共享，域名详情直接置于域名 Tab）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、域名高级设置（开发模式 / 五秒盾 / IPv6）、统计数据（账户级/域名级一键切换，24h/7d/30d，Vico 图表化：汇总卡 + 时间趋势折线图 + 国家/状态码/缓存维度饼图 + 账户级域名流量拆分柱状图）、缓存清除（侧边栏「缓存」Tab，支持全部/URL/主机名/标签/前缀 5 种方式）、用户信息与退出登录**。
 
 **已移除功能**：添加域名（用户要求删除，相关代码已清理干净，如需恢复参考 §8.3）。
 **未开发**：Workers、Zero Trust 等高级功能（用户明确暂不开发）。
@@ -37,7 +37,7 @@ app/src/main/java/io/github/toserk1024/cfdash/
 ├── AppContainer.kt               # 全局单例容器：tokenStore + repository（Service Locator）
 ├── navigation/
 │   ├── Routes.kt                 # 路由字符串常量 + 带参路由构建函数
-│   └── AppNavHost.kt             # NavHost：6 个目的地 + 全局转场动画
+│   └── AppNavHost.kt             # NavHost：4 个目的地 + 全局转场动画
 ├── data/
 │   ├── api/
 │   │   ├── CloudflareApi.kt      # BASE_URL + 端点路径常量（含 /graphql）
@@ -58,10 +58,10 @@ app/src/main/java/io/github/toserk1024/cfdash/
     ├── theme/                    # Color/Theme/Type（Cloudflare 橙 #F6821F）
     ├── onboarding/               # OnboardingScreen + OnboardingViewModel（双认证：Global 默认 / Token）
     ├── home/                     # HomeScreen（侧边栏导航 + 水平平移过渡）+ HomeViewModel（用户信息）
-    ├── stats/                    # StatsViewModel（账号级统计）+ StatsContent（复用组件）+ StatsData（展示数据聚合）+ StatsCharts（Vico 图表：趋势折线/维度饼图/域名柱状图）
-    ├── zones/                    # ZonesScreen + ZonesViewModel（域名列表）+ ZoneDetailScreen + ZoneDetailViewModel（含高级设置 + 域名统计）
-    ├── dns/                      # DnsRecordsContent（复用组件）+ DnsRecordsScreen + DnsRecordEditScreen + DnsViewModel + DnsEditViewModel
-    ├── cache/                    # CacheContent（缓存清除 Tab，5 种方式）+ CacheViewModel + PurgeMode 枚举
+│   ├── stats/                    # StatsViewModel（账户/域名级统计，StatsMode 切换）+ StatsContent（复用组件）+ StatsData + StatsCharts（Vico 图表）
+│   ├── zones/                    # ZoneViewModel（全局域名）+ ZonePicker（统一域名选择器，扁平表格）+ ZoneDetailTab（域名详情 Tab）
+│   ├── dns/                      # DnsRecordsContent + DnsRecordEditScreen + DnsViewModel + DnsEditViewModel
+│   ├── cache/                    # CacheContent（缓存清除 Tab，5 种方式）+ CacheViewModel + PurgeMode 枚举
     └── profile/                  # ProfileScreen（我的）
 ```
 
@@ -83,7 +83,7 @@ UI(Composable) ⇄ ViewModel(StateFlow) ⇄ Repository ⇄ CloudflareClient(OkHt
 ### 4.3 缓存与本地搜索（重要约定！）
 用户明确要求：**请求数据后缓存到内存，搜索/筛选在本地完成，只有下拉刷新才请求 API**。
 
-- **ZonesViewModel**：`allZones`（内存缓存，翻页拉全量直到 total_pages）→ `applyFilter()` 按 `name.contains(query, ignoreCase)` 本地过滤 → 展示 `zones`
+- **ZoneViewModel**：全局域名列表 + 当前选中域名，驱动域名/DNS/统计/缓存四 Tab（统一域名选择器）；`loadZones()` 全量缓存，`selectZone()` 加载域名详情+高级设置
 - **DnsViewModel**：`allRecords`（当前选中域名的全量记录缓存）→ `applyFilter()` 按类型+名称本地过滤 → 展示 `records`
 - **下拉刷新**：Material3 `PullToRefreshBox(isRefreshing, onRefresh)`，onRefresh 重新拉全量
 - **删除后**：同步从缓存移除（`filterNot`），无需刷新
@@ -97,19 +97,16 @@ UI(Composable) ⇄ ViewModel(StateFlow) ⇄ Repository ⇄ CloudflareClient(OkHt
 - Token 校验：发送前检查仅含 ASCII 可打印字符（0x21..0x7E），否则抛友好中文错误（OkHttp 拒绝非 ASCII header）
 
 ### 4.5 导航
-- 单 Activity，路由见 `Routes.kt`：onboarding / home / zone_detail / dns_records / dns_edit
+- 单 Activity，路由见 `Routes.kt`：onboarding / home / dns_edit
 - `AppNavHost` 配置了全局转场动画（fadeIn + slideInHorizontally 1/4 屏）
 - HomeScreen 五个 Tab（域名/DNS/统计数据/缓存/我的）：首次访问后常驻组合（visitedMask 懒加载），切换仅水平平移过渡（SlidingTab，250ms FastOutSlowIn，offset 位移 GPU 合成，方向跟随 Tab 位置），避免重建卡顿
 - **账号切换/退出到剩余账号 = 重建导航栈**：`MainActivity.MainScreen` 用 `key(navResetKey)` 包裹 NavController+NavHost，切换账号或退出到剩余账号时 `navResetKey++` 整体重建导航栈（新 NavController→新 ViewModelStore→所有页面从空态重新加载新账号数据），并显示**纯不透明黑全屏遮罩**（`switching` + `Color.Black`，完全遮住旧界面）；通过 `currentTab` + `initialTab`/`onTabChange` 回调在重建后**保持所在 Home Tab**（而非跳回「域名」）。避免仅刷新"我的"用户信息而域名/DNS/统计仍滞留旧账号缓存。首次登录/退出到无剩余用户用 `loggedIn` + `LaunchedEffect` 导航
-- 带参路由：`zone_detail/{zoneId}?zoneName={zoneName}`（可选参数有 defaultValue=""）
-- ViewModel 从 `SavedStateHandle` 读参数（如 DnsEditViewModel 的 zoneId/recordId、DnsViewModel 的 zoneId）
+- 带参路由：`dns_edit/{zoneId}?recordId={recordId}&zoneName={zoneName}`（可选参数有 defaultValue=""）
+- ViewModel 从 `SavedStateHandle` 读参数（如 DnsEditViewModel 的 zoneId/recordId）
 - **注意**：`SavedStateHandle["key"]` 泛型推断可能失败，用 `savedStateHandle.get<String>("key")` 显式类型
 
 ### 4.6 DNS 页面复用
-`DnsRecordsContent`（列表+搜索+筛选+下拉刷新+FAB）在**两处复用**：
-1. HomeScreen DNS Tab（`DnsViewModel` 由 HomeScreen 顶层 `viewModel()` 创建，常驻内存）
-2. 独立页面 DnsRecordsScreen（从域名详情进入，路由参数预选域名）
-FAB 已内置在 Content 中，DnsRecordsScreen 不再自带 FAB。
+`DnsRecordsContent`（列表+搜索+筛选+下拉刷新+FAB）在 **HomeScreen DNS Tab** 使用（`DnsViewModel` 由 HomeScreen 顶层 `viewModel()` 创建，常驻内存，域名由全局 ZoneViewModel 传入）。FAB 已内置在 Content 中。
 
 ## 5. Cloudflare API 端点
 
@@ -188,7 +185,7 @@ pm install -r /data/local/tmp/cf-app.apk
 1. **数据层**：`data/model/` 加 @Serializable 模型（snake_case 字段直接命名，ignoreUnknownKeys 已开）；`CloudflareApi.kt` 加端点常量；`CloudflareRepository.kt` 加方法（用 client.get/post 的 reified 泛型）
 2. **ViewModel**：新建 `ui/<feature>/XxxViewModel.kt`，StateFlow + `AppContainer.repository`；从 SavedStateHandle 读路由参数（用 `get<String>()`）
 3. **UI**：新建 Screen；`Routes.kt` 加路由 + 构建函数；`AppNavHost.kt` 加 composable（navArgument 定义，可选参数 defaultValue=""）
-4. 需要缓存+本地搜索的功能，参考 ZonesViewModel/DnsViewModel 的 allXxx + applyFilter + PullToRefreshBox 模式
+4. 需要缓存+本地搜索的功能，参考 ZoneViewModel/DnsViewModel 的 allXxx + applyFilter + PullToRefreshBox 模式
 
 ### 8.2 常见修改点速查
 | 需求 | 修改文件 |
@@ -197,8 +194,8 @@ pm install -r /data/local/tmp/cf-app.apk
 | 加底部 Tab / 改 Tab 动画 | ui/home/HomeScreen.kt（SlidingTab，visitedMask 常驻 + 水平平移） |
 | 加路由 | navigation/Routes.kt + AppNavHost.kt |
 | 加 API 端点 | data/api/CloudflareApi.kt + Repository |
-| 加 Zone 设置开关 | data/model/ZoneSetting.kt + CloudflareApi/Repository + ZoneDetailViewModel/Screen |
-| 加统计数据 | data/model/ZoneAnalytics.kt（AnalyticsParser 查询/解析 + 模型）+ Repository.getZoneAnalytics/getAccountAnalytics + ui/stats/ + HomeScreen/ZoneDetailScreen |
+| 加 Zone 设置开关 | data/model/ZoneSetting.kt + CloudflareApi/Repository + ZoneViewModel |
+| 加统计数据 | data/model/ZoneAnalytics.kt（AnalyticsParser 查询/解析 + 模型）+ Repository.getZoneAnalytics/getAccountAnalytics + ui/stats/StatsViewModel（StatsMode 切换）+ HomeScreen |
 | 加统计图表 | ui/stats/StatsCharts.kt（TrendLineChart/BreakdownPieChart/ZoneBarChart，Vico 3.x）+ StatsContent 卡片编排 + StatsData 聚合字段 + AnalyticsParser 对应查询 |
 | 改 DNS 记录字段 | data/model/DnsRecord.kt |
 | 改认证逻辑 | ui/onboarding/OnboardingViewModel.kt + AuthCredential.kt + TokenStore.kt |
@@ -206,7 +203,7 @@ pm install -r /data/local/tmp/cf-app.apk
 ### 8.3 恢复"添加域名"功能（如需）
 1. 恢复 data/model/Zone.kt 中的 `CreateZoneRequest`/`AccountRef`，新建 Account.kt
 2. Repository 恢复 `createZone(name, accountId)` + `getAccounts()`
-3. 新建 AddZoneScreen/AddZoneViewModel；ZonesScreen 加 FAB；Routes/AppNavHost 加 add_zone 路由
+3. 新建 AddZoneScreen/AddZoneViewModel；在域名 Tab（ZoneDetailTab）或全局 ZoneViewModel 中加 FAB；Routes/AppNavHost 加 add_zone 路由
 
 ## 9. 版本记录
 版本演进记录已迁移至 [`changelog.md`](changelog.md)，此处不再维护。

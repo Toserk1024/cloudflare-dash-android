@@ -1,7 +1,6 @@
 package io.github.toserk1024.cfdash.ui.cache
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,14 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -47,21 +42,14 @@ fun CacheContent(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        // 域名选择
-        Text("选择域名", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        // 当前域名
+        Text("当前域名", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(
-            onClick = viewModel::showZonePicker,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = state.selectedZone?.name ?: "选择域名",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium
-            )
-            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-        }
+        Text(
+            text = state.selectedZone?.name ?: "请先选择域名",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
 
         Spacer(Modifier.height(20.dp))
 
@@ -132,39 +120,6 @@ fun CacheContent(
                 style = MaterialTheme.typography.bodyMedium
             )
         }
-    }
-
-    // 域名选择对话框
-    if (state.showZonePicker) {
-        AlertDialog(
-            onDismissRequest = viewModel::dismissZonePicker,
-            title = { Text("选择域名") },
-            text = {
-                if (state.loadingZones) {
-                    Box(
-                        Modifier.fillMaxWidth().padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) { CircularProgressIndicator(modifier = Modifier.size(28.dp)) }
-                } else if (state.zones.isEmpty()) {
-                    Text("暂无域名，请先在“域名”页添加。")
-                } else {
-                    Column(Modifier.fillMaxWidth()) {
-                        state.zones.forEach { zone ->
-                            TextButton(
-                                onClick = { viewModel.selectZone(zone) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(zone.name, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = viewModel::dismissZonePicker) { Text("关闭") }
-            }
-        )
     }
 
     // 清除确认对话框

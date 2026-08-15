@@ -18,18 +18,18 @@ enum class PurgeMode(val label: String, val hint: String, val placeholder: Strin
     PREFIX("按前缀清除", "目录路径前缀匹配的任意资源", "每行一个前缀，如 /images/")
 }
 
-/** 缓存清除 ViewModel */
+/**
+ * 缓存清除 ViewModel。
+ * 当前域名由全局域名选择器（HomeScreen 的 ZoneViewModel）传入，本 VM 不再维护域名列表/选择。
+ */
 class CacheViewModel : ViewModel() {
 
     data class CacheUiState(
-        val zones: List<Zone> = emptyList(),
         val selectedZone: Zone? = null,
-        val loadingZones: Boolean = false,
         val mode: PurgeMode = PurgeMode.EVERYTHING,
         val input: String = "",
         val busy: Boolean = false,
         val showConfirm: Boolean = false,
-        val showZonePicker: Boolean = false,
         val error: String? = null,
         val resultMessage: String? = null,
         val resultSuccess: Boolean? = null
@@ -38,57 +38,31 @@ class CacheViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(CacheUiState())
     val uiState: StateFlow<CacheUiState> = _uiState
 
-    init {
-        loadZones()
-    }
-
-    fun loadZones() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(loadingZones = true, error = null) }
-            try {
-                val resp = AppContainer.repository.getZones(page = 1, perPage = 50)
-                val zones = resp.result ?: emptyList()
-                val keep = _uiState.value.selectedZone
-                _uiState.update {
-                    it.copy(
-                        zones = zones,
-                        selectedZone = keep ?: zones.firstOrNull(),
-                        loadingZones = false
-                    )
-                }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(loadingZones = false, error = e.message) }
-            }
+    /** 由 HomeScreen 响应全局选中域名变化时调用 */
+    fun setZone(zone: Zone?) {
+        _uiState.update {
+            it.copy(
+                selectedZone = zone,
+                mode = PurgeMode.EVERYTHING,
+                input = "",
+                error = null,
+                resultMessage = null,
+                resultSuccess = null
+            )
         }
-    }
-
-    fun selectZone(zone: Zone) {
-        _uiState.update { it.copy(selectedZone = zone, showZonePicker = false) }
-    }
-
-    fun showZonePicker() {
-        _uiState.update { it.copy(showZonePicker = true) }
-    }
-
-    fun dismissZonePicker() {
-        _uiState.update { it.copy(showZonePicker = false) }
     }
 
     fun setMode(mode: PurgeMode) {
-        _uiState.update {
-            it.copy(mode = mode, error = null, resultMessage = null, resultSuccess = null)
-        }
+        _uiState.update { it.copy(mode = mode, error = null, resultMessage = null, resultSuccess = null) }
     }
 
     fun setInput(input: String) {
         _uiState.update { it.copy(input = input, error = null) }
     }
 
-    /** 按行解析输入内容 */
     private fun parseInput(): List<String> =
         _uiState.value.input.lines().map { it.trim() }.filter { it.isNotBlank() }
 
-    /** 发起清除（先弹确认对话框） */
     fun requestPurge() {
         if (_uiState.value.selectedZone == null) {
             _uiState.update { it.copy(error = "请先选择域名") }
@@ -105,14 +79,11 @@ class CacheViewModel : ViewModel() {
         _uiState.update { it.copy(showConfirm = false) }
     }
 
-    /** 执行清除（确认后调用） */
     fun purge() {
         val zone = _uiState.value.selectedZone ?: return
         val mode = _uiState.value.mode
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(busy = true, showConfirm = false, error = null, resultMessage = null, resultSuccess = null)
-            }
+            _uiState.update { it.copy(busy = true, showConfirm = false, error = null, resultMessage = null, resultSuccess = null) }
             try {
                 val values = if (mode == PurgeMode.EVERYTHING) emptyList() else parseInput()
                 AppContainer.repository.purgeCache(

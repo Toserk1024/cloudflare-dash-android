@@ -20,6 +20,15 @@
 - **根因**：`HomeScreen` 缓存 Tab（索引 3）判断位误用 `0b10000`（位 4）、我的 Tab（索引 4）判断位误用 `0b100000`（位 5），而 `visitedMask` 实际用 `1 shl selectedTab` 记录（缓存=位 3=`0b1000`、我的=位 4=`0b10000`），位不匹配导致条件恒假 → 缓存/我的两页始终空白
 - **修复**：缓存 Tab 判断位改为 `0b1000`、我的 Tab 判断位改为 `0b10000`，与 visitedMask 位对齐（`HomeScreen.kt`）
 
+### 域名操作逻辑重构（统一域名选择器）
+
+- **统一域名选择器（全局）**：新增全局 `ZoneViewModel`（域名列表 + 当前选中域名 + 域名详情 + 高级设置），供 域名 / DNS / 统计 / 缓存 四 Tab 统一共享；域名选择器为**全屏覆盖层**（`ZonePicker`，扁平化表格设计），顶部显示当前选中域名信息、选中项打勾 + 高亮（`ZoneViewModel.kt` / `ZonePicker.kt`）
+- **域名 Tab 改为显示域名详情**：域名详情界面（基本信息 / NS / 套餐 / 高级设置）直接放入域名 Tab（`ZoneDetailTab`），移除了域名级统计与底部删除按钮；原域名列表（`ZonesScreen`）移除
+- **域名级统计并入统计 Tab**：`StatsViewModel` 支持账户级 / 域名级（`StatsMode`，默认账户级），域名级用全局选中域名；横栏右侧新增**账户级/域名级切换按钮**（点按 toggle，仅统计 Tab 显示）
+- **横栏右侧按钮**：域名选择按钮（`Public` 图标）始终显示；统计切换按钮（账户/域名级）仅统计 Tab 显示且位于域名按钮外侧；切换 Tab 时按钮**显示/隐藏/移动带动画**（`AnimatedVisibility` + `animateContentSize`）（`HomeScreen.kt`）
+- **DNS / 缓存 Tab 改用全局域名**：移除各自域名选择器，由全局选中域名驱动（`DnsViewModel` / `CacheViewModel` 新增 `setZone`）
+- **清理**：移除旧 `ZonesScreen` / `ZonesViewModel` / `ZoneDetailScreen` / `ZoneDetailViewModel` / `DnsRecordsScreen` 及 `ZONE_DETAIL`/`DNS_RECORDS` 独立路由，`StatusBadge` 迁移至 `ZonePicker.kt`
+
 ## 2026.08.10
 
 ### 修复切换账号后页面不自动重载 + 移除批量操作取消按钮

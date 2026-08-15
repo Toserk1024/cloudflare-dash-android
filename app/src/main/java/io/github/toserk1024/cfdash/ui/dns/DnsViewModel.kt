@@ -1,6 +1,5 @@
 package io.github.toserk1024.cfdash.ui.dns
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.toserk1024.cfdash.AppContainer
@@ -14,36 +13,26 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * DNS 记录 ViewModel
- * 策略：域名列表与记录列表均在首次/下拉刷新时拉取全量缓存；
- * 类型筛选与关键字搜索在本地完成，不再请求 API。
+ * DNS 记录 ViewModel。
+ * 当前域名由全局域名选择器（HomeScreen 的 ZoneViewModel）传入，本 VM 不再维护域名列表/选择。
+ * 记录在首次/下拉刷新时拉取全量缓存；类型筛选与关键字搜索在本地完成。
  */
-class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
-
-    /** 从路由参数读取的初始域名（独立页面进入时预选） */
-    private val initialZoneId: String? = savedStateHandle["zoneId"]
+class DnsViewModel : ViewModel() {
 
     data class DnsUiState(
-        val zones: List<Zone> = emptyList(),
         val selectedZone: Zone? = null,
-        /** 过滤后的显示列表 */
         val records: List<DnsRecord> = emptyList(),
         val filterType: String = "",
         val query: String = "",
-        val loadingZones: Boolean = false,
-        /** 首次加载记录 */
         val loadingRecords: Boolean = false,
-        /** 下拉刷新 */
         val refreshing: Boolean = false,
         val error: String? = null,
         val deletingId: String? = null,
         val showDeleteDialog: DnsRecord? = null,
-        val showZonePicker: Boolean = false,
         // ===== 批量操作（候选框）=====
         val selectionMode: Boolean = false,
         val selectedIds: Set<String> = emptySet(),
         val showBulkDeleteDialog: Boolean = false,
-        /** 批量代理确认目标：null=不显示；true=开启代理；false=关闭代理 */
         val bulkProxyTarget: Boolean? = null,
         val bulkBusy: Boolean = false
     )
@@ -54,76 +43,23 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     /** 当前选中域名的全量记录缓存（内存） */
     private var allRecords: List<DnsRecord> = emptyList()
 
-    init {
-        loadZones()
-    }
-
-    /** 加载域名列表（首次/下拉刷新时请求） */
-    fun loadZones() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(loadingZones = true, error = null) }
-            try {
-                val resp = AppContainer.repository.getZones(page = 1, perPage = 50)
-                val zones = resp.result ?: emptyList()
-                val keepSelection = _uiState.value.selectedZone
-                val matched = initialZoneId?.let { id -> zones.find { it.id == id } }
-                val first = keepSelection ?: matched ?: zones.firstOrNull()
-                _uiState.update {
-                    it.copy(
-                        zones = zones,
-                        selectedZone = first,
-                        loadingZones = false
-                    )
-                }
-                if (first != null) loadAllRecords()
-            } catch (e: Exception) {
-                _uiState.update { it.copy(loadingZones = false, error = e.message) }
-            }
-        }
-    }
-
-    fun selectZone(zone: Zone) {
+    /** 由 HomeScreen 响应全局选中域名变化时调用 */
+    fun setZone(zone: Zone?) {
+        if (_uiState.value.selectedZone?.id == zone?.id && zone != null) return
         _uiState.update {
             it.copy(
                 selectedZone = zone,
-                showZonePicker = false,
                 records = emptyList(),
                 filterType = "",
-                query = ""
+                query = "",
+                selectionMode = false,
+                selectedIds = emptySet()
             )
         }
-        loadAllRecords()
+        allRecords = emptyList()
+        if (zone != null) loadAllRecords()
     }
 
-    /** 类型筛选：仅本地过滤 */
-    fun setFilterType(type: String) {
-        _uiState.update { it.copy(filterType = type) }
-        applyFilter()
-    }
-
-    /** 关键字搜索：仅本地过滤 */
-    fun setQuery(query: String) {
-        _uiState.update { it.copy(query = query) }
-        applyFilter()
-    }
-
-    /** 下拉刷新：重新请求 API 拉全量记录 */
-    fun refresh() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(refreshing = true, error = null) }
-            try {
-                val zone = _uiState.value.selectedZone ?: return@launch
-                allRecords = fetchAllRecords(zone.id)
-                applyFilter()
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
-            } finally {
-                _uiState.update { it.copy(refreshing = false) }
-            }
-        }
-    }
-
-    /** 加载当前选中域名的全部记录 */
     private fun loadAllRecords() {
         val zone = _uiState.value.selectedZone ?: return
         viewModelScope.launch {
@@ -139,17 +75,27 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         }
     }
 
-    /** 拉取指定域名的全部记录（翻页直到最后一页） */
+    fun refresh() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(refreshing = true, error = null) }
+            try {
+                val zone = _uiState.value.selectedZone ?: return@launch
+                allRecords = fetchAllRecords(zone.id)
+                applyFilter()
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            } finally {
+                _uiState.update { it.copy(refreshing = false) }
+            }
+        }
+    }
+
     private suspend fun fetchAllRecords(zoneId: String): List<DnsRecord> {
         val all = mutableListOf<DnsRecord>()
         var page = 1
         var totalPages = 1
         do {
-            val resp = AppContainer.repository.getDnsRecords(
-                zoneId = zoneId,
-                page = page,
-                perPage = PAGE_SIZE
-            )
+            val resp = AppContainer.repository.getDnsRecords(zoneId = zoneId, page = page, perPage = PAGE_SIZE)
             all += resp.result ?: emptyList()
             totalPages = resp.result_info?.total_pages ?: 1
             page++
@@ -157,7 +103,16 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         return all
     }
 
-    /** 本地过滤（类型 + 关键字） */
+    fun setFilterType(type: String) {
+        _uiState.update { it.copy(filterType = type) }
+        applyFilter()
+    }
+
+    fun setQuery(query: String) {
+        _uiState.update { it.copy(query = query) }
+        applyFilter()
+    }
+
     private fun applyFilter() {
         val s = _uiState.value
         val type = s.filterType
@@ -167,14 +122,6 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
                 (q.isEmpty() || record.name.contains(q, ignoreCase = true))
         }
         _uiState.update { it.copy(records = filtered) }
-    }
-
-    fun showZonePicker() {
-        _uiState.update { it.copy(showZonePicker = true) }
-    }
-
-    fun dismissZonePicker() {
-        _uiState.update { it.copy(showZonePicker = false) }
     }
 
     fun requestDelete(record: DnsRecord) {
@@ -201,10 +148,6 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         }
     }
 
-    /**
-     * 应用编辑/新建后的本地同步（无需重新请求 API）。
-     * 从编辑/新建页返回列表时调用：编辑的记录原位替换，新建的记录追加到末尾。
-     */
     fun syncPendingChanges() {
         val zone = _uiState.value.selectedZone ?: return
         val changes = DnsRecordsSync.takeFor(zone.id)
@@ -219,22 +162,16 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
 
     // ===== 批量操作（候选框）=====
 
-    /** 切换候选框启用状态（顶栏图标控制，避免常显拥挤） */
     fun setSelectionMode(enabled: Boolean) {
         _uiState.update { it.copy(selectionMode = enabled, selectedIds = if (enabled) it.selectedIds else emptySet()) }
     }
 
     fun toggleSelect(id: String) {
-        _uiState.update { s ->
-            s.copy(selectedIds = if (id in s.selectedIds) s.selectedIds - id else s.selectedIds + id)
-        }
+        _uiState.update { s -> s.copy(selectedIds = if (id in s.selectedIds) s.selectedIds - id else s.selectedIds + id) }
     }
 
-    /** 全选/取消全选（作用于当前过滤后的显示列表） */
     fun setSelectAll(selected: Boolean) {
-        _uiState.update {
-            it.copy(selectedIds = if (selected) it.records.map { r -> r.id }.toSet() else emptySet())
-        }
+        _uiState.update { it.copy(selectedIds = if (selected) it.records.map { r -> r.id }.toSet() else emptySet()) }
     }
 
     fun clearSelection() {
@@ -257,7 +194,6 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         _uiState.update { it.copy(bulkProxyTarget = null) }
     }
 
-    /** 批量删除（逐条 DELETE，本地同步移除；部分失败汇总到 error 提示） */
     fun bulkDelete() {
         val zone = _uiState.value.selectedZone ?: return
         val ids = _uiState.value.selectedIds
@@ -280,7 +216,6 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         }
     }
 
-    /** 批量开关代理（仅 A/AAAA/CNAME 生效，逐条 PATCH proxied，本地同步） */
     fun bulkSetProxy(proxied: Boolean) {
         val zone = _uiState.value.selectedZone ?: return
         val ids = _uiState.value.selectedIds
@@ -291,12 +226,10 @@ class DnsViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
             var firstError: String? = null
             ids.forEach { id ->
                 val record = remaining.find { it.id == id } ?: return@forEach
-                // 仅对可代理类型（A/AAAA/CNAME）生效，其余忽略
                 if (record.type !in DnsRecordTypes.PROXIABLE) return@forEach
                 try {
                     AppContainer.repository.updateDnsRecord(
-                        zone.id,
-                        id,
+                        zone.id, id,
                         DnsRecordRequest(
                             type = record.type,
                             name = record.name,

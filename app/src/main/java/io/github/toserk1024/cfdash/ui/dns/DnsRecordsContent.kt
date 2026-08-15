@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
@@ -75,26 +74,20 @@ fun DnsRecordsContent(
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // 域名选择器 + 候选框启用图标（顶栏右侧）
+            // 当前域名 + 候选框启用图标（顶栏右侧）
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(
-                    onClick = viewModel::showZonePicker,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = state.selectedZone?.name ?: "选择域名",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Start
-                    )
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                }
+                Text(
+                    text = state.selectedZone?.name ?: "请先选择域名",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Start
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 // check-all 图标：启用/关闭候选框（批量操作）
                 IconButton(onClick = { viewModel.setSelectionMode(!state.selectionMode) }) {
@@ -238,44 +231,6 @@ fun DnsRecordsContent(
         ) {
             Icon(Icons.Default.Add, contentDescription = "新建记录")
         }
-    }
-
-    // 域名选择对话框
-    if (state.showZonePicker) {
-        AlertDialog(
-            onDismissRequest = viewModel::dismissZonePicker,
-            title = { Text("选择域名") },
-            text = {
-                if (state.loadingZones) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) { CircularProgressIndicator(modifier = Modifier.size(28.dp)) }
-                } else if (state.zones.isEmpty()) {
-                    Text("暂无域名，请先在“域名”页添加。")
-                } else {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        state.zones.forEach { zone ->
-                            TextButton(
-                                onClick = { viewModel.selectZone(zone) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = zone.name,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.weight(1f),
-                                    textAlign = TextAlign.Start
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = viewModel::dismissZonePicker) { Text("关闭") }
-            }
-        )
     }
 
     // 删除确认
