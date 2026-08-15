@@ -166,7 +166,7 @@ private fun AboutCard() {
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "v${BuildConfig.VERSION_NAME}",
+                text = "version: ${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

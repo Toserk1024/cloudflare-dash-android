@@ -246,26 +246,6 @@ fun HomeScreen(
                         )
                     }
                 }
-
-                // 域名选择器覆盖层（位于横栏下方，进出带动画）
-                AnimatedVisibility(
-                    visible = showZonePicker,
-                    enter = fadeIn(tween(200)),
-                    exit = fadeOut(tween(150)),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    ZonePicker(
-                        zones = zoneState.zones,
-                        loading = zoneState.loading,
-                        error = zoneState.error,
-                        selectedZone = zoneState.selectedZone,
-                        onSelect = { zone ->
-                            zoneViewModel.selectZone(zone)
-                            showZonePicker = false
-                        },
-                        onDismiss = { showZonePicker = false }
-                    )
-                }
             }
         }
 
@@ -373,6 +353,26 @@ fun HomeScreen(
                     )
                 }
             }
+        }
+
+        // ===== 域名选择器覆盖层（全屏独立页面，覆盖整个含横栏，带动画）=====
+        AnimatedVisibility(
+            visible = showZonePicker,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(150)),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            ZonePicker(
+                zones = zoneState.zones,
+                loading = zoneState.loading,
+                error = zoneState.error,
+                selectedZone = zoneState.selectedZone,
+                onSelect = { zone ->
+                    zoneViewModel.selectZone(zone)
+                    showZonePicker = false
+                },
+                onDismiss = { showZonePicker = false }
+            )
         }
     }
 }
