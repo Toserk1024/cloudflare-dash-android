@@ -186,7 +186,7 @@ fun HomeScreen(
                     }
                 }
                 // 缓存 Tab（常驻）
-                if ((visitedMask and 0b10000) != 0) {
+                if ((visitedMask and 0b1000) != 0) {
                     SlidingTab(
                         selected = selectedTab == 3,
                         targetOffset = slideOffsetFor(selectedTab, 3, screenWidthPx)
@@ -195,7 +195,7 @@ fun HomeScreen(
                     }
                 }
                 // 我的 Tab（常驻）
-                if ((visitedMask and 0b100000) != 0) {
+                if ((visitedMask and 0b10000) != 0) {
                     SlidingTab(
                         selected = selectedTab == 4,
                         targetOffset = slideOffsetFor(selectedTab, 4, screenWidthPx)
