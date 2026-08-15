@@ -5,7 +5,7 @@
 ## 1. 项目概览
 
 基于 **Jetpack Compose + Material 3** 的 Cloudflare 第三方 Android 客户端（包名 `io.github.toserk1024.cfdash`）。
-当前已实现：**双认证登录（Global API Key / API Token，Global 默认优先）、侧边栏导航（域名/DNS/统计/我的）、域名管理（列表/搜索/详情/删除）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、域名高级设置（开发模式 / 五秒盾 / IPv6）、统计数据（账号级/域名级，24h/7d/30d 切换，Vico 图表化：汇总卡 + 时间趋势折线图 + 国家/状态码/缓存维度饼图 + 账号级域名流量拆分柱状图）、用户信息与退出登录**。
+当前已实现：**双认证登录（Global API Key / API Token，Global 默认优先）、侧边栏导航（域名/DNS/统计/我的/缓存）、域名管理（列表/搜索/详情/删除）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、域名高级设置（开发模式 / 五秒盾 / IPv6）、统计数据（账号级/域名级，24h/7d/30d 切换，Vico 图表化：汇总卡 + 时间趋势折线图 + 国家/状态码/缓存维度饼图 + 账号级域名流量拆分柱状图）、缓存清除（侧边栏「缓存」页，支持全部/URL/主机名/标签/前缀 5 种方式）、用户信息与退出登录**。
 
 **已移除功能**：添加域名（用户要求删除，相关代码已清理干净，如需恢复参考 §8.3）。
 **未开发**：Workers、Zero Trust 等高级功能（用户明确暂不开发）。
@@ -61,6 +61,7 @@ app/src/main/java/io/github/toserk1024/cfdash/
     ├── stats/                    # StatsViewModel（账号级统计）+ StatsContent（复用组件）+ StatsData（展示数据聚合）+ StatsCharts（Vico 图表：趋势折线/维度饼图/域名柱状图）
     ├── zones/                    # ZonesScreen + ZonesViewModel（域名列表）+ ZoneDetailScreen + ZoneDetailViewModel（含高级设置 + 域名统计）
     ├── dns/                      # DnsRecordsContent（复用组件）+ DnsRecordsScreen + DnsRecordEditScreen + DnsViewModel + DnsEditViewModel
+    ├── cache/                    # CacheScreen + CacheViewModel（缓存清除页，5 种方式）+ PurgeMode 枚举
     └── profile/                  # ProfileScreen（我的）
 ```
 
@@ -99,7 +100,7 @@ UI(Composable) ⇄ ViewModel(StateFlow) ⇄ Repository ⇄ CloudflareClient(OkHt
 - 单 Activity，路由见 `Routes.kt`：onboarding / home / zone_detail / dns_records / dns_edit
 - `AppNavHost` 配置了全局转场动画（fadeIn + slideInHorizontally 1/4 屏）
 - HomeScreen 底部三 Tab（域名/DNS/我的）：首次访问后常驻组合（visitedMask 懒加载），切换仅水平平移过渡（SlidingTab，250ms FastOutSlowIn，offset 位移 GPU 合成，方向跟随 Tab 位置），避免重建卡顿
-- **账号切换/退出到剩余账号 = 重建导航栈**：`MainActivity.MainScreen` 用 `key(navResetKey)` 包裹 NavController+NavHost，切换账号或退出到剩余账号时 `navResetKey++` 整体重建导航栈（新 NavController→新 ViewModelStore→所有页面从空态重新加载新账号数据），并显示全屏加载遮罩（`switching`）；避免仅刷新"我的"用户信息而域名/DNS/统计仍滞留旧账号缓存。首次登录/退出到无剩余用户用 `loggedIn` + `LaunchedEffect` 导航
+- **账号切换/退出到剩余账号 = 重建导航栈**：`MainActivity.MainScreen` 用 `key(navResetKey)` 包裹 NavController+NavHost，切换账号或退出到剩余账号时 `navResetKey++` 整体重建导航栈（新 NavController→新 ViewModelStore→所有页面从空态重新加载新账号数据），并显示**纯不透明黑全屏遮罩**（`switching` + `Color.Black`，完全遮住旧界面）；通过 `currentTab` + `initialTab`/`onTabChange` 回调在重建后**保持所在 Home Tab**（而非跳回「域名」）。避免仅刷新"我的"用户信息而域名/DNS/统计仍滞留旧账号缓存。首次登录/退出到无剩余用户用 `loggedIn` + `LaunchedEffect` 导航
 - 带参路由：`zone_detail/{zoneId}?zoneName={zoneName}`（可选参数有 defaultValue=""）
 - ViewModel 从 `SavedStateHandle` 读参数（如 DnsEditViewModel 的 zoneId/recordId、DnsViewModel 的 zoneId）
 - **注意**：`SavedStateHandle["key"]` 泛型推断可能失败，用 `savedStateHandle.get<String>("key")` 显式类型
@@ -127,6 +128,7 @@ FAB 已内置在 Content 中，DnsRecordsScreen 不再自带 FAB。
 | 新建记录 | POST `/zones/{zone_id}/dns_records` | body: DnsRecordRequest |
 | 更新记录 | PATCH `/zones/{zone_id}/dns_records/{id}` | body: DnsRecordRequest |
 | 删除记录 | DELETE `/zones/{zone_id}/dns_records/{id}` | |
+| 清除缓存 | POST `/zones/{zone_id}/purge_cache` | body: 5 种方式互斥（purge_everything / files / hosts / tags / prefixes），需 Cache Purge 权限 |
 
 Token 权限要求：Zone Read/Edit、DNS Read/Edit、Zone Settings Read/Edit（高级设置）、Analytics Read（统计数据）、User Details Read（Account Settings Read 仅在添加域名时需要，已无此功能）。
 

@@ -12,6 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import io.github.toserk1024.cfdash.AppContainer
+import io.github.toserk1024.cfdash.ui.cache.CacheScreen
 import io.github.toserk1024.cfdash.ui.disclaimer.DisclaimerScreen
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordEditScreen
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordsScreen
@@ -24,6 +25,8 @@ import io.github.toserk1024.cfdash.ui.zones.ZoneDetailScreen
 fun AppNavHost(
     startDestination: String,
     homeKey: Int = 0,
+    initialTab: Int = 0,
+    onTabChange: (Int) -> Unit = {},
     onLoggedOut: () -> Unit,
     onNewUser: () -> Unit = {},
     onUserSwitched: () -> Unit = {},
@@ -75,6 +78,8 @@ fun AppNavHost(
         composable(Routes.HOME) {
             HomeScreen(
                 homeKey = homeKey,
+                initialTab = initialTab,
+                onTabChange = onTabChange,
                 onZoneClick = { zone ->
                     navController.navigate(Routes.zoneDetail(zone.id, zone.name))
                 },
@@ -83,6 +88,7 @@ fun AppNavHost(
                         navController.navigate(Routes.dnsEdit(zoneId, recordId, zoneName))
                     }
                 },
+                onOpenCache = { navController.navigate(Routes.CACHE) },
                 onNewUser = onNewUser,
                 onUserSwitched = onUserSwitched,
                 onLogout = onLoggedOut
@@ -160,6 +166,13 @@ fun AppNavHost(
                 zoneName = zoneName,
                 onBack = { navController.popBackStack() },
                 onSaved = { navController.popBackStack() }
+            )
+        }
+
+        // 缓存清除
+        composable(Routes.CACHE) {
+            CacheScreen(
+                onBack = { navController.popBackStack() }
             )
         }
     }

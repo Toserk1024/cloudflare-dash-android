@@ -24,4 +24,7 @@ object CloudflareApi {
     // DNS 记录
     const val DNS_RECORDS = "/zones/%s/dns_records"
     const val DNS_RECORD = "/zones/%s/dns_records/%s"
+
+    // 缓存清除
+    const val PURGE_CACHE = "/zones/%s/purge_cache"
 }

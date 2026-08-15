@@ -50,6 +50,9 @@ private fun MainScreen() {
     // 账号切换中的全屏加载遮罩（覆盖整个 MainActivity），避免切换瞬间闪现旧账号内容
     var switching by remember { mutableStateOf(false) }
 
+    // 当前所在 Home Tab（切换账号/重建导航栈后保持所在页面不变）
+    var currentTab by remember { mutableIntStateOf(0) }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // 主体：key 变化时整体重建（新 NavController → 新 ViewModelStore → 所有页面从空态重新加载）
         key(navResetKey) {
@@ -78,6 +81,8 @@ private fun MainScreen() {
                     else -> Routes.ONBOARDING
                 },
                 homeKey = navResetKey,
+                initialTab = currentTab,
+                onTabChange = { currentTab = it },
                 onLoggedOut = {
                     // 退出登录：删除当前激活用户；若有剩余用户自动切换并重建导航栈刷新，否则回初始化
                     AppContainer.tokenStore.getActiveUser()?.id?.let { AppContainer.tokenStore.deleteUser(it) }
@@ -112,7 +117,7 @@ private fun MainScreen() {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f)),
+                    .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()

@@ -19,7 +19,11 @@ import io.github.toserk1024.cfdash.data.model.Zone
 import io.github.toserk1024.cfdash.data.model.ZoneAnalyticsItem
 import io.github.toserk1024.cfdash.data.model.ZoneSetting
 import io.github.toserk1024.cfdash.data.model.ZoneSettingRequest
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /** 业务仓储层：封装所有 Cloudflare API 调用 */
 class CloudflareRepository(private val client: CloudflareClient) {
@@ -162,5 +166,35 @@ class CloudflareRepository(private val client: CloudflareClient) {
     /** 删除 DNS 记录（破坏性操作） */
     suspend fun deleteDnsRecord(zoneId: String, recordId: String) {
         client.delete<JsonElement>(CloudflareApi.DNS_RECORD.format(zoneId, recordId))
+    }
+
+    /**
+     * 清除 Zone 缓存（POST /zones/{id}/purge_cache）
+     * 5 种方式互斥（清除所有时不能与其他方式同时传）：
+     * - purgeEverything=true → purge_everything:true（清除该域名全部缓存）
+     * - files → 按 URL 精确清除（单文件清除排除项除外）
+     * - hosts → 按主机名清除（主机与所提供值之一匹配的所有 URL）
+     * - tags → 按 Cache-Tag 清除（响应标头匹配所提供值之一的资源）
+     * - prefixes → 按前缀清除（目录下任何资源）
+     */
+    suspend fun purgeCache(
+        zoneId: String,
+        purgeEverything: Boolean = false,
+        files: List<String> = emptyList(),
+        hosts: List<String> = emptyList(),
+        tags: List<String> = emptyList(),
+        prefixes: List<String> = emptyList()
+    ) {
+        val body = buildJsonObject {
+            if (purgeEverything) {
+                put("purge_everything", true)
+            } else {
+                files.takeIf { it.isNotEmpty() }?.let { put("files", JsonArray(it.map(::JsonPrimitive))) }
+                hosts.takeIf { it.isNotEmpty() }?.let { put("hosts", JsonArray(it.map(::JsonPrimitive))) }
+                tags.takeIf { it.isNotEmpty() }?.let { put("tags", JsonArray(it.map(::JsonPrimitive))) }
+                prefixes.takeIf { it.isNotEmpty() }?.let { put("prefixes", JsonArray(it.map(::JsonPrimitive))) }
+            }
+        }.toString()
+        client.requestRaw("POST", CloudflareApi.PURGE_CACHE.format(zoneId), body, emptyMap())
     }
 }

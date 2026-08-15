@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026.08.15
+
+### 新增缓存清除功能 + 切换账号重载体验优化
+
+- **新增「缓存」清除功能（侧边栏 → 缓存清除页）**：侧边栏新增「缓存」菜单项（AutoDelete 图标），进入独立缓存清除页 `CacheScreen`。支持 Cloudflare `POST /zones/{id}/purge_cache` 的 **5 种清除方式**（单选互斥）：① 清除所有（`purge_everything:true`）；② 按 URL 清除（`files`，精确匹配）；③ 按主机名清除（`hosts`）；④ 按标签清除（`tags`，Cache-Tag）；⑤ 按前缀清除（`prefixes`）。页面含域名选择器（复用域名列表）、方式说明、按行输入内容（"清除所有"无需输入）、二次确认对话框、清除结果/错误提示（`CacheScreen.kt` / `CacheViewModel.kt`）
+- **数据层扩展**：`CloudflareApi` 新增 `PURGE_CACHE` 端点；`CloudflareRepository.purgeCache(zoneId, purgeEverything, files, hosts, tags, prefixes)` 用 `buildJsonObject` 动态构造互斥请求体（避免 null 字段序列化），经 `client.requestRaw` POST 调用（`CloudflareRepository.kt` / `CloudflareApi.kt`）
+- **切换账号重载遮罩全不透明（todo）**：切换账号/退出到剩余账号时的全屏加载遮罩由半透明黑（alpha 0.5）改为**纯不透明黑**（`Color.Black`），完全遮住旧界面，避免闪现旧账号内容（`MainActivity.kt`）
+- **切换账号重载后保持所在页面（todo）**：`MainActivity` 新增 `currentTab` 记录当前 Home Tab，重建导航栈后通过 `initialTab`/`onTabChange` 透传（`AppNavHost` → `HomeScreen`），`HomeScreen` 初始 Tab 用 `initialTab`，切换 Tab 时回调 `onTabChange`；账号切换/重建后停留在原所在 Tab 而非跳回「域名」（`MainActivity.kt` / `AppNavHost.kt` / `HomeScreen.kt`）
+
 ## 2026.08.10
 
 ### 修复切换账号后页面不自动重载 + 移除批量操作取消按钮

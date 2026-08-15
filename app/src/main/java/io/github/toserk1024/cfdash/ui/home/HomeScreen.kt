@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.AutoDelete
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
@@ -87,13 +88,16 @@ fun HomeScreen(
     onDnsEdit: (String, String?, String?) -> Unit,
     onLogout: () -> Unit,
     homeKey: Int = 0,
+    initialTab: Int = 0,
+    onTabChange: (Int) -> Unit = {},
+    onOpenCache: () -> Unit = {},
     onNewUser: () -> Unit = {},
     onUserSwitched: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(),
     dnsViewModel: DnsViewModel = viewModel(),
     statsViewModel: StatsViewModel = viewModel()
 ) {
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(initialTab) }
     val homeState by homeViewModel.uiState.collectAsState()
     val statsState by statsViewModel.uiState.collectAsState()
 
@@ -106,6 +110,8 @@ fun HomeScreen(
     var visitedMask by rememberSaveable { mutableIntStateOf(1) }
     LaunchedEffect(selectedTab) {
         visitedMask = visitedMask or (1 shl selectedTab)
+        // 通知外部当前 Tab（用于切换账号重建后保持所在页面不变）
+        onTabChange(selectedTab)
     }
 
     // 水平平移动画所需的屏幕宽度（px）
@@ -300,6 +306,15 @@ fun HomeScreen(
                         onClick = {
                             scope.launch { drawerState.close() }
                             selectedTab = 3
+                        }
+                    )
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.AutoDelete, contentDescription = null) },
+                        label = { Text("缓存") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onOpenCache()
                         }
                     )
 

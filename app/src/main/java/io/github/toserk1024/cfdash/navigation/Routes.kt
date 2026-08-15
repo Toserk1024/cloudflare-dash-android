@@ -5,6 +5,7 @@ object Routes {
     const val DISCLAIMER = "disclaimer"
     const val ONBOARDING = "onboarding"
     const val HOME = "home"
+    const val CACHE = "cache"
 
     const val ZONE_DETAIL = "zone_detail/{zoneId}?zoneName={zoneName}"
 
