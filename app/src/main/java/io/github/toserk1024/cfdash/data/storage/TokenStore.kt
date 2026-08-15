@@ -112,6 +112,18 @@ class TokenStore(context: Context) {
 
     fun isDisclaimerAccepted(): Boolean = prefs.getBoolean(KEY_DISCLAIMER_ACCEPTED, false)
 
+    /** 保存/清除当前选中域名 id（持久化，重启后恢复；仅切换账户时清除） */
+    fun saveSelectedZoneId(id: String?) {
+        if (id == null) {
+            prefs.edit().remove(KEY_SELECTED_ZONE_ID).apply()
+        } else {
+            prefs.edit().putString(KEY_SELECTED_ZONE_ID, id).apply()
+        }
+    }
+
+    /** 上次选中的域名 id（应用重启后恢复选中域名） */
+    fun getSelectedZoneId(): String? = prefs.getString(KEY_SELECTED_ZONE_ID, null)
+
     private fun readCredential(id: String): AuthCredential? =
         when (prefs.getString("${KEY_USER_PREFIX}$id${KEY_SUFFIX_MODE}", null)) {
             MODE_TOKEN -> prefs.getString("${KEY_USER_PREFIX}$id${KEY_SUFFIX_TOKEN}", null)
@@ -141,6 +153,7 @@ class TokenStore(context: Context) {
         private const val FILE_NAME = "cf_secure_prefs"
         private const val KEY_ACTIVE_USER = "cf_active_user"
         private const val KEY_DISCLAIMER_ACCEPTED = "cf_disclaimer_accepted"
+        private const val KEY_SELECTED_ZONE_ID = "cf_selected_zone_id"
         private const val KEY_USER_PREFIX = "cf_user_"
         private const val KEY_SUFFIX_MODE = "_mode"
         private const val KEY_SUFFIX_TOKEN = "_token"

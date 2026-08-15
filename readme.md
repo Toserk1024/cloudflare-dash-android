@@ -30,6 +30,7 @@
 | Zone → DNS → Read / Edit | DNS 记录查看与增删改 |
 | Zone → Zone Settings → Read / Edit | 高级设置（开发模式 / 五秒盾 / IPv6） |
 | Zone → Analytics → Read | 统计数据（请求/威胁/带宽/缓存命中率） |
+| Zone → Cache Purge → Purge | 缓存清除 |
 | User → User Details → Read | 验证与用户信息 |
 
 > 也支持 **Global API Key**（邮箱 + API Key，`X-Auth-Email` / `X-Auth-Key`）登录，拥有账号全部权限，请谨慎保管。
@@ -77,6 +78,10 @@ app/src/main/java/io/github/toserk1024/cfdash/
 3. 解压得到 `app-release.apk`，安装到设备：`adb install app-release.apk`
 
 > 本地不保留 Android SDK / Gradle 构建环境，全部走 CI 构建。
+
+## 📄 开源协议
+
+本项目采用 **GNU General Public License v3.0（GPL-3.0）** 开源协议，完整文本见 [LICENSE](LICENSE)。
 
 ## ⚠️ 说明
 

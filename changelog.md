@@ -2,6 +2,13 @@
 
 ## 2026.08.15
 
+### 初始化权限更新 + GPL 开源协议
+
+- **初始化页 Token 权限列表新增 Cache Purge**：登录页权限列表加入"Zone → Cache Purge → Purge（缓存清除）"（缓存清除功能所需）（`OnboardingScreen.kt`）
+- **readme 权限表同步**：API Token 权限表新增"Zone → Cache Purge → Purge | 缓存清除"（`readme.md`）
+- **新增 GPL-3.0 开源协议**：readme 增加"📄 开源协议"章节（GNU General Public License v3.0），仓库根新增 `LICENSE` 文件（GPL-3.0 完整文本）（`readme.md` / `LICENSE`）
+- **域名选择持久化（跨重启）**：当前选中域名 id 持久化到 TokenStore（`saveSelectedZoneId` / `getSelectedZoneId`），应用重启后自动恢复上次选中域名并加载详情/高级设置；**仅切换账户或退出登录时清除**（`TokenStore.kt` / `ZoneViewModel.kt` / `MainActivity.kt`）
+
 ### 域名选择器/我的页面/文档 体验优化（8 项）
 
 - **域名选择器高度与横栏持平**：`ZonePicker` 保持**独立全屏覆盖页面**（覆盖含横栏），标题栏加 `statusBarsPadding` 上间距使其与横栏持平，不顶到状态栏；进入/退出带动画（`HomeScreen.kt` / `ZonePicker.kt`）

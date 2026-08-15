@@ -86,6 +86,8 @@ private fun MainScreen() {
                 onLoggedOut = {
                     // 退出登录：删除当前激活用户；若有剩余用户自动切换并重建导航栈刷新，否则回初始化
                     AppContainer.tokenStore.getActiveUser()?.id?.let { AppContainer.tokenStore.deleteUser(it) }
+                    // 账户变化，清除持久化的选中域名
+                    AppContainer.tokenStore.saveSelectedZoneId(null)
                     if (AppContainer.tokenStore.hasCredential()) {
                         switching = true
                         navResetKey++
@@ -97,7 +99,8 @@ private fun MainScreen() {
                     navController.navigate(Routes.ONBOARDING)
                 },
                 onUserSwitched = {
-                    // 切换账号：重建导航栈，重新执行启动流程（全屏遮罩 + 全量重载）
+                    // 切换账号：清除持久化域名选择，重建导航栈重新加载
+                    AppContainer.tokenStore.saveSelectedZoneId(null)
                     switching = true
                     navResetKey++
                 },

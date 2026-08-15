@@ -63,14 +63,34 @@ class ZoneViewModel : ViewModel() {
                 } while (page <= totalPages)
                 allZones = all
                 _uiState.update { it.copy(zones = all, loading = false) }
+                restorePersistedZone()
             } catch (e: Exception) {
                 _uiState.update { it.copy(loading = false, error = e.message ?: "加载域名失败") }
             }
         }
     }
 
+    /** 启动时恢复上次选中的域名（持久化 id），仅当 id 存在且域名列表有匹配时 */
+    private fun restorePersistedZone() {
+        if (_uiState.value.selectedZone != null) return
+        val persistedId = AppContainer.tokenStore.getSelectedZoneId() ?: return
+        val zone = allZones.find { it.id == persistedId } ?: return
+        _uiState.update {
+            it.copy(
+                selectedZone = zone,
+                devMode = null,
+                underAttack = null,
+                ipv6 = null,
+                settingsError = null,
+                detailError = null
+            )
+        }
+        loadDetailAndSettings(zone.id)
+    }
+
     /** 选择域名：更新选中并加载详情 + 高级设置 */
     fun selectZone(zone: Zone) {
+        AppContainer.tokenStore.saveSelectedZoneId(zone.id)
         _uiState.update {
             it.copy(
                 selectedZone = zone,
