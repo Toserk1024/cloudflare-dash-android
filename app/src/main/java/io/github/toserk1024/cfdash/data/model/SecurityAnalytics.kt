@@ -137,8 +137,8 @@ object SecurityAnalyticsParser {
     /** 解析 httpRequests1hGroups：按小时趋势 + 总请求/命中 */
     fun parseHttpHourly(root: JsonElement): Pair<List<SecurityTrendPoint>, SecurityOverview> {
         val zones = root.jsonObject["data"]?.jsonObject?.get("viewer")?.jsonObject?.get("zones") as? JsonArray
-            ?: return emptyList() to SecurityOverview()
-        val groups = zones.firstOrNull()?.jsonObject?.get(H1_GROUPS) as? JsonArray ?: return emptyList() to SecurityOverview()
+            ?: return emptyList<SecurityTrendPoint>() to SecurityOverview()
+        val groups = zones.firstOrNull()?.jsonObject?.get(H1_GROUPS) as? JsonArray ?: return emptyList<SecurityTrendPoint>() to SecurityOverview()
         var requests = 0L
         var cached = 0L
         val byLabel = LinkedHashMap<String, Long>()
@@ -160,8 +160,8 @@ object SecurityAnalyticsParser {
     /** 解析 firewallEventsAdaptiveGroups：缓解按小时 + 总缓解（仅统计缓解动作） */
     fun parseMitigation(root: JsonElement): Pair<List<SecurityTrendPoint>, Long> {
         val zones = root.jsonObject["data"]?.jsonObject?.get("viewer")?.jsonObject?.get("zones") as? JsonArray
-            ?: return emptyList() to 0L
-        val groups = zones.firstOrNull()?.jsonObject?.get(FW_ADAPTIVE_GROUPS) as? JsonArray ?: return emptyList() to 0L
+            ?: return emptyList<SecurityTrendPoint>() to 0L
+        val groups = zones.firstOrNull()?.jsonObject?.get(FW_ADAPTIVE_GROUPS) as? JsonArray ?: return emptyList<SecurityTrendPoint>() to 0L
         val byLabel = LinkedHashMap<String, Long>()
         var total = 0L
         groups.forEach { g ->

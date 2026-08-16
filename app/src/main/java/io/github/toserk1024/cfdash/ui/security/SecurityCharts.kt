@@ -71,9 +71,9 @@ fun HorizontalStackBar(
     }
     Column(modifier = modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().height(32.dp)) {
-            StackSegment(overview.pct(overview.origin), originColor)
-            StackSegment(overview.pct(overview.cached), cachedColor)
-            StackSegment(overview.pct(overview.mitigated), mitigatedColor)
+            StackSegment(modifier = Modifier.weight(overview.pct(overview.origin)).fillMaxHeight(), color = originColor, pct = overview.pct(overview.origin))
+            StackSegment(modifier = Modifier.weight(overview.pct(overview.cached)).fillMaxHeight(), color = cachedColor, pct = overview.pct(overview.cached))
+            StackSegment(modifier = Modifier.weight(overview.pct(overview.mitigated)).fillMaxHeight(), color = mitigatedColor, pct = overview.pct(overview.mitigated))
         }
         Spacer(modifier = Modifier.height(10.dp))
         LegendSegment(originColor, "回源", overview.origin, total)
@@ -83,12 +83,9 @@ fun HorizontalStackBar(
 }
 
 @Composable
-private fun StackSegment(pct: Float, color: Color) {
+private fun StackSegment(modifier: Modifier, color: Color, pct: Float) {
     Box(
-        modifier = Modifier
-            .weight(pct)
-            .fillMaxHeight()
-            .background(color),
+        modifier = modifier.background(color),
         contentAlignment = Alignment.Center
     ) {
         if (pct > 0.06f) {

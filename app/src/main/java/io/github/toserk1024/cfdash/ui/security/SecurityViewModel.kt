@@ -122,7 +122,7 @@ class SecurityViewModel : ViewModel() {
                             loadBreakdownPart(zoneId, _uiState.value.groupBy, failures)
                         } else null
                     }
-                    Triple(http, miti, logs) to breakdown
+                    Triple(http, miti, logs) to breakdown.await()
                 }
                 val (http, miti, logs) = result.first
                 val httpData: Pair<List<SecurityTrendPoint>, SecurityOverview>? = http.await().getOrElse { e ->
