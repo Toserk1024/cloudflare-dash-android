@@ -5,7 +5,7 @@
 ## 1. 项目概览
 
 基于 **Jetpack Compose + Material 3** 的 Cloudflare 第三方 Android 客户端（包名 `io.github.toserk1024.cfdash`）。
-当前已实现：**双认证登录（Global API Key / API Token，Global 默认优先）、侧边栏导航（域名/DNS/统计/缓存/速度/网络/我的）、统一域名选择器（全局共享，域名详情直接置于域名 Tab）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、域名高级设置（开发模式 / 五秒盾 / IPv6）、统计数据（账户级/域名级一键切换，24h/7d/30d，Vico 图表化：汇总卡 + 时间趋势折线图 + 国家/状态码/缓存维度饼图 + 账户级域名流量拆分柱状图）、缓存清除（侧边栏「缓存」Tab，支持全部/URL/主机名/标签/前缀 5 种方式）、速度优化（「速度」Tab，协议优化 HTTP/2、HTTP/2 到源服务器、HTTP/3、0-RTT + 内容优化 Speed Brain、Cloudflare Fonts、Early Hints、Rocket Loader，分段按钮切换）、网络优化（「网络」Tab，IPv6/gRPC/WebSockets/Pseudo IPv4/IP 地理位置/网络错误记录/洋葱路由）、用户信息与退出登录**。
+当前已实现：**双认证登录（Global API Key / API Token，Global 默认优先）、侧边栏导航（域名/DNS/统计/缓存/速度/网络/我的）、统一域名选择器（全局共享，域名详情直接置于域名 Tab）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、域名高级设置（开发模式 / 五秒盾 / IPv6）、统计数据（账户级/域名级一键切换，24h/7d/30d，Vico 图表化：汇总卡 + 时间趋势折线图 + 国家/状态码/缓存维度饼图 + 账户级域名流量拆分柱状图）、缓存清除（侧边栏「缓存」Tab，支持全部/URL/主机名/标签/前缀 5 种方式）、速度优化（「速度」Tab，协议优化 HTTP/2、HTTP/3、0-RTT + 内容优化 Speed Brain、Cloudflare Fonts、Early Hints、Rocket Loader，分段按钮切换）、网络优化（「网络」Tab，IPv6/gRPC/WebSockets/Pseudo IPv4/IP 地理位置/网络错误记录/洋葱路由）、用户信息与退出登录**。
 
 **已移除功能**：添加域名（用户要求删除，相关代码已清理干净，如需恢复参考 §8.3）。
 **未开发**：Workers、Zero Trust 等高级功能（用户明确暂不开发）。

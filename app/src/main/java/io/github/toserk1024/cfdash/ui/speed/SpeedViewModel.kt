@@ -57,7 +57,7 @@ class SpeedViewModel : ViewModel() {
                     async {
                         runCatching { AppContainer.repository.getZoneSetting(zoneId, setting) }
                             .onSuccess { s ->
-                                _uiState.update { st -> st.copy(values = st.values + (setting to (s.value == "on"))) }
+                                _uiState.update { st -> st.copy(values = st.values + (setting to parseValue(setting, s.value))) }
                             }
                             .onFailure { e -> _uiState.update { st -> st.copy(settingsError = e.message) } }
                     }
@@ -75,10 +75,10 @@ class SpeedViewModel : ViewModel() {
         loadSettings(zone.id)
     }
 
-    /** 切换单个设置（on/off） */
+    /** 切换单个设置（开关语义，含特殊值映射） */
     fun setSetting(setting: String, on: Boolean) {
-        updateSetting(setting, if (on) "on" else "off") { s ->
-            _uiState.update { st -> st.copy(values = st.values + (setting to (s.value == "on"))) }
+        updateSetting(setting, encodeValue(setting, on)) { s ->
+            _uiState.update { st -> st.copy(values = st.values + (setting to parseValue(setting, s.value))) }
         }
     }
 
@@ -101,7 +101,8 @@ class SpeedViewModel : ViewModel() {
     companion object {
         // ===== 协议优化 =====
         const val HTTP2 = "http2"
-        const val HTTP2_ORIGIN = "http2_origin"
+        /** HTTP/2 到源服务器：origin_max_http_version（值 "2"=HTTP/2 开 / "1"=HTTP/1.1 关） */
+        const val HTTP2_ORIGIN = "origin_max_http_version"
         const val HTTP3 = "http3"
         const val ZERO_RTT = "0rtt"
         // ===== 内容优化 =====
@@ -115,5 +116,17 @@ class SpeedViewModel : ViewModel() {
             HTTP2, HTTP2_ORIGIN, HTTP3, ZERO_RTT,
             SPEED_BRAIN, FONTS, EARLY_HINTS, ROCKET_LOADER
         )
+
+        /** 读取值 → 开关态（HTTP/2 到源：origin_max_http_version 值 "2"=开、"1"=关） */
+        private fun parseValue(setting: String, value: String): Boolean = when (setting) {
+            HTTP2_ORIGIN -> value == "2"
+            else -> value == "on"
+        }
+
+        /** 开关态 → 写入值 */
+        private fun encodeValue(setting: String, on: Boolean): String = when (setting) {
+            HTTP2_ORIGIN -> if (on) "2" else "1"
+            else -> if (on) "on" else "off"
+        }
     }
 }

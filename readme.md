@@ -16,7 +16,7 @@
 - **DNS 记录管理**：按全局选中域名查看（全量缓存 + 类型筛选 + 本地搜索 + 下拉刷新）/ 新建 / 编辑 / 删除，支持 A、AAAA、CNAME、MX、TXT、NS、SRV、CAA 等类型
 - **统计数据**：账户级 / 域名级一键切换，请求数 / 威胁数 / 带宽 / 缓存命中率 / 独立访客；**Vico 图表化展示**：请求数与带宽时间趋势折线图（24小时/7天/30天）、国家地区 / HTTP 状态码 / 缓存状态分布饼图、账户级域名流量拆分柱状图
 - **缓存清除**：按全部 / URL / 主机名 / 标签 / 前缀 5 种方式清除指定域名的 Cloudflare 缓存
-- **速度优化**：协议优化（HTTP/2 / HTTP/2 到源服务器 / HTTP/3 / 0-RTT 连接恢复）与内容优化（Speed Brain / Cloudflare Fonts / Early Hints / Rocket Loader）分段切换开关，沿用域名页高级设置样式
+- **速度优化**：协议优化（HTTP/2 / HTTP/2 到源服务器 / HTTP/3 / 0-RTT 连接恢复，HTTP/2 Free 计划始终开启不可关闭）与内容优化（Speed Brain / Cloudflare Fonts / Early Hints / Rocket Loader）分段切换开关，沿用域名页高级设置样式
 - **网络优化**：IPv6 兼容性（与域名页高级设置共享开关）/ gRPC / WebSockets / Pseudo IPv4 / IP 地理位置 / 网络错误记录 / 洋葱路由
 - **我的**：用户信息展示、功能简介、版本号、开源地址
 - **安全**：凭据使用 EncryptedSharedPreferences（Android Keystore）加密存储，仅保存在本机

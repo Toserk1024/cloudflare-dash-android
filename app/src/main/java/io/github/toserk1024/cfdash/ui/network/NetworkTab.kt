@@ -80,7 +80,6 @@ fun NetworkTab(
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                 val items = listOf(
-                    Triple(NetworkViewModel.GRPC, "gRPC", "支持 gRPC 协议，通过 HTTP/2 传输"),
                     Triple(NetworkViewModel.WEBSOCKETS, "WebSockets", "支持 WebSocket 双向实时通信"),
                     Triple(NetworkViewModel.PSEUDO_IPV4, "Pseudo IPv4", "为仅支持 IPv4 的源服务器添加伪 IPv4 头部"),
                     Triple(NetworkViewModel.IP_GEOLOCATION, "IP 地理位置", "添加国家/地区代码请求头（Cf-IPCountry）"),

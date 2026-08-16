@@ -13,6 +13,9 @@ import io.github.toserk1024.cfdash.data.model.AnalyticsSeries
 import io.github.toserk1024.cfdash.data.model.AnalyticsSum
 import io.github.toserk1024.cfdash.data.model.DnsRecord
 import io.github.toserk1024.cfdash.data.model.DnsRecordRequest
+import io.github.toserk1024.cfdash.data.model.NelSetting
+import io.github.toserk1024.cfdash.data.model.NelSettingRequest
+import io.github.toserk1024.cfdash.data.model.NelValue
 import io.github.toserk1024.cfdash.data.model.TokenVerifyResult
 import io.github.toserk1024.cfdash.data.model.User
 import io.github.toserk1024.cfdash.data.model.Zone
@@ -93,6 +96,17 @@ class CloudflareRepository(private val client: CloudflareClient) {
             CloudflareApi.ZONE_SETTING.format(zoneId, setting),
             ZoneSettingRequest(value)
         ).result ?: throw CloudflareException("更新设置 $setting 失败")
+
+    /** 获取 NEL（网络错误记录）设置（value 为对象 {"enabled": bool}，非 on/off 字符串） */
+    suspend fun getNel(zoneId: String): Boolean =
+        client.get<NelSetting>(CloudflareApi.ZONE_SETTING.format(zoneId, "nel")).result?.value?.enabled ?: false
+
+    /** 更新 NEL（网络错误记录）设置（PATCH {"value": {"enabled": ...}}） */
+    suspend fun updateNel(zoneId: String, enabled: Boolean): Boolean =
+        client.patch<NelSetting, NelSettingRequest>(
+            CloudflareApi.ZONE_SETTING.format(zoneId, "nel"),
+            NelSettingRequest(NelValue(enabled))
+        ).result?.value?.enabled ?: false
 
     /** 获取域名级统计（GraphQL Analytics，需 Analytics Read 权限） */
     suspend fun getZoneAnalytics(zoneId: String, range: AnalyticsRange): AnalyticsSum {

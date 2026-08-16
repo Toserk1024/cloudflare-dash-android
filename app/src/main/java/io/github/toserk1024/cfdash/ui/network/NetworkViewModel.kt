@@ -57,10 +57,15 @@ class NetworkViewModel : ViewModel() {
             coroutineScope {
                 ALL_SETTINGS.forEach { setting ->
                     async {
-                        runCatching { AppContainer.repository.getZoneSetting(zoneId, setting) }
-                            .onSuccess { s ->
-                                _uiState.update { st -> st.copy(values = st.values + (setting to parseValue(setting, s.value))) }
+                        runCatching {
+                            if (setting == NETWORK_ERROR_LOGGING) {
+                                // NEL 值对象 {"enabled": bool}，走专用方法
+                                AppContainer.repository.getNel(zoneId)
+                            } else {
+                                parseValue(setting, AppContainer.repository.getZoneSetting(zoneId, setting).value)
                             }
+                        }
+                            .onSuccess { v -> _uiState.update { st -> st.copy(values = st.values + (setting to v)) } }
                             .onFailure { e -> _uiState.update { st -> st.copy(settingsError = e.message) } }
                     }
                 }
@@ -77,10 +82,31 @@ class NetworkViewModel : ViewModel() {
         loadSettings(zone.id)
     }
 
-    /** 切换单个设置（开关语义） */
+    /** 切换单个设置（开关语义，NEL 走对象值专用方法） */
     fun setSetting(setting: String, on: Boolean) {
-        updateSetting(setting, encodeValue(setting, on)) { s ->
-            _uiState.update { st -> st.copy(values = st.values + (setting to parseValue(setting, s.value))) }
+        if (setting == NETWORK_ERROR_LOGGING) {
+            updateNel(on)
+        } else {
+            updateSetting(setting, encodeValue(setting, on)) { s ->
+                _uiState.update { st -> st.copy(values = st.values + (setting to parseValue(setting, s.value))) }
+            }
+        }
+    }
+
+    /** 更新 NEL（网络错误记录）：值对象 {"enabled": bool} */
+    private fun updateNel(on: Boolean) {
+        val zone = _uiState.value.selectedZone ?: return
+        if (NETWORK_ERROR_LOGGING in _uiState.value.settingsBusy) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(settingsBusy = it.settingsBusy + NETWORK_ERROR_LOGGING, settingsError = null) }
+            try {
+                val enabled = AppContainer.repository.updateNel(zone.id, on)
+                _uiState.update { st -> st.copy(values = st.values + (NETWORK_ERROR_LOGGING to enabled)) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(settingsError = e.message) }
+            } finally {
+                _uiState.update { it.copy(settingsBusy = it.settingsBusy - NETWORK_ERROR_LOGGING) }
+            }
         }
     }
 
@@ -101,16 +127,15 @@ class NetworkViewModel : ViewModel() {
     }
 
     companion object {
-        const val GRPC = "grpc"
         const val WEBSOCKETS = "websockets"
         const val PSEUDO_IPV4 = "pseudo_ipv4"
         const val IP_GEOLOCATION = "ip_geolocation"
-        const val NETWORK_ERROR_LOGGING = "web_network_error_logging"
+        const val NETWORK_ERROR_LOGGING = "nel"
         const val ONION_ROUTING = "opportunistic_onion"
 
         /** 本 VM 管理的全部设置名（IPv6 由 ZoneViewModel 管理，不在此列） */
         val ALL_SETTINGS = listOf(
-            GRPC, WEBSOCKETS, PSEUDO_IPV4, IP_GEOLOCATION, NETWORK_ERROR_LOGGING, ONION_ROUTING
+            WEBSOCKETS, PSEUDO_IPV4, IP_GEOLOCATION, NETWORK_ERROR_LOGGING, ONION_ROUTING
         )
 
         /** 读取值 → 开关态 */

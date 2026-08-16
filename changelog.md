@@ -22,6 +22,18 @@
 - **数据层**：新增 `NetworkViewModel`（并行加载 6 项，IPv6 由 ZoneViewModel 统一管理）、`settingsBusy` 独立防抖、`setZone` 由全局选中域名驱动
 - **新增文件**：`ui/network/NetworkViewModel.kt` + `ui/network/NetworkTab.kt`
 
+### 修正 zone setting 设置名 + HTTP/2 Free 计划锁定
+
+- **网络错误记录**：设置名 `web_network_error_logging` → **`nel`**（`NetworkViewModel.kt`）
+- **gRPC**：确认设置名为 `grpc`（on/off），网络 Tab 保持正确，无需改动
+- **HTTP/2 到源服务器改用官方设置恢复**：原 `http2_origin` 非 zone setting（已废弃），改用官方 **`origin_max_http_version`**（值 `"2"`=HTTP/2 开 / `"1"`=HTTP/1.1 关）映射开关语义，恢复速度 Tab 协议优化该项（`SpeedViewModel.kt` / `SpeedTab.kt`）
+- **HTTP/2 副标题换行 + Free 锁定**：HTTP/2 副标题改为「多路复用、低延迟传输\n(Free 计划始终开启，不可关闭)」；检测站点为 **Free 计划**时 HTTP/2 开关自动禁用（`SpeedTab.kt`，经 `planName` 传入，`HomeScreen.kt` 传 `zoneState.selectedZone?.plan?.name`）
+
+### 修复 NEL 对象值 + 确认 gRPC 官方端点
+
+- **NEL（网络错误记录）对象值处理**：nel 的 value 是**对象** `{"enabled": bool}`（非 on/off 字符串），新增专用模型 `NelSetting`/`NelValue`/`NelSettingRequest` 与 Repository `getNel`/`updateNel`（GET/PATCH `/zones/{id}/settings/nel`，body `{"value":{"enabled":...}}`），NetworkViewModel 对 nel 走专用方法（`ZoneSetting.kt` / `CloudflareRepository.kt` / `NetworkViewModel.kt`）
+- **gRPC 确认官方端点**：gRPC 用 `PATCH /zones/{id}/settings/grpc`（value `on`/`off`），网络 Tab 保持 `grpc` 设置名（`NetworkViewModel.kt`）
+
 ## 2026.08.15
 
 ### 初始化权限更新 + GPL 开源协议

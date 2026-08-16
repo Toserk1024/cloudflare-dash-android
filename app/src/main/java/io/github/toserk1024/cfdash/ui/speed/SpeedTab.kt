@@ -47,6 +47,7 @@ enum class SpeedSection(val label: String) {
 @Composable
 fun SpeedTab(
     state: SpeedViewModel.SpeedUiState,
+    planName: String?,
     onSetSetting: (String, Boolean) -> Unit,
     onRetry: () -> Unit
 ) {
@@ -98,7 +99,7 @@ fun SpeedTab(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 when (section) {
-                    SpeedSection.PROTOCOL -> ProtocolContent(state, onSetSetting)
+                    SpeedSection.PROTOCOL -> ProtocolContent(state, planName, onSetSetting)
                     SpeedSection.CONTENT -> ContentContent(state, onSetSetting)
                 }
 
@@ -124,9 +125,20 @@ fun SpeedTab(
 }
 
 @Composable
-private fun ProtocolContent(state: SpeedViewModel.SpeedUiState, onSetSetting: (String, Boolean) -> Unit) {
+private fun ProtocolContent(state: SpeedViewModel.SpeedUiState, planName: String?, onSetSetting: (String, Boolean) -> Unit) {
+    val isFree = planName?.equals("Free", ignoreCase = true) == true
+    // HTTP/2：Free 计划始终开启不可关闭 → 副标题标注括号换行 + Free 下开关禁用
+    AdvancedSwitchRow(
+        title = "HTTP/2",
+        subtitle = "多路复用、低延迟传输\n(Free 计划始终开启，不可关闭)",
+        checked = state.value(SpeedViewModel.HTTP2) == true,
+        enabled = !isFree && SpeedViewModel.HTTP2 !in state.settingsBusy && state.value(SpeedViewModel.HTTP2) != null,
+        busy = SpeedViewModel.HTTP2 in state.settingsBusy,
+        onCheckedChange = { onSetSetting(SpeedViewModel.HTTP2, it) }
+    )
+    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
     val items = listOf(
-        Triple(SpeedViewModel.HTTP2, "HTTP/2", "多路复用、低延迟传输（Free 计划默认开启，可能不可自定义）"),
         Triple(SpeedViewModel.HTTP2_ORIGIN, "HTTP/2 到源服务器", "源服务器连接也使用 HTTP/2，提升回源性能"),
         Triple(SpeedViewModel.HTTP3, "HTTP/3（使用 QUIC）", "基于 UDP 的更快、更稳的传输协议"),
         Triple(SpeedViewModel.ZERO_RTT, "0-RTT 连接恢复", "对已连接访客减少往返延迟（TLS 更快恢复）")

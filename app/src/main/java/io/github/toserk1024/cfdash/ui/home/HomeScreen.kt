@@ -253,6 +253,7 @@ fun HomeScreen(
                         val speedState by speedViewModel.uiState.collectAsState()
                         SpeedTab(
                             state = speedState,
+                            planName = zoneState.selectedZone?.plan?.name,
                             onSetSetting = speedViewModel::setSetting,
                             onRetry = speedViewModel::refreshSettings
                         )
