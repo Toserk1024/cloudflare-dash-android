@@ -18,7 +18,6 @@ enum class SecurityTimeRange(val label: String, val millis: Long) {
     H12("12小时", 12 * 3600_000L),
     H24("1天", 24 * 3600_000L);
 
-    /** 趋势时间粒度（adaptive 维度）：30m/5分钟、3h/15分钟、12h·24h/小时 */
     val trendDimension: String
         get() = when (this) {
             HALF_HOUR -> "datetimeFiveMinutes"
@@ -30,7 +29,7 @@ enum class SecurityTimeRange(val label: String, val millis: Long) {
 /** 分组数据源数据集 */
 enum class SecurityDataset { HTTP_ADAPTIVE, FIREWALL_ADAPTIVE }
 
-/** 安全分组视图维度（来源浏览器/操作系统因无现成维度字段已按用户确认删除） */
+/** 安全分组视图维度 */
 enum class SecurityGroupBy(val label: String, val dimension: String?, val dataset: SecurityDataset) {
     ALL("全部", null, SecurityDataset.HTTP_ADAPTIVE),
     COUNTRY("国家", "clientCountryName", SecurityDataset.HTTP_ADAPTIVE),
@@ -61,24 +60,49 @@ enum class SecurityFilterOp(val label: String, val suffix: String) {
     NOT_CONTAINS("不包含", "_nlike")
 }
 
-/** 单条筛选器 */
+/** 单条筛选器（values 多值：仅"包含"支持多项→GraphQL _in；单值条件 values 大小为 1） */
 data class SecurityFilter(
     val attr: SecurityFilterAttr,
     val op: SecurityFilterOp,
-    val value: String
-)
+    val values: List<String>
+) {
+    val value: String get() = values.firstOrNull() ?: ""
+}
 
 /** 概况段（分组=全部：回源/命中/缓解；分组=X：TopN 分组占比） */
 data class SecuritySegment(val name: String, val count: Long)
 
-/** 24h 趋势点（按时间粒度） */
+/** 趋势点（按时间粒度） */
 data class SecurityTrendPoint(val label: String, val count: Long)
 
-/** 趋势序列（分组=全部：单条"请求"；分组=X：Top5 分组各一条） */
+/** 趋势序列（分组=全部单条"请求"；分组=X Top5 分组各一条） */
 data class SecurityTrendSeries(val name: String, val points: List<SecurityTrendPoint> = emptyList())
 
 /** 分组分布项 */
 data class SecurityBreakdownItem(val name: String, val count: Long)
+
+/** 日志可用列（用户可自选显示，持久化） */
+enum class SecurityLogColumn(val label: String, val field: String) {
+    ACTION("采取的措施", "action"),
+    ASN("ASN", "clientASN"),
+    COUNTRY("国家/地区", "clientCountryName"),
+    IP("IP 地址", "clientIP"),
+    HOST("主机", "clientRequestHost"),
+    METHOD("方法", "clientRequestMethod"),
+    HTTP_VERSION("HTTP 版本", "clientRequestHTTPProtocol"),
+    PATH("路径", "clientRequestPath"),
+    QUERY("查询字符串", "clientRequestQuery"),
+    RAY_ID("Ray ID", "rayId"),
+    RULE_ID("规则 ID", "ruleId"),
+    SERVICE("服务", "source"),
+    USER_AGENT("用户代理", "clientRequestHTTPUserAgent");
+
+    companion object {
+        /** 默认显示列 */
+        val DEFAULT = setOf(ACTION, COUNTRY, IP, HOST, HTTP_VERSION)
+        fun byName(name: String) = entries.firstOrNull { it.name == name }
+    }
+}
 
 /** 安全日志条目（firewallEventsAdaptive，字段名为 GraphQL camelCase） */
 data class SecurityLogEntry(
@@ -87,19 +111,54 @@ data class SecurityLogEntry(
     val source: String?,
     val clientIP: String?,
     val clientCountry: String?,
-    val deviceType: String?,
+    val clientASN: String?,
+    val method: String?,
     val httpVersion: String?,
-    val cacheStatus: String?,
+    val path: String?,
+    val query: String?,
+    val rayId: String?,
+    val ruleId: String?,
+    val userAgent: String?,
     val host: String?
 )
 
+/** 国家代码 ↔ 中文名映射（筛选器国家属性用：API 存代码、UI 显示中文，边输入边搜索） */
+object CountryMapping {
+    private val codeToName = mapOf(
+        "CN" to "中国", "HK" to "中国香港", "MO" to "中国澳门", "TW" to "中国台湾",
+        "US" to "美国", "JP" to "日本", "KR" to "韩国", "SG" to "新加坡",
+        "GB" to "英国", "DE" to "德国", "FR" to "法国", "RU" to "俄罗斯",
+        "CA" to "加拿大", "AU" to "澳大利亚", "IN" to "印度", "BR" to "巴西",
+        "NL" to "荷兰", "SE" to "瑞典", "CH" to "瑞士", "IT" to "意大利",
+        "ES" to "西班牙", "UA" to "乌克兰", "PL" to "波兰", "TR" to "土耳其",
+        "ID" to "印度尼西亚", "MY" to "马来西亚", "TH" to "泰国", "VN" to "越南",
+        "PH" to "菲律宾", "NZ" to "新西兰", "IE" to "爱尔兰", "IL" to "以色列",
+        "SA" to "沙特阿拉伯", "AE" to "阿联酋", "ZA" to "南非", "EG" to "埃及",
+        "MX" to "墨西哥", "AR" to "阿根廷", "CL" to "智利", "CO" to "哥伦比亚",
+        "FI" to "芬兰", "NO" to "挪威", "DK" to "丹麦", "BE" to "比利时",
+        "AT" to "奥地利", "PT" to "葡萄牙", "GR" to "希腊", "CZ" to "捷克"
+    )
+    private val nameToCode = codeToName.entries.associate { (c, n) -> n to c }
+
+    fun codeToName(code: String): String = codeToName[code] ?: code
+    fun nameToCode(name: String): String? = nameToCode[name]
+
+    /** 按关键字搜索（支持中文名或代码），返回 (code, name) 列表 */
+    fun search(query: String, limit: Int = 20): List<Pair<String, String>> {
+        if (query.isBlank()) return codeToName.entries.take(limit).map { it.key to it.value }
+        val q = query.trim()
+        return codeToName.entries
+            .filter { it.value.contains(q, ignoreCase = true) || it.key.contains(q, ignoreCase = true) }
+            .take(limit)
+            .map { it.key to it.value }
+    }
+}
+
 /**
  * 安全分析 GraphQL 查询构建与响应解析。
- * schema 结论：
- * - 概况（分组=全部，回源/命中/缓解）用 httpRequests1hGroups：requests(总)、cachedRequests(命中)、threats(缓解)；origin=总-命中-缓解
- * - 概况/趋势（分组=X）与趋势用 httpRequestsAdaptiveGroups（或 firewallEventsAdaptiveGroups 当维度为 action/source）
- * - 日志用 firewallEventsAdaptive（字段 camelCase：clientCountryName/clientRequestHTTPProtocol/clientRequestHTTPHost 等）
- * - filter 操作符：等于(无后缀)/不等于(_neq)/包含(_like)/不包含(_nlike)；时间窗 datetime_geq/leq
+ * - 概况（分组=全部）用 httpRequests1hGroups：requests/cachedRequests(命中)/threats(缓解)；origin=总-命中-缓解
+ * - 概况/趋势（分组=X）用 httpRequestsAdaptiveGroups（或 firewallEventsAdaptiveGroups 当维度为 action/source）
+ * - 日志用 firewallEventsAdaptive；filter 操作符：等于(无后缀)/不等于(_neq)/包含(_like)/不包含(_nlike)；多值"包含"→_in
  */
 object SecurityAnalyticsParser {
 
@@ -112,7 +171,6 @@ object SecurityAnalyticsParser {
 
     // ===== 查询构建 =====
 
-    /** 概况查询：分组=全部 → 1hGroups(requests/cachedRequests/threats)；分组=X → adaptive 按分组维度 TopN */
     fun overviewQuery(zoneId: String, range: SecurityTimeRange, groupBy: SecurityGroupBy, filters: List<SecurityFilter>): String {
         val (s, e) = window(range)
         if (groupBy == SecurityGroupBy.ALL) {
@@ -133,7 +191,6 @@ object SecurityAnalyticsParser {
         }
     }
 
-    /** 趋势查询：分组=全部 → 单序列(时间粒度)；分组=X → 按[时间粒度,分组维度]取 TopN 分组时序 */
     fun trendQuery(zoneId: String, range: SecurityTimeRange, groupBy: SecurityGroupBy, filters: List<SecurityFilter>): String {
         val (s, e) = window(range)
         val timeDim = range.trendDimension
@@ -157,7 +214,7 @@ object SecurityAnalyticsParser {
         }
     }
 
-    /** 日志查询：firewallEventsAdaptive 最近 N 条（时间窗 + 全局筛选器） */
+    /** 日志查询：拉取全部可用列字段，客户端按选中列显示 */
     fun logsQuery(zoneId: String, range: SecurityTimeRange, filters: List<SecurityFilter>): String {
         val (s, e) = window(range)
         val filter = buildFilter(filters, SecurityDataset.FIREWALL_ADAPTIVE)
@@ -166,16 +223,21 @@ object SecurityAnalyticsParser {
             append(FW_ADAPTIVE).append("(limit: $LOG_LIMIT, filter: {datetime_geq: \"$s\", datetime_leq: \"$e\"")
             if (filter.isNotEmpty()) append(", $filter")
             append("}) {\n")
-            append(" datetime action source clientIP clientCountryName clientDeviceType clientRequestHTTPProtocol cacheStatus clientRequestHost rayId\n }\n }\n }\n }")
+            append(" datetime action source clientIP clientCountryName clientASN clientRequestHTTPProtocol clientRequestHost clientRequestMethod clientRequestPath clientRequestQuery clientRequestHTTPUserAgent rayId ruleId\n }\n }\n }\n }")
         }
     }
 
-    /** 构建筛选器 filter 片段（多筛选器 AND 叠加） */
+    /** 构建筛选器 filter 片段：多值"包含"→_in（列表任一命中）；单值→字段+操作符后缀 */
     private fun buildFilter(filters: List<SecurityFilter>, dataset: SecurityDataset): String {
-        val parts = filters.filter { it.value.isNotBlank() }.mapNotNull { f ->
+        val parts = filters.mapNotNull { f ->
             if (!datasetCompatible(f.attr.dataset, dataset)) return@mapNotNull null
-            val key = f.attr.field + f.op.suffix
-            "$key: \"${escapeValue(f.value)}\""
+            val vals = f.values.filter { it.isNotBlank() }
+            if (vals.isEmpty()) return@mapNotNull null
+            if (vals.size > 1) {
+                "${f.attr.field}_in: [${vals.joinToString(", ") { "\"${escapeValue(it)}\"" }}]"
+            } else {
+                "${f.attr.field}${f.op.suffix}: \"${escapeValue(vals[0])}\""
+            }
         }
         return parts.joinToString(", ")
     }
@@ -188,7 +250,6 @@ object SecurityAnalyticsParser {
 
     // ===== 解析 =====
 
-    /** 解析概况段列表 */
     fun parseOverview(root: JsonElement, groupBy: SecurityGroupBy): List<SecuritySegment> {
         val zones = root.jsonObject["data"]?.jsonObject?.get("viewer")?.jsonObject?.get("zones") as? JsonArray ?: return emptyList()
         if (groupBy == SecurityGroupBy.ALL) {
@@ -209,7 +270,6 @@ object SecurityAnalyticsParser {
         return parseTopBreakdown(zones.firstOrNull()?.jsonObject?.get(dataset) as? JsonArray, TOP_N)
     }
 
-    /** 解析趋势序列列表（分组=全部单序列；分组=X Top5 分组时序） */
     fun parseTrend(root: JsonElement, range: SecurityTimeRange, groupBy: SecurityGroupBy): List<SecurityTrendSeries> {
         val zones = root.jsonObject["data"]?.jsonObject?.get("viewer")?.jsonObject?.get("zones") as? JsonArray ?: return emptyList()
         if (groupBy == SecurityGroupBy.ALL) {
@@ -256,7 +316,6 @@ object SecurityAnalyticsParser {
         return items.sortedByDescending { it.count }.take(topN)
     }
 
-    /** 解析安全日志列表 */
     fun parseLogs(root: JsonElement): List<SecurityLogEntry> {
         val zones = root.jsonObject["data"]?.jsonObject?.get("viewer")?.jsonObject?.get("zones") as? JsonArray ?: return emptyList()
         val events = zones.firstOrNull()?.jsonObject?.get(FW_ADAPTIVE) as? JsonArray ?: return emptyList()
@@ -268,9 +327,14 @@ object SecurityAnalyticsParser {
                 source = o["source"]?.jsonPrimitive?.content,
                 clientIP = o["clientIP"]?.jsonPrimitive?.content,
                 clientCountry = o["clientCountryName"]?.jsonPrimitive?.content,
-                deviceType = o["clientDeviceType"]?.jsonPrimitive?.content,
+                clientASN = o["clientASN"]?.jsonPrimitive?.content,
+                method = o["clientRequestMethod"]?.jsonPrimitive?.content,
                 httpVersion = o["clientRequestHTTPProtocol"]?.jsonPrimitive?.content,
-                cacheStatus = o["cacheStatus"]?.jsonPrimitive?.content,
+                path = o["clientRequestPath"]?.jsonPrimitive?.content,
+                query = o["clientRequestQuery"]?.jsonPrimitive?.content,
+                rayId = o["rayId"]?.jsonPrimitive?.content,
+                ruleId = o["ruleId"]?.jsonPrimitive?.content,
+                userAgent = o["clientRequestHTTPUserAgent"]?.jsonPrimitive?.content,
                 host = o["clientRequestHost"]?.jsonPrimitive?.content
             )
         }
@@ -288,7 +352,6 @@ object SecurityAnalyticsParser {
             .apply { timeZone = TimeZone.getTimeZone("UTC") }
             .format(Date(ts))
 
-    /** 趋势时间标签：5/15 分钟→HH:mm；小时→HH时 */
     private fun formatTrendLabel(iso: String, range: SecurityTimeRange): String = try {
         val parsed = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
             .apply { timeZone = TimeZone.getTimeZone("UTC") }
@@ -299,7 +362,6 @@ object SecurityAnalyticsParser {
         iso
     }
 
-    /** 日志时间：MM-dd HH:mm:ss */
     private fun formatLogTime(iso: String): String = try {
         val parsed = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
             .apply { timeZone = TimeZone.getTimeZone("UTC") }

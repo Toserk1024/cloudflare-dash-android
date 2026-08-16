@@ -2,6 +2,16 @@
 
 ## 2026.08.16
 
+### 安全 Tab 双子页重构：总览/日志分离 + 筛选器隔离 + 日志自选列 + 筛选器人性化
+
+- **界面分离**：安全 Tab 内子项切换「总览 | 日志」（SegmentedButton）；总览（概况堆叠条 + 趋势折线）与日志（表格）独立页面；**总览 / 日志筛选器各自隔离**（`SecurityViewModel` 双筛选器集合）
+- **日志自选列（Dropdown 多选 + 重启持久化）**：13 列可勾选显示 —— 采取的措施 / ASN / 国家·地区 / IP 地址 / 主机 / 方法 / HTTP 版本 / 路径 / 查询字符串 / Ray ID / 规则 ID / 服务 / 用户代理；选中列持久化到 `TokenStore`（EncryptedSharedPreferences，重启恢复）；日志表格横向滚动按选中列渲染
+- **筛选器人性化**：国家属性 → 内置国家映射（代码↔中文名），**边输入边搜索候选多选**（`CountryMapping`）；「包含」条件支持**多值列表**（GraphQL `_in`，任一命中）；操作/缓存状态/HTTP 版本等候选下拉
+- **分组视图保持 Dropdown**（用户确认不改）
+- **修复日志 unknown field**：移除 `clientDeviceType`（firewall_events 数据集无此字段）；日志查询拉取全部可选列字段（`clientASN`/`clientRequestMethod`/`clientRequestPath`/`clientRequestQuery`/`clientRequestHTTPUserAgent`/`rayId`/`ruleId` 等）
+- **数据层**：`SecurityFilter` 改多值 `values: List<String>`；新增 `SecurityLogColumn` / `CountryMapping`；`buildFilter` 多值"包含"→`_in`、单值→操作符后缀
+- **TokenStore**：新增 `saveSecurityLogColumns` / `getSecurityLogColumns`
+
 ### 安全 Tab 升级：全局筛选器 + 时间范围 + 分组联动 + 修复缓解与日志
 
 - **全局筛选器（仿 Cloudflare Dash）**：新建筛选器 = **属性**（Dropdown：客户端 IP / 国家 / 来源 / 操作 / 客户端设备类型 / HTTP 版本 / 缓存状态）＋**条件**（Dropdown：等于 / 不等于 / 包含 / 不包含）＋**值输入**＋添加按钮；已应用筛选器以 **Chip 展示（带删除叉）+ 清除全部**；多筛选器 **AND 叠加**，经 GraphQL filter 作用于**概况 / 趋势 / 日志**全局（`SecurityTab.kt` / `SecurityViewModel.kt`）

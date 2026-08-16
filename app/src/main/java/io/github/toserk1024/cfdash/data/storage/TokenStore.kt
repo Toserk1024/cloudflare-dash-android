@@ -124,6 +124,15 @@ class TokenStore(context: Context) {
     /** 上次选中的域名 id（应用重启后恢复选中域名） */
     fun getSelectedZoneId(): String? = prefs.getString(KEY_SELECTED_ZONE_ID, null)
 
+    /** 保存安全日志自选列（Set<SecurityLogColumn.name>，重启持久化） */
+    fun saveSecurityLogColumns(columns: Set<String>) {
+        prefs.edit().putStringSet(KEY_SECURITY_LOG_COLUMNS, columns).apply()
+    }
+
+    /** 上次保存的安全日志自选列（无则空，由 ViewModel 用默认列兜底） */
+    fun getSecurityLogColumns(): Set<String> =
+        prefs.getStringSet(KEY_SECURITY_LOG_COLUMNS, null) ?: emptySet()
+
     private fun readCredential(id: String): AuthCredential? =
         when (prefs.getString("${KEY_USER_PREFIX}$id${KEY_SUFFIX_MODE}", null)) {
             MODE_TOKEN -> prefs.getString("${KEY_USER_PREFIX}$id${KEY_SUFFIX_TOKEN}", null)
@@ -154,6 +163,7 @@ class TokenStore(context: Context) {
         private const val KEY_ACTIVE_USER = "cf_active_user"
         private const val KEY_DISCLAIMER_ACCEPTED = "cf_disclaimer_accepted"
         private const val KEY_SELECTED_ZONE_ID = "cf_selected_zone_id"
+        private const val KEY_SECURITY_LOG_COLUMNS = "cf_security_log_columns"
         private const val KEY_USER_PREFIX = "cf_user_"
         private const val KEY_SUFFIX_MODE = "_mode"
         private const val KEY_SUFFIX_TOKEN = "_token"

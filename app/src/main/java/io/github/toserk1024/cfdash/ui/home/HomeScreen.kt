@@ -284,13 +284,19 @@ fun HomeScreen(
                         val securityState by securityViewModel.uiState.collectAsState()
                         SecurityTab(
                             state = securityState,
+                            onSection = securityViewModel::setSection,
                             onGroupBy = securityViewModel::setGroupBy,
                             onTimeRange = securityViewModel::setTimeRange,
-                            onAddFilter = securityViewModel::addFilter,
-                            onRemoveFilter = securityViewModel::removeFilter,
-                            onClearFilters = securityViewModel::clearFilters,
+                            onLogTimeRange = securityViewModel::setLogTimeRange,
+                            onAddOverviewFilter = securityViewModel::addOverviewFilter,
+                            onRemoveOverviewFilter = securityViewModel::removeOverviewFilter,
+                            onClearOverviewFilters = securityViewModel::clearOverviewFilters,
+                            onAddLogFilter = securityViewModel::addLogFilter,
+                            onRemoveLogFilter = securityViewModel::removeLogFilter,
+                            onClearLogFilters = securityViewModel::clearLogFilters,
+                            onToggleLogColumn = securityViewModel::toggleLogColumn,
                             onRefresh = securityViewModel::refresh,
-                            onRetry = securityViewModel::load
+                            onRetry = securityViewModel::refresh
                         )
                     }
                 }

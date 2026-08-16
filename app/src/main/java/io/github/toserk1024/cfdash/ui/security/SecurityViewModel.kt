@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.data.model.SecurityFilter
 import io.github.toserk1024.cfdash.data.model.SecurityGroupBy
+import io.github.toserk1024.cfdash.data.model.SecurityLogColumn
 import io.github.toserk1024.cfdash.data.model.SecurityLogEntry
 import io.github.toserk1024.cfdash.data.model.SecuritySegment
 import io.github.toserk1024.cfdash.data.model.SecurityTimeRange
@@ -19,126 +20,191 @@ import kotlinx.coroutines.launch
 
 /**
  * 安全分析 ViewModel。
- * 时间范围（半小时/3h/12h/1天）作用于概况/趋势/日志/分组；
- * 分组视图联动概况与趋势；全局筛选器（AND 叠加）经 GraphQL filter 过滤概况/趋势/日志。
+ * 总览 / 日志两个子页：筛选器各自隔离；总览（概况+趋势）用总览筛选器，日志用日志筛选器；
+ * 日志列自选并持久化；时间范围各自独立；分组视图联动概况与趋势。
  */
 class SecurityViewModel : ViewModel() {
 
+    enum class SecuritySection { OVERVIEW, LOG }
+
     data class SecurityUiState(
         val selectedZone: Zone? = null,
+        val section: SecuritySection = SecuritySection.OVERVIEW,
         val groupBy: SecurityGroupBy = SecurityGroupBy.ALL,
+        /** 总览时间范围 */
         val timeRange: SecurityTimeRange = SecurityTimeRange.H24,
-        /** 概况段（分组=全部→回源/命中/缓解；分组=X→TopN 分组占比） */
+        /** 日志时间范围 */
+        val logTimeRange: SecurityTimeRange = SecurityTimeRange.H24,
         val overview: List<SecuritySegment> = emptyList(),
-        /** 趋势序列（分组=全部单序列；分组=X Top5） */
         val trend: List<SecurityTrendSeries> = emptyList(),
-        /** 日志（服务端已按筛选器过滤） */
         val allLogs: List<SecurityLogEntry> = emptyList(),
-        /** 已应用筛选器（AND 叠加） */
-        val filters: List<SecurityFilter> = emptyList(),
-        val loading: Boolean = true,
+        val overviewFilters: List<SecurityFilter> = emptyList(),
+        val logFilters: List<SecurityFilter> = emptyList(),
+        val selectedLogColumns: Set<SecurityLogColumn> = SecurityLogColumn.DEFAULT,
+        val overviewLoading: Boolean = true,
+        val logLoading: Boolean = true,
         val refreshing: Boolean = false,
-        val error: String? = null,
+        val overviewError: String? = null,
+        val logError: String? = null,
         val partError: String? = null
     )
 
     private val _uiState = MutableStateFlow(SecurityUiState())
     val uiState: StateFlow<SecurityUiState> = _uiState
 
-    /** 由 HomeScreen 响应全局选中域名变化时调用：重置并重载全部安全数据 */
+    init {
+        // 读取日志自选列持久化（无则用默认列）
+        val saved = AppContainer.tokenStore.getSecurityLogColumns()
+        val cols = if (saved.isEmpty()) SecurityLogColumn.DEFAULT
+        else saved.mapNotNull { SecurityLogColumn.byName(it) }.toSet().ifEmpty { SecurityLogColumn.DEFAULT }
+        _uiState.update { it.copy(selectedLogColumns = cols) }
+    }
+
     fun setZone(zone: Zone?) {
         _uiState.update {
             it.copy(
                 selectedZone = zone,
                 groupBy = SecurityGroupBy.ALL,
                 timeRange = SecurityTimeRange.H24,
+                logTimeRange = SecurityTimeRange.H24,
                 overview = emptyList(),
                 trend = emptyList(),
                 allLogs = emptyList(),
-                filters = emptyList(),
-                loading = false,
+                overviewFilters = emptyList(),
+                logFilters = emptyList(),
                 refreshing = false,
-                error = null,
+                overviewError = null,
+                logError = null,
                 partError = null
             )
         }
-        if (zone != null) load(refreshing = false)
+        if (zone != null) {
+            loadOverview()
+            loadLog()
+        }
+    }
+
+    fun setSection(section: SecuritySection) {
+        if (_uiState.value.section == section) return
+        _uiState.update { it.copy(section = section) }
     }
 
     fun setGroupBy(groupBy: SecurityGroupBy) {
         if (_uiState.value.groupBy == groupBy) return
         _uiState.update { it.copy(groupBy = groupBy) }
-        load(refreshing = false)
+        loadOverview()
     }
 
     fun setTimeRange(range: SecurityTimeRange) {
         if (_uiState.value.timeRange == range) return
         _uiState.update { it.copy(timeRange = range) }
-        load(refreshing = false)
+        loadOverview()
     }
 
-    /** 添加筛选器（值非空才生效）并重载 */
-    fun addFilter(filter: SecurityFilter) {
-        if (filter.value.isBlank()) return
-        _uiState.update { it.copy(filters = it.filters + filter) }
-        load(refreshing = false)
+    fun setLogTimeRange(range: SecurityTimeRange) {
+        if (_uiState.value.logTimeRange == range) return
+        _uiState.update { it.copy(logTimeRange = range) }
+        loadLog()
     }
 
-    /** 移除指定筛选器并重载 */
-    fun removeFilter(index: Int) {
-        val list = _uiState.value.filters
+    // ===== 总览筛选器（隔离） =====
+
+    fun addOverviewFilter(filter: SecurityFilter) {
+        if (filter.values.all { it.isBlank() }) return
+        _uiState.update { it.copy(overviewFilters = it.overviewFilters + filter) }
+        loadOverview()
+    }
+
+    fun removeOverviewFilter(index: Int) {
+        val list = _uiState.value.overviewFilters
         if (index !in list.indices) return
-        _uiState.update { it.copy(filters = list.filterIndexed { i, _ -> i != index }) }
-        load(refreshing = false)
+        _uiState.update { it.copy(overviewFilters = list.filterIndexed { i, _ -> i != index }) }
+        loadOverview()
     }
 
-    fun clearFilters() {
-        if (_uiState.value.filters.isEmpty()) return
-        _uiState.update { it.copy(filters = emptyList()) }
-        load(refreshing = false)
+    fun clearOverviewFilters() {
+        if (_uiState.value.overviewFilters.isEmpty()) return
+        _uiState.update { it.copy(overviewFilters = emptyList()) }
+        loadOverview()
     }
 
-    fun refresh() = load(refreshing = true)
+    // ===== 日志筛选器（隔离） =====
 
-    fun load() = load(refreshing = false)
+    fun addLogFilter(filter: SecurityFilter) {
+        if (filter.values.all { it.isBlank() }) return
+        _uiState.update { it.copy(logFilters = it.logFilters + filter) }
+        loadLog()
+    }
 
-    private fun load(refreshing: Boolean) {
+    fun removeLogFilter(index: Int) {
+        val list = _uiState.value.logFilters
+        if (index !in list.indices) return
+        _uiState.update { it.copy(logFilters = list.filterIndexed { i, _ -> i != index }) }
+        loadLog()
+    }
+
+    fun clearLogFilters() {
+        if (_uiState.value.logFilters.isEmpty()) return
+        _uiState.update { it.copy(logFilters = emptyList()) }
+        loadLog()
+    }
+
+    // ===== 日志列选择（持久化） =====
+
+    fun toggleLogColumn(col: SecurityLogColumn) {
+        val cur = _uiState.value.selectedLogColumns
+        val next = if (col in cur) cur - col else cur + col
+        _uiState.update { it.copy(selectedLogColumns = next) }
+        AppContainer.tokenStore.saveSecurityLogColumns(next.map { it.name }.toSet())
+    }
+
+    // ===== 加载 =====
+
+    fun refresh() {
+        loadOverview()
+        loadLog()
+    }
+
+    private fun loadOverview() {
         val zone = _uiState.value.selectedZone ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(loading = !refreshing, refreshing = refreshing, error = null, partError = null) }
-            val failures = mutableListOf<String>()
+            _uiState.update { it.copy(overviewLoading = true, overviewError = null) }
             try {
                 val range = _uiState.value.timeRange
                 val gb = _uiState.value.groupBy
-                val filters = _uiState.value.filters
+                val filters = _uiState.value.overviewFilters
                 val result = coroutineScope {
-                    val overview = async { runCatching { AppContainer.repository.getSecurityOverview(zone.id, range, gb, filters) } }
-                    val trend = async { runCatching { AppContainer.repository.getSecurityTrend(zone.id, range, gb, filters) } }
-                    val logs = async { runCatching { AppContainer.repository.getSecurityLogs(zone.id, range, filters) } }
-                    Triple(overview, trend, logs)
+                    val ov = async { runCatching { AppContainer.repository.getSecurityOverview(zone.id, range, gb, filters) } }
+                    val tr = async { runCatching { AppContainer.repository.getSecurityTrend(zone.id, range, gb, filters) } }
+                    ov to tr
                 }
                 val ov: List<SecuritySegment>? = result.first.await().getOrElse { e ->
-                    failures.add("概况：${e.message ?: "加载失败"}"); null
+                    _uiState.update { it.copy(overviewError = e.message ?: "加载概况失败") }; null
                 }
                 val tr: List<SecurityTrendSeries>? = result.second.await().getOrElse { e ->
-                    failures.add("趋势：${e.message ?: "加载失败"}"); null
-                }
-                val lg: List<SecurityLogEntry>? = result.third.await().getOrElse { e ->
-                    failures.add("日志：${e.message ?: "加载失败"}"); null
+                    _uiState.update { it.copy(partError = "趋势：${e.message ?: "加载失败"}") }; null
                 }
                 _uiState.update {
-                    it.copy(
-                        overview = ov ?: emptyList(),
-                        trend = tr ?: emptyList(),
-                        allLogs = lg ?: emptyList(),
-                        loading = false,
-                        refreshing = false,
-                        error = null,
-                        partError = failures.takeIf { f -> f.isNotEmpty() }?.joinToString("；")
-                    )
+                    it.copy(overview = ov ?: emptyList(), trend = tr ?: emptyList(), overviewLoading = false)
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(loading = false, refreshing = false, error = e.message ?: "加载安全数据失败") }
+                _uiState.update { it.copy(overviewLoading = false, overviewError = e.message ?: "加载安全数据失败") }
+            }
+        }
+    }
+
+    private fun loadLog() {
+        val zone = _uiState.value.selectedZone ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(logLoading = true, logError = null) }
+            try {
+                val range = _uiState.value.logTimeRange
+                val filters = _uiState.value.logFilters
+                val logs = runCatching { AppContainer.repository.getSecurityLogs(zone.id, range, filters) }
+                    .getOrElse { e -> _uiState.update { it.copy(logError = e.message ?: "加载日志失败") }; emptyList() }
+                _uiState.update { it.copy(allLogs = logs, logLoading = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(logLoading = false, logError = e.message ?: "加载日志失败") }
             }
         }
     }
