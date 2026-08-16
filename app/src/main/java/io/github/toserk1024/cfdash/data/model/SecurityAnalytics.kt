@@ -199,7 +199,7 @@ object SecurityAnalyticsParser {
             groupBy == SecurityGroupBy.ALL -> buildString {
                 append("query {\n viewer {\n zones(filter: {zoneTag: \"$zoneId\"}) {\n ")
                 append(H1_GROUPS).append("(limit: 48, filter: {datetime_geq: \"$s\", datetime_leq: \"$e\"}) {\n")
-                append(" sum { requests cachedRequests threats }\n }\n }\n }\n }")
+                append(" sum { requests cachedRequests threatPathingMap { requests } }\n }\n }\n }\n }")
             }
             groupBy.dataset == SecurityDataset.FIREWALL_ADAPTIVE -> {
                 // events 客户端聚合（source/action）
@@ -231,7 +231,7 @@ object SecurityAnalyticsParser {
             groupBy == SecurityGroupBy.ALL -> buildString {
                 append("query {\n viewer {\n zones(filter: {zoneTag: \"$zoneId\"}) {\n ")
                 append(H1_GROUPS).append("(limit: 48, filter: {datetime_geq: \"$s\", datetime_leq: \"$e\"}) {\n")
-                append(" dimensions { datetime }\n sum { requests cachedRequests threats }\n }\n }\n }\n }")
+                append(" dimensions { datetime }\n sum { requests cachedRequests threatPathingMap { requests } }\n }\n }\n }\n }")
             }
             groupBy.dataset == SecurityDataset.FIREWALL_ADAPTIVE -> {
                 val dim = groupBy.dimension!!
@@ -301,7 +301,9 @@ object SecurityAnalyticsParser {
                     val s = g.jsonObject["sum"] as? JsonObject ?: return@forEach
                     requests += s["requests"]?.jsonPrimitive?.longOrNull ?: 0L
                     cached += s["cachedRequests"]?.jsonPrimitive?.longOrNull ?: 0L
-                    threats += s["threats"]?.jsonPrimitive?.longOrNull ?: 0L
+                    (s["threatPathingMap"] as? JsonArray)?.forEach { t ->
+                        threats += t.jsonObject["requests"]?.jsonPrimitive?.longOrNull ?: 0L
+                    }
                 }
                 listOf(
                     SecuritySegment("回源", (requests - cached - threats).coerceAtLeast(0)),
@@ -340,7 +342,7 @@ object SecurityAnalyticsParser {
                     val label = o["dimensions"]?.jsonObject?.get("datetime")?.jsonPrimitive?.content?.let { formatTrendLabel(it, range) } ?: return@forEach
                     val r = s["requests"]?.jsonPrimitive?.longOrNull ?: 0L
                     val c = s["cachedRequests"]?.jsonPrimitive?.longOrNull ?: 0L
-                    val t = s["threats"]?.jsonPrimitive?.longOrNull ?: 0L
+                    val t = (s["threatPathingMap"] as? JsonArray)?.sumOf { it.jsonObject["requests"]?.jsonPrimitive?.longOrNull ?: 0L } ?: 0L
                     req.merge(label, r) { a, b -> a + b }
                     cached.merge(label, c) { a, b -> a + b }
                     threats.merge(label, t) { a, b -> a + b }
