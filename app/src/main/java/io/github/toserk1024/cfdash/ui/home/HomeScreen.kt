@@ -285,9 +285,10 @@ fun HomeScreen(
                         SecurityTab(
                             state = securityState,
                             onGroupBy = securityViewModel::setGroupBy,
-                            onActionFilter = securityViewModel::setActionFilter,
-                            onSourceFilter = securityViewModel::setSourceFilter,
-                            onCountryFilter = securityViewModel::setCountryFilter,
+                            onTimeRange = securityViewModel::setTimeRange,
+                            onAddFilter = securityViewModel::addFilter,
+                            onRemoveFilter = securityViewModel::removeFilter,
+                            onClearFilters = securityViewModel::clearFilters,
                             onRefresh = securityViewModel::refresh,
                             onRetry = securityViewModel::load
                         )

@@ -17,11 +17,12 @@ import io.github.toserk1024.cfdash.data.model.NelSetting
 import io.github.toserk1024.cfdash.data.model.NelSettingRequest
 import io.github.toserk1024.cfdash.data.model.NelValue
 import io.github.toserk1024.cfdash.data.model.SecurityAnalyticsParser
-import io.github.toserk1024.cfdash.data.model.SecurityBreakdownItem
+import io.github.toserk1024.cfdash.data.model.SecurityFilter
 import io.github.toserk1024.cfdash.data.model.SecurityGroupBy
 import io.github.toserk1024.cfdash.data.model.SecurityLogEntry
-import io.github.toserk1024.cfdash.data.model.SecurityOverview
-import io.github.toserk1024.cfdash.data.model.SecurityTrendPoint
+import io.github.toserk1024.cfdash.data.model.SecuritySegment
+import io.github.toserk1024.cfdash.data.model.SecurityTimeRange
+import io.github.toserk1024.cfdash.data.model.SecurityTrendSeries
 import io.github.toserk1024.cfdash.data.model.TokenVerifyResult
 import io.github.toserk1024.cfdash.data.model.User
 import io.github.toserk1024.cfdash.data.model.Zone
@@ -156,27 +157,21 @@ class CloudflareRepository(private val client: CloudflareClient) {
         return AnalyticsParser.parseZoneItems(resp, range)
     }
 
-    /** 安全：获取 24h HTTP 概况（总请求/命中）+ 每小时趋势（httpRequests1hGroups，需 Analytics Read 权限） */
-    suspend fun getHttpSecurity(zoneId: String): Pair<List<SecurityTrendPoint>, SecurityOverview> {
-        val resp = client.graphql(SecurityAnalyticsParser.overviewQuery(zoneId))
-        return SecurityAnalyticsParser.parseHttpHourly(resp)
+    /** 安全：获取概况段（分组=全部→回源/命中/缓解；分组=X→TopN 分组占比），时间范围 + 全局筛选器 */
+    suspend fun getSecurityOverview(zoneId: String, range: SecurityTimeRange, groupBy: SecurityGroupBy, filters: List<SecurityFilter>): List<SecuritySegment> {
+        val resp = client.graphql(SecurityAnalyticsParser.overviewQuery(zoneId, range, groupBy, filters))
+        return SecurityAnalyticsParser.parseOverview(resp, groupBy)
     }
 
-    /** 安全：获取 24h 缓解（firewallEventsAdaptiveGroups，action 缓解动作累计）+ 每小时缓解趋势 */
-    suspend fun getMitigation(zoneId: String): Pair<List<SecurityTrendPoint>, Long> {
-        val resp = client.graphql(SecurityAnalyticsParser.mitigationQuery(zoneId))
-        return SecurityAnalyticsParser.parseMitigation(resp)
+    /** 安全：获取趋势序列（分组=全部单序列；分组=X Top5 分组时序），时间范围 + 全局筛选器 */
+    suspend fun getSecurityTrend(zoneId: String, range: SecurityTimeRange, groupBy: SecurityGroupBy, filters: List<SecurityFilter>): List<SecurityTrendSeries> {
+        val resp = client.graphql(SecurityAnalyticsParser.trendQuery(zoneId, range, groupBy, filters))
+        return SecurityAnalyticsParser.parseTrend(resp, range, groupBy)
     }
 
-    /** 安全：获取分组分布（按所选维度 Top N；国家/设备/IP/HTTP版本/缓存状态 走 httpRequestsAdaptiveGroups，操作/来源 走 firewallEventsAdaptiveGroups） */
-    suspend fun getSecurityBreakdown(zoneId: String, groupBy: SecurityGroupBy): List<SecurityBreakdownItem> {
-        val resp = client.graphql(SecurityAnalyticsParser.breakdownQuery(zoneId, groupBy))
-        return SecurityAnalyticsParser.parseBreakdown(resp, groupBy.dataset)
-    }
-
-    /** 安全：获取安全事件日志（firewallEventsAdaptive 最近 200 条，客户端按筛选过滤） */
-    suspend fun getSecurityLogs(zoneId: String): List<SecurityLogEntry> {
-        val resp = client.graphql(SecurityAnalyticsParser.logsQuery(zoneId))
+    /** 安全：获取安全事件日志（firewallEventsAdaptive），时间范围 + 全局筛选器 */
+    suspend fun getSecurityLogs(zoneId: String, range: SecurityTimeRange, filters: List<SecurityFilter>): List<SecurityLogEntry> {
+        val resp = client.graphql(SecurityAnalyticsParser.logsQuery(zoneId, range, filters))
         return SecurityAnalyticsParser.parseLogs(resp)
     }
 

@@ -2,6 +2,17 @@
 
 ## 2026.08.16
 
+### 安全 Tab 升级：全局筛选器 + 时间范围 + 分组联动 + 修复缓解与日志
+
+- **全局筛选器（仿 Cloudflare Dash）**：新建筛选器 = **属性**（Dropdown：客户端 IP / 国家 / 来源 / 操作 / 客户端设备类型 / HTTP 版本 / 缓存状态）＋**条件**（Dropdown：等于 / 不等于 / 包含 / 不包含）＋**值输入**＋添加按钮；已应用筛选器以 **Chip 展示（带删除叉）+ 清除全部**；多筛选器 **AND 叠加**，经 GraphQL filter 作用于**概况 / 趋势 / 日志**全局（`SecurityTab.kt` / `SecurityViewModel.kt`）
+- **时间范围**（作用于概况 / 趋势 / 日志 / 分组）：**分段按钮** 半小时 / 3 小时 / 12 小时 / 1 天；趋势时间粒度 30m→5 分钟、3h→15 分钟、12h·24h→小时（`SecurityTimeRange`）
+- **分组视图联动整个页面**：分组=全部 → 概况=回源/命中/缓解堆叠条 + 趋势=总请求线；分组=X → 概况=**Top5 分组占比堆叠条**（多段色板）+ 趋势=**Top5 分组多折线**（取数据量最大前 5，统一 x 轴补齐 0）（`SecurityCharts.kt`）
+- **修复缓解始终为 0**：缓解改用 `httpRequests1hGroups.sum.threats`（无需额外权限、与概况同源一致），origin=总请求-命中-缓解（`SecurityAnalytics.kt`）
+- **修复日志 unknown field**：`firewallEventsAdaptive` 字段名修正为 GraphQL camelCase `clientCountryName` / `clientRequestHTTPProtocol` / `clientRequestHTTPHost`
+- **筛选器操作符**：等于(无后缀)/不等于(`_neq`)/包含(`_like`)/不包含(`_nlike`)；多数据集兼容（action/source 仅 firewall，http 属性在 firewall 亦可用）
+- **模型重构**：新增 `SecurityTimeRange`/`SecurityFilterAttr`/`SecurityFilterOp`/`SecurityFilter`/`SecuritySegment`/`SecurityTrendSeries`；移除旧 `SecurityOverview`/`SecurityTrendPoint(旧)`/`getHttpSecurity`/`getMitigation`/`getSecurityBreakdown`
+- **Repository 重构**：`getSecurityOverview(zone,range,groupBy,filters)` / `getSecurityTrend(zone,range,groupBy,filters)` / `getSecurityLogs(zone,range,filters)`
+
 ### 新增侧边栏「安全」Tab（Security Analytics，安全概况 + 24h 趋势 + 分组分布 + 日志）
 
 - **侧边栏新增「安全」菜单项**（第 8 个常驻 Tab，索引 6，`Security` 图标），进入安全分析页；侧边栏顺序：域名 / DNS / 统计 / 缓存 / 速度 / 网络 / 安全 / 我的（`HomeScreen.kt`）

@@ -23,7 +23,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,30 +37,40 @@ import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.common.Fill
-import io.github.toserk1024.cfdash.data.model.SecurityOverview
-import io.github.toserk1024.cfdash.data.model.SecurityTrendPoint
+import com.patrykandpatrick.vico.compose.common.data.ExtraStore
+import io.github.toserk1024.cfdash.data.model.SecuritySegment
+import io.github.toserk1024.cfdash.data.model.SecurityTrendSeries
 import io.github.toserk1024.cfdash.ui.stats.formatCount
-import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
 import kotlin.math.roundToInt
 
-/** x 轴分类标签（通过 extras 与模型同步，供 bottomAxis valueFormatter 读取） */
-private val labelListKey = com.patrykandpatrick.vico.compose.common.data.ExtraStore.Key<List<String>>()
+/** x 轴分类标签（extras 同步） */
+private val labelListKey = ExtraStore.Key<List<String>>()
 
-// 三段颜色：回源(蓝) / 命中(绿) / 缓解(红)
-private val originColor = Color(0xFF2D9CDB)
-private val cachedColor = Color(0xFF27AE60)
-private val mitigatedColor = Color(0xFFEB5757)
+/** 段色板（与 Cloudflare 橙主题协调） */
+private val segmentColors = listOf(
+    Color(0xFFF6821F), // Cloudflare 橙
+    Color(0xFF2D9CDB), // 蓝
+    Color(0xFF27AE60), // 绿
+    Color(0xFFEB5757), // 红
+    Color(0xFF9B51E0), // 紫
+    Color(0xFFF2994A), // 橙黄
+    Color(0xFF56CCF2), // 浅蓝
+    Color(0xFF6FCF97)  // 浅绿
+)
 
-/**
- * 100% 水平堆叠条形图（自绘 Canvas/Row 方案，Vico 3.x 不支持横向条形图）。
- * 回源 / 命中 / 缓解 三色块按比例横向排布，下方图例展示名称/数量/占比。
- */
+// 分组=全部时三段固定色：回源(蓝) / 命中(绿) / 缓解(红)
+private val fixedSegmentColors = listOf(
+    Color(0xFF2D9CDB), Color(0xFF27AE60), Color(0xFFEB5757)
+)
+
+/** 100% 水平堆叠条形图（Canvas 自绘，天然处理 0 值）。分组=全部用固定三段色；分组=X 用色板多段 */
 @Composable
 fun HorizontalStackBar(
-    overview: SecurityOverview,
+    segments: List<SecuritySegment>,
+    groupByAll: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val total = overview.total
+    val total = segments.sumOf { it.count }
     if (total <= 0) {
         Box(
             modifier = modifier.fillMaxWidth().height(120.dp),
@@ -75,27 +84,30 @@ fun HorizontalStackBar(
         Canvas(modifier = Modifier.fillMaxWidth().height(32.dp)) {
             val w = size.width
             val h = size.height
-            val pctO = overview.pct(overview.origin)
-            val pctC = overview.pct(overview.cached)
-            val pctM = overview.pct(overview.mitigated)
             var x = 0f
-            if (pctO > 0f) { drawRect(originColor, Offset(x, 0f), Size(w * pctO, h)); x += w * pctO }
-            if (pctC > 0f) { drawRect(cachedColor, Offset(x, 0f), Size(w * pctC, h)); x += w * pctC }
-            if (pctM > 0f) { drawRect(mitigatedColor, Offset(x, 0f), Size(w * pctM, h)) }
+            segments.forEachIndexed { index, seg ->
+                val pct = seg.count.toFloat() / total
+                if (pct > 0f) {
+                    val color = if (groupByAll) fixedSegmentColors.getOrElse(index) { segmentColors[index % segmentColors.size] }
+                    else segmentColors[index % segmentColors.size]
+                    drawRect(color, Offset(x, 0f), Size(w * pct, h))
+                    x += w * pct
+                }
+            }
         }
         Spacer(modifier = Modifier.height(10.dp))
-        LegendSegment(originColor, "回源", overview.origin, total)
-        LegendSegment(cachedColor, "命中", overview.cached, total)
-        LegendSegment(mitigatedColor, "缓解", overview.mitigated, total)
+        segments.forEachIndexed { index, seg ->
+            val color = if (groupByAll) fixedSegmentColors.getOrElse(index) { segmentColors[index % segmentColors.size] }
+            else segmentColors[index % segmentColors.size]
+            LegendSegment(color, seg.name, seg.count, total)
+        }
     }
 }
 
 @Composable
 private fun LegendSegment(color: Color, name: String, value: Long, total: Long) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(color))
@@ -117,37 +129,49 @@ private fun LegendSegment(color: Color, name: String, value: Long, total: Long) 
     }
 }
 
-/** 24h 安全趋势折线图：总请求(橙) + 缓解(红) 双序列 */
+/** 安全趋势折线图（支持多序列：分组=全部单线"请求"；分组=X Top5 分组各一线） */
 @Composable
 fun SecurityTrendChart(
-    points: List<SecurityTrendPoint>,
+    series: List<SecurityTrendSeries>,
     modifier: Modifier = Modifier
 ) {
-    if (points.isEmpty()) {
+    if (series.isEmpty()) {
         Box(
-            modifier = modifier.fillMaxWidth().height(180.dp),
+            modifier = modifier.fillMaxWidth().height(200.dp),
             contentAlignment = Alignment.Center
         ) {
             Text("暂无数据", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
+    // 统一 x 轴：取全部 label 并集，缺失点补 0（保证多序列长度一致）
+    val allLabels = remember(series) {
+        series.flatMap { it.points.map { p -> p.label } }.distinct().sorted()
+    }
     val modelProducer = remember { CartesianChartModelProducer() }
-    LaunchedEffect(points) {
+    LaunchedEffect(series, allLabels) {
         modelProducer.runTransaction {
             lineModel {
-                series(y = points.map { it.requests.toFloat() })
-                series(y = points.map { it.mitigated.toFloat() })
+                series.forEach { s ->
+                    series(
+                        y = allLabels.map { label ->
+                            s.points.firstOrNull { it.label == label }?.count?.toFloat() ?: 0f
+                        }
+                    )
+                }
             }
-            extras { it[labelListKey] = points.map { p -> p.label } }
+            extras { it[labelListKey] = allLabels }
         }
     }
     CartesianChartHost(
         chart = rememberCartesianChart(
             rememberLineCartesianLayer(
                 LineCartesianLayer.LineProvider.series(
-                    LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(CloudflareOrange))),
-                    LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(mitigatedColor)))
+                    LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(segmentColors[0]))),
+                    LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(segmentColors[1]))),
+                    LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(segmentColors[2]))),
+                    LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(segmentColors[3]))),
+                    LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(segmentColors[4])))
                 )
             ),
             startAxis = VerticalAxis.rememberStart(
@@ -164,21 +188,23 @@ fun SecurityTrendChart(
     )
 }
 
-/** 折线图图例说明 */
+/** 趋势图例：逐序列色块 + 名称 */
 @Composable
-fun TrendLegend(modifier: Modifier = Modifier) {
-    Row(modifier = modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        LegendDot(CloudflareOrange, "总请求")
-        Spacer(modifier = Modifier.width(12.dp))
-        LegendDot(mitigatedColor, "缓解")
-    }
-}
-
-@Composable
-private fun LegendDot(color: Color, name: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(color))
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(text = name, style = TextStyle(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+fun TrendLegend(series: List<SecurityTrendSeries>, modifier: Modifier = Modifier) {
+    if (series.isEmpty()) return
+    Column(modifier = modifier.fillMaxWidth().padding(top = 4.dp)) {
+        series.forEachIndexed { index, s ->
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(segmentColors[index % segmentColors.size]))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = s.name,
+                    style = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
