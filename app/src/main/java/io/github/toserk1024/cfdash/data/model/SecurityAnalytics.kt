@@ -41,15 +41,34 @@ enum class SecurityGroupBy(val label: String, val dimension: String?, val datase
     SOURCE("安全性来源", "source", SecurityDataset.FIREWALL_ADAPTIVE)
 }
 
-/** 筛选器属性（全局过滤） */
-enum class SecurityFilterAttr(val label: String, val field: String, val dataset: SecurityDataset) {
-    IP("客户端 IP", "clientIP", SecurityDataset.HTTP_ADAPTIVE),
-    COUNTRY("国家", "clientCountryName", SecurityDataset.HTTP_ADAPTIVE),
-    SOURCE("来源", "source", SecurityDataset.FIREWALL_ADAPTIVE),
-    ACTION("操作", "action", SecurityDataset.FIREWALL_ADAPTIVE),
-    DEVICE("客户端设备类型", "clientDeviceType", SecurityDataset.HTTP_ADAPTIVE),
-    HTTP_VERSION("HTTP 版本", "clientRequestHTTPProtocol", SecurityDataset.HTTP_ADAPTIVE),
-    CACHE_STATUS("缓存状态", "cacheStatus", SecurityDataset.HTTP_ADAPTIVE)
+/** 筛选器值控件类型 */
+enum class FilterValueKind { TEXT, COUNTRY, CANDIDATES }
+
+/** 筛选器属性（映射 13 个 firewallEventsAdaptive 日志字段；valueKind 决定值控件类型，candidates 为选择型候选项） */
+enum class SecurityFilterAttr(
+    val label: String,
+    val field: String,
+    val dataset: SecurityDataset,
+    val valueKind: FilterValueKind,
+    val candidates: List<String> = emptyList()
+) {
+    IP("客户端 IP", "clientIP", SecurityDataset.HTTP_ADAPTIVE, FilterValueKind.TEXT),
+    COUNTRY("国家/地区", "clientCountryName", SecurityDataset.HTTP_ADAPTIVE, FilterValueKind.COUNTRY),
+    HOST("主机", "clientRequestHTTPHost", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
+    METHOD("方法", "clientRequestHTTPMethodName", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.CANDIDATES,
+        listOf("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS")),
+    HTTP_VERSION("HTTP 版本", "clientRequestHTTPProtocol", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.CANDIDATES,
+        SecurityCandidates.HTTP_VERSIONS),
+    ACTION("操作", "action", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.CANDIDATES,
+        SecurityCandidates.ACTIONS),
+    ASN("ASN", "clientAsn", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
+    PATH("路径", "clientRequestPath", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
+    QUERY("查询字符串", "clientRequestQuery", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
+    RAY_ID("Ray ID", "rayId", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
+    RULE_ID("规则 ID", "ruleId", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
+    SOURCE("来源", "source", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.CANDIDATES,
+        listOf("waf", "rate_limit", "bot_management", "access_rules", "custom_rule", "managed_rule", "firewall_rules")),
+    USER_AGENT("用户代理", "userAgent", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT)
 }
 
 /** 筛选器条件（GraphQL 操作符后缀；无后缀=等于） */
@@ -78,21 +97,21 @@ data class SecurityTrendPoint(val label: String, val count: Long)
 /** 趋势序列（分组=全部：请求/回源/命中/缓解 四条；分组=X：Top5 分组各一条） */
 data class SecurityTrendSeries(val name: String, val points: List<SecurityTrendPoint> = emptyList())
 
-/** 日志可用列（用户可自选显示，持久化） */
+/** 日志可用列（13 列全部为 firewallEventsAdaptive schema 确认字段） */
 enum class SecurityLogColumn(val label: String, val field: String) {
     ACTION("采取的措施", "action"),
     ASN("ASN", "clientAsn"),
     COUNTRY("国家/地区", "clientCountryName"),
     IP("IP 地址", "clientIP"),
-    HOST("主机", "clientRequestHost"),
-    METHOD("方法", "clientRequestMethod"),
+    HOST("主机", "clientRequestHTTPHost"),
+    METHOD("方法", "clientRequestHTTPMethodName"),
     HTTP_VERSION("HTTP 版本", "clientRequestHTTPProtocol"),
     PATH("路径", "clientRequestPath"),
     QUERY("查询字符串", "clientRequestQuery"),
     RAY_ID("Ray ID", "rayId"),
     RULE_ID("规则 ID", "ruleId"),
     SERVICE("服务", "source"),
-    USER_AGENT("用户代理", "clientRequestHTTPUserAgent");
+    USER_AGENT("用户代理", "userAgent");
 
     companion object {
         /** 默认显示列 */
@@ -101,7 +120,7 @@ enum class SecurityLogColumn(val label: String, val field: String) {
     }
 }
 
-/** 安全日志条目（firewallEventsAdaptive，字段名为 GraphQL camelCase） */
+/** 安全日志条目（firewallEventsAdaptive，字段名均经 schema 确认） */
 data class SecurityLogEntry(
     val datetime: String,
     val action: String,
@@ -109,14 +128,14 @@ data class SecurityLogEntry(
     val clientIP: String?,
     val clientCountry: String?,
     val clientAsn: String?,
+    val host: String?,
     val method: String?,
     val httpVersion: String?,
     val path: String?,
     val query: String?,
     val rayId: String?,
     val ruleId: String?,
-    val userAgent: String?,
-    val host: String?
+    val userAgent: String?
 )
 
 /** 国家代码 ↔ 中文名映射（筛选器国家属性用） */
@@ -247,7 +266,7 @@ object SecurityAnalyticsParser {
             append(FW_ADAPTIVE).append("(limit: $LOG_LIMIT, filter: {datetime_geq: \"$s\", datetime_leq: \"$e\"")
             if (filter.isNotEmpty()) append(", $filter")
             append("}) {\n")
-            append(" datetime action source clientIP clientCountryName clientAsn clientRequestHTTPProtocol clientRequestHost clientRequestMethod clientRequestPath clientRequestQuery clientRequestHTTPUserAgent rayId ruleId\n }\n }\n }\n }")
+            append(" datetime action source clientIP clientCountryName clientAsn clientRequestHTTPHost clientRequestHTTPMethodName clientRequestHTTPProtocol clientRequestPath clientRequestQuery userAgent rayId ruleId\n }\n }\n }\n }")
         }
     }
 
@@ -398,14 +417,14 @@ object SecurityAnalyticsParser {
                 clientIP = o["clientIP"]?.jsonPrimitive?.content,
                 clientCountry = o["clientCountryName"]?.jsonPrimitive?.content,
                 clientAsn = o["clientAsn"]?.jsonPrimitive?.content,
-                method = o["clientRequestMethod"]?.jsonPrimitive?.content,
+                host = o["clientRequestHTTPHost"]?.jsonPrimitive?.content,
+                method = o["clientRequestHTTPMethodName"]?.jsonPrimitive?.content,
                 httpVersion = o["clientRequestHTTPProtocol"]?.jsonPrimitive?.content,
                 path = o["clientRequestPath"]?.jsonPrimitive?.content,
                 query = o["clientRequestQuery"]?.jsonPrimitive?.content,
                 rayId = o["rayId"]?.jsonPrimitive?.content,
                 ruleId = o["ruleId"]?.jsonPrimitive?.content,
-                userAgent = o["clientRequestHTTPUserAgent"]?.jsonPrimitive?.content,
-                host = o["clientRequestHost"]?.jsonPrimitive?.content
+                userAgent = o["userAgent"]?.jsonPrimitive?.content
             )
         }
     }

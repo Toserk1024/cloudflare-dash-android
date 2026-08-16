@@ -50,7 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.toserk1024.cfdash.data.model.CountryMapping
-import io.github.toserk1024.cfdash.data.model.SecurityCandidates
+import io.github.toserk1024.cfdash.data.model.FilterValueKind
 import io.github.toserk1024.cfdash.data.model.SecurityFilter
 import io.github.toserk1024.cfdash.data.model.SecurityFilterAttr
 import io.github.toserk1024.cfdash.data.model.SecurityFilterOp
@@ -288,32 +288,44 @@ private fun FilterEditor(onAddFilter: (SecurityFilter) -> Unit) {
         LabeledDropdown("属性", attr.label, SecurityFilterAttr.entries.map { it.label }) { sel ->
             SecurityFilterAttr.entries.firstOrNull { it.label == sel }?.let {
                 attr = it; values = emptyList(); singleValue = ""; countryQuery = ""
-                op = if (attr == SecurityFilterAttr.HTTP_VERSION) SecurityFilterOp.EQ else op
+                // 固定候选属性（方法/HTTP版本/操作/来源）仅支持等于/不等于，切到其它运算符时自动重置
+                if (attr.valueKind == FilterValueKind.CANDIDATES && op != SecurityFilterOp.EQ && op != SecurityFilterOp.NEQ) {
+                    op = SecurityFilterOp.EQ
+                }
             }
         }
         Spacer(modifier = Modifier.width(6.dp))
-        LabeledDropdown("条件", op.label, SecurityFilterOp.entries.map { it.label }) { sel ->
+        val allowedOps = if (attr.valueKind == FilterValueKind.CANDIDATES)
+            listOf(SecurityFilterOp.EQ, SecurityFilterOp.NEQ)
+        else SecurityFilterOp.entries
+        LabeledDropdown("条件", op.label, allowedOps.map { it.label }) { sel ->
             SecurityFilterOp.entries.firstOrNull { it.label == sel }?.let { op = it }
         }
     }
     Spacer(modifier = Modifier.height(6.dp))
 
-    // 值控件按属性类型动态切换
-    when (attr) {
-        SecurityFilterAttr.COUNTRY -> CountryValueSelector(countryQuery, { countryQuery = it }, values,
+    // 值控件按属性类型（valueKind）动态切换
+    when (attr.valueKind) {
+        FilterValueKind.COUNTRY -> CountryValueSelector(countryQuery, { countryQuery = it }, values,
             { code -> values = if (code in values) values - code else (values + code).distinct() })
-        SecurityFilterAttr.IP -> OutlinedTextField(
-            value = singleValue,
-            onValueChange = { singleValue = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("输入 IP", style = MaterialTheme.typography.bodySmall) },
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodySmall,
-            trailingIcon = if (op == SecurityFilterOp.CONTAINS) {
-                { IconButton(onClick = { if (singleValue.isNotBlank()) { values = (values + singleValue).distinct(); singleValue = "" } }) { Icon(Icons.Default.Add, contentDescription = "添加") } }
-            } else null
-        )
-        else -> CandidatesSelector(attr, values, { values = it })
+        FilterValueKind.TEXT -> Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = singleValue,
+                onValueChange = { singleValue = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("输入值", style = MaterialTheme.typography.bodySmall) },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodySmall
+            )
+            // 包含/不包含时：加号在输入框后（外部），用于追加多值
+            if (op == SecurityFilterOp.CONTAINS || op == SecurityFilterOp.NOT_CONTAINS) {
+                Spacer(modifier = Modifier.width(6.dp))
+                IconButton(onClick = {
+                    if (singleValue.isNotBlank()) { values = (values + singleValue).distinct(); singleValue = "" }
+                }) { Icon(Icons.Default.Add, contentDescription = "添加多值") }
+            }
+        }
+        FilterValueKind.CANDIDATES -> CandidatesSelector(attr.candidates, values, { values = it })
     }
     // 已选多值 chips
     if (values.isNotEmpty()) {
@@ -333,11 +345,11 @@ private fun FilterEditor(onAddFilter: (SecurityFilter) -> Unit) {
     Spacer(modifier = Modifier.height(6.dp))
     FilledTonalButton(
         onClick = {
-            val finalValues = when {
-                attr == SecurityFilterAttr.COUNTRY -> values
-                attr == SecurityFilterAttr.IP && op == SecurityFilterOp.CONTAINS -> values
-                attr == SecurityFilterAttr.IP && singleValue.isNotBlank() -> listOf(singleValue)
-                else -> values
+            val finalValues = when (attr.valueKind) {
+                FilterValueKind.COUNTRY -> values
+                FilterValueKind.TEXT -> if (op == SecurityFilterOp.CONTAINS || op == SecurityFilterOp.NOT_CONTAINS) values
+                    else if (singleValue.isNotBlank()) listOf(singleValue) else emptyList()
+                FilterValueKind.CANDIDATES -> values
             }
             if (finalValues.isNotEmpty()) {
                 onAddFilter(SecurityFilter(attr, op, finalValues))
@@ -349,23 +361,15 @@ private fun FilterEditor(onAddFilter: (SecurityFilter) -> Unit) {
     ) { Text("添加筛选器", style = MaterialTheme.typography.bodySmall) }
 }
 
-private fun finalEnabled(attr: SecurityFilterAttr, op: SecurityFilterOp, values: List<String>, singleValue: String): Boolean = when (attr) {
-    SecurityFilterAttr.COUNTRY -> values.isNotEmpty()
-    SecurityFilterAttr.IP -> if (op == SecurityFilterOp.CONTAINS) values.isNotEmpty() else singleValue.isNotBlank()
-    else -> values.isNotEmpty()
+private fun finalEnabled(attr: SecurityFilterAttr, op: SecurityFilterOp, values: List<String>, singleValue: String): Boolean = when (attr.valueKind) {
+    FilterValueKind.COUNTRY -> values.isNotEmpty()
+    FilterValueKind.TEXT -> if (op == SecurityFilterOp.CONTAINS || op == SecurityFilterOp.NOT_CONTAINS) values.isNotEmpty() else singleValue.isNotBlank()
+    FilterValueKind.CANDIDATES -> values.isNotEmpty()
 }
 
-/** 候选值选择框（FilterChip 组：操作/来源/HTTP版本/缓存/设备） */
+/** 候选值选择框（FilterChip 组：方法/HTTP版本/操作/来源等） */
 @Composable
-private fun CandidatesSelector(attr: SecurityFilterAttr, selected: List<String>, onSelect: (List<String>) -> Unit) {
-    val candidates = when (attr) {
-        SecurityFilterAttr.SOURCE -> listOf("firewall_rules", "rate_limit", "bot_management", "access_rules")
-        SecurityFilterAttr.ACTION -> SecurityCandidates.ACTIONS
-        SecurityFilterAttr.HTTP_VERSION -> SecurityCandidates.HTTP_VERSIONS
-        SecurityFilterAttr.CACHE_STATUS -> SecurityCandidates.CACHE_STATUS
-        SecurityFilterAttr.DEVICE -> SecurityCandidates.DEVICES
-        else -> emptyList()
-    }
+private fun CandidatesSelector(candidates: List<String>, selected: List<String>, onSelect: (List<String>) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
         candidates.forEach { c ->
             FilterChip(

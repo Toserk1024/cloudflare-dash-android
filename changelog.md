@@ -2,6 +2,36 @@
 
 ## 2026.08.16
 
+### 筛选器运算符合理化 + 加号外置
+
+- **固定候选属性（方法 / HTTP 版本 / 操作 / 来源）仅支持「等于 / 不等于」**：选择此类属性时，运算符下拉自动剔除「包含 / 不包含」，若当前在其它运算符则自动重置为「等于」（`FilterEditor.allowedOps`）
+- **「包含 / 不包含」时加号外置**：值输入框**右侧外部**显示「＋」按钮追加多值（不再用输入框内部 trailingIcon）（`SecurityTab.kt`）
+- 总览 / 日志两处筛选器共用组件，行为一致
+
+### 筛选器逻辑重写（映射 13 个日志字段）
+
+- **筛选器属性重构为 13 个**（映射 `firewallEventsAdaptive` 日志字段）：IP / 国家·地区 / 主机 / 方法 / HTTP 版本 / 操作 / ASN / 路径 / 查询字符串 / Ray ID / 规则 ID / 来源 / 用户代理（`SecurityFilterAttr`）
+- **新增 `FilterValueKind` 值控件类型**：
+  - `TEXT`：文本输入（IP / ASN / 主机 / 路径 / 查询字符串 / Ray ID / 规则 ID / 用户代理）
+  - `COUNTRY`：国家搜索多选
+  - `CANDIDATES`：候选选择框（方法 GET/POST… / HTTP 版本 / 操作 / 来源）
+- **运算符保留** 等于 / 不等于 / 包含 / 不包含；「包含」支持多值（GraphQL `_in`）
+- **筛选器编辑器按 `valueKind` 动态切换值控件**；`finalValues` / `finalEnabled` 同步按 `valueKind`（`SecurityTab.kt`）
+
+### 安全 Tab 日志列全面恢复 13 列（schema 确认正确字段名）
+
+- 经 **Cloudflare GraphQL schema** 确认，`firewallEventsAdaptive` **实含全部 13 列字段**；此前反复报 unknown field 是因字段名写错，非字段不存在
+- **正确字段名**：主机=`clientRequestHTTPHost`、方法=`clientRequestHTTPMethodName`、HTTP 版本=`clientRequestHTTPProtocol`、Ray ID=`rayId`(uint64)、规则 ID=`ruleId`、用户代理=`userAgent`、ASN=`clientAsn`、国家=`clientCountryName`、措施=`action`、服务=`source` 等
+- **日志可用列恢复全部 13 列**（`SecurityLogColumn` / `SecurityLogEntry` / `parseLogs` / `logValue`）
+- 说明：本方案单一 `firewallEventsAdaptive` 数据源即可覆盖全部列，无需引入 http_requests 数据集
+
+### 安全 Tab 日志字段全面排查（官方教程确认）+ 速度页 Tab 化
+
+- **日志字段全部修正为 `firewallEventsAdaptive` 官方确认字段**（依据官方教程 *Querying Firewall Events with GraphQL*）：`action` / `clientAsn` / `clientCountryName` / `clientIP` / `clientRequestPath` / `clientRequestQuery` / `datetime` / `source` / `userAgent`
+- **用户代理字段为 `userAgent`**（非 `clientRequestHTTPUserAgent`）；**移除不存在的字段**：`clientRequestHost` / `clientRequestMethod` / `clientRequestHTTPProtocol` / `rayId` / `ruleId`（此前逐字段猜测导致反复报 unknown field）
+- **日志可用列缩减为 8 列**（均为确认字段）：采取的措施 / ASN / 国家·地区 / IP 地址 / 路径 / 查询字符串 / 服务 / 用户代理（`SecurityLogColumn` / `SecurityLogEntry` / `parseLogs` / `logValue`）
+- **速度页分段按钮 → TabRow 选项卡**：协议优化 / 内容优化（`SpeedTab.kt`）
+
 ### 安全 Tab 三期：数据源修复 + UI 组件重构
 
 - **修复日志 unknown field clientASN**：ASN 字段改为 GraphQL camelCase `clientAsn`（`SecurityAnalytics.kt` 日志查询/解析、`SecurityLogColumn.ASN`、`SecurityTab.logValue`）

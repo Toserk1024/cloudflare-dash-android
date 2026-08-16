@@ -17,9 +17,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -74,17 +73,10 @@ fun SpeedTab(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        // 分段按钮：协议优化 / 内容优化
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SpeedSection.entries.forEachIndexed { index, s ->
-                SegmentedButton(
-                    selected = section == s,
-                    onClick = { section = s },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = SpeedSection.entries.size)
-                ) {
-                    Text(s.label)
-                }
-            }
+        // Tab 选项卡：协议优化 / 内容优化
+        TabRow(selectedTabIndex = if (section == SpeedSection.PROTOCOL) 0 else 1) {
+            Tab(selected = section == SpeedSection.PROTOCOL, onClick = { section = SpeedSection.PROTOCOL }, text = { Text("协议优化") })
+            Tab(selected = section == SpeedSection.CONTENT, onClick = { section = SpeedSection.CONTENT }, text = { Text("内容优化") })
         }
 
         Spacer(modifier = Modifier.height(16.dp))
