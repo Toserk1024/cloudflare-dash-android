@@ -1,11 +1,11 @@
 package io.github.toserk1024.cfdash.ui.security
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,6 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -70,33 +72,21 @@ fun HorizontalStackBar(
         return
     }
     Column(modifier = modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth().height(32.dp)) {
-            StackSegment(modifier = Modifier.weight(overview.pct(overview.origin)).fillMaxHeight(), color = originColor, pct = overview.pct(overview.origin))
-            StackSegment(modifier = Modifier.weight(overview.pct(overview.cached)).fillMaxHeight(), color = cachedColor, pct = overview.pct(overview.cached))
-            StackSegment(modifier = Modifier.weight(overview.pct(overview.mitigated)).fillMaxHeight(), color = mitigatedColor, pct = overview.pct(overview.mitigated))
+        Canvas(modifier = Modifier.fillMaxWidth().height(32.dp)) {
+            val w = size.width
+            val h = size.height
+            val pctO = overview.pct(overview.origin)
+            val pctC = overview.pct(overview.cached)
+            val pctM = overview.pct(overview.mitigated)
+            var x = 0f
+            if (pctO > 0f) { drawRect(originColor, Offset(x, 0f), Size(w * pctO, h)); x += w * pctO }
+            if (pctC > 0f) { drawRect(cachedColor, Offset(x, 0f), Size(w * pctC, h)); x += w * pctC }
+            if (pctM > 0f) { drawRect(mitigatedColor, Offset(x, 0f), Size(w * pctM, h)) }
         }
         Spacer(modifier = Modifier.height(10.dp))
         LegendSegment(originColor, "回源", overview.origin, total)
         LegendSegment(cachedColor, "命中", overview.cached, total)
         LegendSegment(mitigatedColor, "缓解", overview.mitigated, total)
-    }
-}
-
-@Composable
-private fun StackSegment(modifier: Modifier, color: Color, pct: Float) {
-    Box(
-        modifier = modifier.background(color),
-        contentAlignment = Alignment.Center
-    ) {
-        if (pct > 0.06f) {
-            Text(
-                text = "${(pct * 100).roundToInt()}%",
-                color = Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1
-            )
-        }
     }
 }
 
