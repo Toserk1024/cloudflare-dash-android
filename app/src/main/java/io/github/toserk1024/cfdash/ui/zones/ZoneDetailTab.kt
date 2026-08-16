@@ -228,7 +228,7 @@ private fun PlanRow(plan: ZonePlan) {
 }
 
 @Composable
-private fun AdvancedSwitchRow(
+internal fun AdvancedSwitchRow(
     title: String,
     subtitle: String,
     checked: Boolean,

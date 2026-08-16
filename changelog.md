@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026.08.16
+
+### 新增侧边栏「速度」Tab（协议/内容优化开关）
+
+- **侧边栏新增「速度」菜单项**（第 6 个常驻 Tab，索引 5，`Speed` 图标），进入速度优化页；侧边栏顺序：域名 / DNS / 统计数据 / 缓存 / 我的 / 速度（`HomeScreen.kt`）
+- **页面顶部用分段按钮**（`SingleChoiceSegmentedButtonRow` + `SegmentedButton`）在「协议优化 / 内容优化」两个板块间切换（默认协议优化）
+- **开关样式沿用域名页高级设置**：`AdvancedSwitchRow`（标题 + 副标题 + Switch + 独立防抖 busy/转圈 + 单项失败不影响其他）；`AdvancedSwitchRow` 由 `private` 改为 `internal` 供跨包复用（`ZoneDetailTab.kt`）
+- **协议优化**：HTTP/2（`http2`）、HTTP/2 到源服务器（`http2_origin`）、HTTP/3 使用 QUIC（`http3`）、0-RTT 连接恢复（`0rtt`）
+- **内容优化**：Speed Brain（`speed_brain`）、Cloudflare Fonts（`fonts`）、Early Hints（`early_hints`）、Rocket Loader™（`rocket_loader`）（共享字典压缩为非 on/off 特例，用户要求移除）
+- **数据层**：复用现有 `getZoneSetting`/`updateZoneSetting`（`/zones/{id}/settings/{name}`）；新增 `SpeedViewModel` 并行加载全部 8 项设置（单项失败不阻塞其他）、`settingsBusy` 独立防抖、`setZone` 由全局选中域名驱动（`SpeedViewModel.kt`）
+- **新增文件**：`ui/speed/SpeedViewModel.kt` + `ui/speed/SpeedTab.kt`（`SpeedSection` 枚举 + `SpeedTab`/`ProtocolContent`/`ContentContent`）
+
+### 新增侧边栏「网络」Tab + Tab 名称调整
+
+- **侧边栏新增「网络」菜单项**（常驻 Tab，索引 5，`Wifi` 图标），进入网络优化页；**Tab 顺序调整为**：域名 / DNS / 统计 / 缓存 / 速度 / 网络 / 我的（`HomeScreen.kt`）
+- **「统计数据」Tab 名简化为「统计」**：topbar 标题 + 侧边栏菜单项均改（`tabTitles` + `NavigationDrawerItem`）
+- **网络开关**（沿用 `AdvancedSwitchRow`）：IPv6 兼容性、gRPC（`grpc`）、WebSockets（`websockets`）、Pseudo IPv4（`pseudo_ipv4`）、IP 地理位置（`ip_geolocation`）、网络错误记录（`web_network_error_logging`）、洋葱路由（**`opportunistic_onion`**，非 `onion_routing`）
+- **IPv6 两处保留 + 开关同步**：网络 Tab 的 IPv6 行复用 `ZoneViewModel` 状态（域名页高级设置 + 网络 Tab 共享同一 `ipv6`/`setIpv6`，天然同步）
+- **Pseudo IPv4 特殊取值**：非 on/off（`off`/`add_header`/`overwrite_header`），开关映射 开=`add_header`、关=`off`（`NetworkViewModel` `parseValue`/`encodeValue`）
+- **数据层**：新增 `NetworkViewModel`（并行加载 6 项，IPv6 由 ZoneViewModel 统一管理）、`settingsBusy` 独立防抖、`setZone` 由全局选中域名驱动
+- **新增文件**：`ui/network/NetworkViewModel.kt` + `ui/network/NetworkTab.kt`
+
 ## 2026.08.15
 
 ### 初始化权限更新 + GPL 开源协议
