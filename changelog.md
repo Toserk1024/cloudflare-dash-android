@@ -2,6 +2,15 @@
 
 ## 2026.08.16
 
+### 安全 Tab 三期：数据源修复 + UI 组件重构
+
+- **修复日志 unknown field clientASN**：ASN 字段改为 GraphQL camelCase `clientAsn`（`SecurityAnalytics.kt` 日志查询/解析、`SecurityLogColumn.ASN`、`SecurityTab.logValue`）
+- **分组「安全性来源/操作」改用 firewallEventsAdaptive 客户端聚合**：因 `firewallEventsAdaptiveGroups`（安全事件聚合）对当前 zone 报 `does not have access to the path`（Zone/套餐级数据集可用性限制，与 Global Key 权限无关），改拉 `firewallEventsAdaptive` 事件明细客户端聚合 Top5（方案 C，用户确认）
+- **总览趋势分组=全部显示 4 条线**：请求 / 回源 / 命中 / 缓解（`httpRequests1hGroups` 的 requests/cachedRequests/threats 按小时算 origin）
+- **筛选器逻辑重构**：属性→值控件动态切换（IP 文本输入 / 国家搜索 / 候选选择框）；运算符按属性过滤（HTTP 版本仅"等于"）；新增 `SecurityCandidates`（HTTP 版本/缓存状态/操作/设备候选值）
+- **UI 组件多样化**：子项切换改 **TabRow**（总览/日志）；「分组视图：」Label 移到选择器左侧；筛选器 **tiny 化**；国家搜索**聚焦才展开候选**（不中断输入法）+ **点击 toggle**（可取消勾选）；候选值用 **FilterChip 组**
+- 新增 `SecurityCandidates` 候选值对象
+
 ### 安全 Tab 双子页重构：总览/日志分离 + 筛选器隔离 + 日志自选列 + 筛选器人性化
 
 - **界面分离**：安全 Tab 内子项切换「总览 | 日志」（SegmentedButton）；总览（概况堆叠条 + 趋势折线）与日志（表格）独立页面；**总览 / 日志筛选器各自隔离**（`SecurityViewModel` 双筛选器集合）

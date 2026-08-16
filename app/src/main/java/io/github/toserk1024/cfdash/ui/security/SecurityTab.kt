@@ -24,12 +24,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -40,11 +43,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.toserk1024.cfdash.data.model.CountryMapping
+import io.github.toserk1024.cfdash.data.model.SecurityCandidates
 import io.github.toserk1024.cfdash.data.model.SecurityFilter
 import io.github.toserk1024.cfdash.data.model.SecurityFilterAttr
 import io.github.toserk1024.cfdash.data.model.SecurityFilterOp
@@ -54,7 +60,7 @@ import io.github.toserk1024.cfdash.data.model.SecurityLogEntry
 import io.github.toserk1024.cfdash.data.model.SecurityTimeRange
 import io.github.toserk1024.cfdash.ui.security.SecurityViewModel.SecuritySection
 
-/** 安全 Tab：子项切换「总览 | 日志」，总览/日志筛选器隔离，日志列自选 */
+/** 安全 Tab：TabRow 子项「总览 | 日志」，总览/日志筛选器隔离，日志列自选 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SecurityTab(
@@ -73,37 +79,15 @@ fun SecurityTab(
     onRefresh: () -> Unit,
     onRetry: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        // 子项切换
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SecuritySection.entries.forEachIndexed { index, s ->
-                SegmentedButton(
-                    selected = state.section == s,
-                    onClick = { onSection(s) },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = SecuritySection.entries.size)
-                ) { Text(if (s == SecuritySection.OVERVIEW) "总览" else "日志", maxLines = 1) }
-            }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        TabRow(selectedTabIndex = if (state.section == SecuritySection.OVERVIEW) 0 else 1) {
+            Tab(selected = state.section == SecuritySection.OVERVIEW, onClick = { onSection(SecuritySection.OVERVIEW) }, text = { Text("总览") })
+            Tab(selected = state.section == SecuritySection.LOG, onClick = { onSection(SecuritySection.LOG) }, text = { Text("日志") })
         }
         Spacer(modifier = Modifier.height(12.dp))
         when (state.section) {
-            SecuritySection.OVERVIEW -> OverviewContent(
-                state = state,
-                onGroupBy = onGroupBy,
-                onTimeRange = onTimeRange,
-                onAddFilter = onAddOverviewFilter,
-                onRemoveFilter = onRemoveOverviewFilter,
-                onClearFilters = onClearOverviewFilters,
-                onRefresh = onRefresh,
-                onRetry = onRetry
-            )
-            SecuritySection.LOG -> LogContent(
-                state = state,
-                onTimeRange = onLogTimeRange,
-                onAddFilter = onAddLogFilter,
-                onRemoveFilter = onRemoveLogFilter,
-                onClearFilters = onClearLogFilters,
-                onToggleLogColumn = onToggleLogColumn
-            )
+            SecuritySection.OVERVIEW -> OverviewContent(state, onGroupBy, onTimeRange, onAddOverviewFilter, onRemoveOverviewFilter, onClearOverviewFilters, onRefresh, onRetry)
+            SecuritySection.LOG -> LogContent(state, onLogTimeRange, onAddLogFilter, onRemoveLogFilter, onClearLogFilters, onToggleLogColumn)
         }
     }
 }
@@ -123,23 +107,22 @@ private fun OverviewContent(
     onRetry: () -> Unit
 ) {
     PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-            // 控制卡：分组视图 + 时间范围
+        Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
             Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     GroupBySelector(current = state.groupBy, onSelect = onGroupBy)
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     TimeRangeSelector(current = state.timeRange, onChange = onTimeRange)
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            FilterPanel(filters = state.overviewFilters, onAddFilter = onAddFilter, onRemoveFilter = onRemoveFilter, onClearFilters = onClearFilters)
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+            FilterPanel(state.overviewFilters, onAddFilter, onRemoveFilter, onClearFilters)
+            Spacer(modifier = Modifier.height(10.dp))
 
             when {
                 state.overviewLoading -> CenterProgress()
                 state.overviewError != null -> Column(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("⚠ ${state.overviewError}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
@@ -148,20 +131,17 @@ private fun OverviewContent(
                 }
                 else -> {
                     ChartCard(if (state.groupBy == SecurityGroupBy.ALL) "安全概况" else "${state.groupBy.label}占比") {
-                        HorizontalStackBar(segments = state.overview, groupByAll = state.groupBy == SecurityGroupBy.ALL)
+                        HorizontalStackBar(state.overview, state.groupBy == SecurityGroupBy.ALL)
                     }
                     if (!state.partError.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("⚠ 部分数据加载失败：${state.partError}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
-                            TextButton(onClick = onRetry) { Text("重试", style = MaterialTheme.typography.bodySmall) }
-                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("⚠ 部分数据加载失败：${state.partError}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
                     if (state.trend.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         ChartCard("趋势（${state.timeRange.label}）") {
-                            SecurityTrendChart(series = state.trend)
-                            TrendLegend(series = state.trend)
+                            SecurityTrendChart(state.trend)
+                            TrendLegend(state.trend)
                         }
                     }
                 }
@@ -181,28 +161,23 @@ private fun LogContent(
     onClearFilters: () -> Unit,
     onToggleLogColumn: (SecurityLogColumn) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                TimeRangeSelector(current = state.logTimeRange, onChange = onTimeRange)
-                Spacer(modifier = Modifier.height(12.dp))
-                ColumnSelector(selected = state.selectedLogColumns, onToggle = onToggleLogColumn)
+            Column(modifier = Modifier.padding(12.dp)) {
+                TimeRangeSelector(state.logTimeRange, onTimeRange)
+                Spacer(modifier = Modifier.height(10.dp))
+                ColumnSelector(state.selectedLogColumns, onToggleLogColumn)
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        FilterPanel(filters = state.logFilters, onAddFilter = onAddFilter, onRemoveFilter = onRemoveFilter, onClearFilters = onClearFilters)
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
+        FilterPanel(state.logFilters, onAddFilter, onRemoveFilter, onClearFilters)
+        Spacer(modifier = Modifier.height(10.dp))
 
         when {
             state.logLoading -> CenterProgress()
-            state.logError != null -> Column(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text("⚠ ${state.logError}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
-            }
-            state.allLogs.isEmpty() -> Text("暂无日志", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 24.dp))
-            else -> LogTable(logs = state.allLogs, columns = state.selectedLogColumns)
+            state.logError != null -> Text("⚠ ${state.logError}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 20.dp))
+            state.allLogs.isEmpty() -> Text("暂无日志", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 20.dp))
+            else -> LogTable(state.allLogs, state.selectedLogColumns)
         }
     }
 }
@@ -211,9 +186,7 @@ private fun LogContent(
 
 @Composable
 private fun CenterProgress() {
-    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
-    }
+    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
 }
 
 @Composable
@@ -224,60 +197,53 @@ private fun TimeRangeSelector(current: SecurityTimeRange, onChange: (SecurityTim
                 selected = current == r,
                 onClick = { onChange(r) },
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = SecurityTimeRange.entries.size)
-            ) { Text(r.label, maxLines = 1) }
+            ) { Text(r.label, maxLines = 1, fontSize = 12.sp) }
         }
     }
 }
 
+/** 分组视图：Label 在左侧 + 选择器只显示当前值（Dropdown） */
 @Composable
 private fun GroupBySelector(current: SecurityGroupBy, onSelect: (SecurityGroupBy) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    Box(modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
-            Text("分组视图：${current.label}", modifier = Modifier.weight(1f), maxLines = 1)
-            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            SecurityGroupBy.entries.forEach { gb ->
-                DropdownMenuItem(text = { Text(gb.label) }, onClick = { onSelect(gb); expanded = false })
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("分组视图：", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box {
+            OutlinedButton(onClick = { expanded = true }) {
+                Text(current.label, maxLines = 1)
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                SecurityGroupBy.entries.forEach { gb ->
+                    DropdownMenuItem(text = { Text(gb.label) }, onClick = { onSelect(gb); expanded = false })
+                }
             }
         }
     }
 }
 
-/** 日志列选择（Dropdown 多选 + 候选框） */
+/** 日志列选择（Dropdown 多选） */
 @Composable
 private fun ColumnSelector(selected: Set<SecurityLogColumn>, onToggle: (SecurityLogColumn) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         OutlinedButton(onClick = { expanded = true }) {
-            Text("显示列（${selected.size}/${SecurityLogColumn.entries.size}）", maxLines = 1)
+            Text("显示列 ${selected.size}/${SecurityLogColumn.entries.size}", maxLines = 1)
             Icon(Icons.Default.ArrowDropDown, contentDescription = null)
         }
         Spacer(modifier = Modifier.width(8.dp))
-        // 已选列预览
-        Text(
-            text = selected.joinToString(" · ") { it.label },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Text(selected.joinToString(" · ") { it.label }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
     Box {
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             SecurityLogColumn.entries.forEach { col ->
-                DropdownMenuItem(
-                    text = { Text("${if (col in selected) "✓ " else ""}${col.label}", maxLines = 1) },
-                    onClick = { onToggle(col) }
-                )
+                DropdownMenuItem(text = { Text("${if (col in selected) "✓ " else ""}${col.label}", maxLines = 1) }, onClick = { onToggle(col) })
             }
         }
     }
 }
 
-/** 筛选器面板：新建筛选器 + 已应用筛选器 Chips */
+/** 筛选器面板（tiny） */
 @Composable
 private fun FilterPanel(
     filters: List<SecurityFilter>,
@@ -286,22 +252,22 @@ private fun FilterPanel(
     onClearFilters: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "筛选器", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                if (filters.isNotEmpty()) TextButton(onClick = onClearFilters) { Text("清除全部") }
+                Text("筛选器", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                if (filters.isNotEmpty()) TextButton(onClick = onClearFilters) { Text("清除全部", style = MaterialTheme.typography.bodySmall) }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            FilterEditor(onAddFilter = onAddFilter)
+            Spacer(modifier = Modifier.height(6.dp))
+            FilterEditor(onAddFilter)
             if (filters.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 filters.forEachIndexed { index, f ->
                     FilterChip(
                         selected = true,
                         onClick = { onRemoveFilter(index) },
-                        label = { Text("${f.attr.label} ${f.op.label} ${f.values.joinToString("、")}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        trailingIcon = { Icon(Icons.Default.Close, contentDescription = "移除", modifier = Modifier.size(18.dp)) },
-                        modifier = Modifier.padding(vertical = 2.dp)
+                        label = { Text("${f.attr.label} ${f.op.label} ${f.values.joinToString("、")}", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall) },
+                        trailingIcon = { Icon(Icons.Default.Close, contentDescription = "移除", modifier = Modifier.size(16.dp)) },
+                        modifier = Modifier.padding(vertical = 1.dp)
                     )
                 }
             }
@@ -309,127 +275,155 @@ private fun FilterPanel(
     }
 }
 
-/** 新建筛选器编辑器：属性/条件 Dropdown + 人性化值输入（国家搜索、多选） */
+/** 新建筛选器：属性/运算符/值 对应关系重构 */
 @Composable
 private fun FilterEditor(onAddFilter: (SecurityFilter) -> Unit) {
     var attr by remember { mutableStateOf(SecurityFilterAttr.IP) }
     var op by remember { mutableStateOf(SecurityFilterOp.EQ) }
-    var values by remember { mutableStateOf(listOf<String>()) } // 多值（国家/包含）
-    var singleValue by remember { mutableStateOf("") } // 单值文本
+    var values by remember { mutableStateOf(listOf<String>()) }
+    var singleValue by remember { mutableStateOf("") }
     var countryQuery by remember { mutableStateOf("") }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        SelectorDropdown(current = attr.label, options = SecurityFilterAttr.entries.map { it.label }) { sel ->
-            SecurityFilterAttr.entries.firstOrNull { it.label == sel }?.let { attr = it; values = emptyList(); singleValue = ""; countryQuery = "" }
+        LabeledDropdown("属性", attr.label, SecurityFilterAttr.entries.map { it.label }) { sel ->
+            SecurityFilterAttr.entries.firstOrNull { it.label == sel }?.let {
+                attr = it; values = emptyList(); singleValue = ""; countryQuery = ""
+                op = if (attr == SecurityFilterAttr.HTTP_VERSION) SecurityFilterOp.EQ else op
+            }
         }
-        Spacer(modifier = Modifier.width(8.dp))
-        SelectorDropdown(current = op.label, options = SecurityFilterOp.entries.map { it.label }) { sel ->
+        Spacer(modifier = Modifier.width(6.dp))
+        LabeledDropdown("条件", op.label, SecurityFilterOp.entries.map { it.label }) { sel ->
             SecurityFilterOp.entries.firstOrNull { it.label == sel }?.let { op = it }
         }
     }
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier = Modifier.height(6.dp))
 
-    if (attr == SecurityFilterAttr.COUNTRY) {
-        // 国家：边输入边搜索 + 候选多选
-        CountryValueSelector(query = countryQuery, onQueryChange = { countryQuery = it }, selected = values, onSelect = { code -> values = (values + code).distinct() }, onRemove = { code -> values = values - code })
-    } else {
-        // 其他属性：文本输入；"包含"支持多值
-        OutlinedTextField(
+    // 值控件按属性类型动态切换
+    when (attr) {
+        SecurityFilterAttr.COUNTRY -> CountryValueSelector(countryQuery, { countryQuery = it }, values,
+            { code -> values = if (code in values) values - code else (values + code).distinct() })
+        SecurityFilterAttr.IP -> OutlinedTextField(
             value = singleValue,
             onValueChange = { singleValue = it },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("输入值，如 192.168.0.1") },
+            placeholder = { Text("输入 IP", style = MaterialTheme.typography.bodySmall) },
             singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall,
             trailingIcon = if (op == SecurityFilterOp.CONTAINS) {
-                { IconButtonCompat(onClick = {
-                    if (singleValue.isNotBlank()) { values = (values + singleValue).distinct(); singleValue = "" }
-                }) { Icon(Icons.Default.Add, contentDescription = "添加") } }
+                { IconButton(onClick = { if (singleValue.isNotBlank()) { values = (values + singleValue).distinct(); singleValue = "" } }) { Icon(Icons.Default.Add, contentDescription = "添加") } }
             } else null
         )
+        else -> CandidatesSelector(attr, values, { values = it })
     }
-    // 已选多值 chips（国家/包含）
+    // 已选多值 chips
     if (values.isNotEmpty()) {
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Column {
             values.forEach { v ->
                 FilterChip(
                     selected = true,
                     onClick = { values = values - v },
-                    label = { Text(if (attr == SecurityFilterAttr.COUNTRY) CountryMapping.codeToName(v) else v, maxLines = 1) },
-                    trailingIcon = { Icon(Icons.Default.Close, contentDescription = "移除", modifier = Modifier.size(16.dp)) },
-                    modifier = Modifier.padding(vertical = 2.dp)
+                    label = { Text(if (attr == SecurityFilterAttr.COUNTRY) CountryMapping.codeToName(v) else v, maxLines = 1, style = MaterialTheme.typography.bodySmall) },
+                    trailingIcon = { Icon(Icons.Default.Close, contentDescription = "移除", modifier = Modifier.size(14.dp)) },
+                    modifier = Modifier.padding(vertical = 1.dp)
                 )
             }
         }
     }
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier = Modifier.height(6.dp))
     FilledTonalButton(
         onClick = {
             val finalValues = when {
                 attr == SecurityFilterAttr.COUNTRY -> values
-                op == SecurityFilterOp.CONTAINS -> values
-                singleValue.isNotBlank() -> listOf(singleValue)
-                else -> emptyList()
+                attr == SecurityFilterAttr.IP && op == SecurityFilterOp.CONTAINS -> values
+                attr == SecurityFilterAttr.IP && singleValue.isNotBlank() -> listOf(singleValue)
+                else -> values
             }
             if (finalValues.isNotEmpty()) {
                 onAddFilter(SecurityFilter(attr, op, finalValues))
                 values = emptyList(); singleValue = ""; countryQuery = ""
             }
         },
-        enabled = (attr == SecurityFilterAttr.COUNTRY && values.isNotEmpty()) ||
-            (attr != SecurityFilterAttr.COUNTRY && (if (op == SecurityFilterOp.CONTAINS) values.isNotEmpty() else singleValue.isNotBlank())),
+        enabled = finalEnabled(attr, op, values, singleValue),
         modifier = Modifier.fillMaxWidth()
-    ) { Text("添加筛选器") }
+    ) { Text("添加筛选器", style = MaterialTheme.typography.bodySmall) }
 }
 
+private fun finalEnabled(attr: SecurityFilterAttr, op: SecurityFilterOp, values: List<String>, singleValue: String): Boolean = when (attr) {
+    SecurityFilterAttr.COUNTRY -> values.isNotEmpty()
+    SecurityFilterAttr.IP -> if (op == SecurityFilterOp.CONTAINS) values.isNotEmpty() else singleValue.isNotBlank()
+    else -> values.isNotEmpty()
+}
+
+/** 候选值选择框（FilterChip 组：操作/来源/HTTP版本/缓存/设备） */
 @Composable
-private fun IconButtonCompat(onClick: () -> Unit, content: @Composable () -> Unit) {
-    androidx.compose.material3.IconButton(onClick = onClick) { content() }
+private fun CandidatesSelector(attr: SecurityFilterAttr, selected: List<String>, onSelect: (List<String>) -> Unit) {
+    val candidates = when (attr) {
+        SecurityFilterAttr.SOURCE -> listOf("firewall_rules", "rate_limit", "bot_management", "access_rules")
+        SecurityFilterAttr.ACTION -> SecurityCandidates.ACTIONS
+        SecurityFilterAttr.HTTP_VERSION -> SecurityCandidates.HTTP_VERSIONS
+        SecurityFilterAttr.CACHE_STATUS -> SecurityCandidates.CACHE_STATUS
+        SecurityFilterAttr.DEVICE -> SecurityCandidates.DEVICES
+        else -> emptyList()
+    }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        candidates.forEach { c ->
+            FilterChip(
+                selected = c in selected,
+                onClick = { onSelect(if (c in selected) selected - c else selected + c) },
+                label = { Text(c, maxLines = 1, style = MaterialTheme.typography.bodySmall) },
+                modifier = Modifier.padding(vertical = 1.dp)
+            )
+        }
+    }
 }
 
-/** 国家搜索选择器：边输入边搜索 + 候选列表 */
+/** 国家搜索：聚焦才展开候选 + 点击 toggle */
 @Composable
 private fun CountryValueSelector(
     query: String,
     onQueryChange: (String) -> Unit,
     selected: List<String>,
-    onSelect: (String) -> Unit,
-    onRemove: (String) -> Unit
+    onToggle: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val candidates = remember(query) { CountryMapping.search(query) }
     Box {
         OutlinedTextField(
             value = query,
-            onValueChange = { onQueryChange(it); expanded = true },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("输入国家名或代码搜索") },
-            singleLine = true
+            onValueChange = { onQueryChange(it) },
+            modifier = Modifier.fillMaxWidth().onFocusChanged { expanded = it.isFocused },
+            placeholder = { Text("输入国家名或代码", style = MaterialTheme.typography.bodySmall) },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall
         )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             candidates.forEach { (code, name) ->
                 val checked = code in selected
                 DropdownMenuItem(
                     text = { Text("${if (checked) "✓ " else ""}$name ($code)", maxLines = 1) },
-                    onClick = { onSelect(code); onQueryChange("") }
+                    onClick = { onToggle(code); onQueryChange("") }
                 )
             }
         }
     }
 }
 
-/** 通用下拉（属性/条件/列） */
+/** 带 Label 的下拉（tiny） */
 @Composable
-private fun SelectorDropdown(current: String, options: List<String>, onSelect: (String) -> Unit) {
+private fun LabeledDropdown(label: String, current: String, options: List<String>, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    Box {
-        OutlinedButton(onClick = { expanded = true }) {
-            Text(current, maxLines = 1)
-            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEach { opt ->
-                DropdownMenuItem(text = { Text(opt, maxLines = 1, overflow = TextOverflow.Ellipsis) }, onClick = { onSelect(opt); expanded = false })
+    Column {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box {
+            OutlinedButton(onClick = { expanded = true }) {
+                Text(current, maxLines = 1, style = MaterialTheme.typography.bodySmall)
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                options.forEach { opt ->
+                    DropdownMenuItem(text = { Text(opt, maxLines = 1, overflow = TextOverflow.Ellipsis) }, onClick = { onSelect(opt); expanded = false })
+                }
             }
         }
     }
@@ -440,14 +434,14 @@ private fun SelectorDropdown(current: String, options: List<String>, onSelect: (
 private fun LogTable(logs: List<SecurityLogEntry>, columns: Set<SecurityLogColumn>) {
     val cols = columns.toList()
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        Column(modifier = Modifier.padding(vertical = 6.dp)) {
             val scroll = rememberScrollState()
-            Row(modifier = Modifier.horizontalScroll(scroll).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.horizontalScroll(scroll).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 TableCell("时间", bold = true)
                 cols.forEach { TableCell(it.label, bold = true) }
             }
             logs.forEach { log ->
-                Row(modifier = Modifier.horizontalScroll(scroll).padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.horizontalScroll(scroll).padding(horizontal = 10.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                     TableCell(log.datetime)
                     cols.forEach { TableCell(logValue(log, it)) }
                 }
@@ -463,16 +457,15 @@ private fun TableCell(text: String, bold: Boolean = false) {
         style = MaterialTheme.typography.bodySmall,
         fontWeight = if (bold) FontWeight.SemiBold else null,
         color = if (bold) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 8.dp).width(110.dp),
+        modifier = Modifier.padding(horizontal = 6.dp).width(100.dp),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
 }
 
-/** 按列提取日志字段值 */
 private fun logValue(log: SecurityLogEntry, col: SecurityLogColumn): String = when (col) {
     SecurityLogColumn.ACTION -> log.action
-    SecurityLogColumn.ASN -> log.clientASN.orEmpty()
+    SecurityLogColumn.ASN -> log.clientAsn.orEmpty()
     SecurityLogColumn.COUNTRY -> log.clientCountry?.let { CountryMapping.codeToName(it) }.orEmpty()
     SecurityLogColumn.IP -> log.clientIP.orEmpty()
     SecurityLogColumn.HOST -> log.host.orEmpty()
@@ -486,13 +479,12 @@ private fun logValue(log: SecurityLogEntry, col: SecurityLogColumn): String = wh
     SecurityLogColumn.USER_AGENT -> log.userAgent.orEmpty()
 }
 
-/** 卡片容器 */
 @Composable
 private fun ChartCard(title: String, content: @Composable () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(text = title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             content()
         }
     }
