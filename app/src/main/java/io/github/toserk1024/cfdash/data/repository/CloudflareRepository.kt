@@ -16,6 +16,12 @@ import io.github.toserk1024.cfdash.data.model.DnsRecordRequest
 import io.github.toserk1024.cfdash.data.model.NelSetting
 import io.github.toserk1024.cfdash.data.model.NelSettingRequest
 import io.github.toserk1024.cfdash.data.model.NelValue
+import io.github.toserk1024.cfdash.data.model.SecurityAnalyticsParser
+import io.github.toserk1024.cfdash.data.model.SecurityBreakdownItem
+import io.github.toserk1024.cfdash.data.model.SecurityGroupBy
+import io.github.toserk1024.cfdash.data.model.SecurityLogEntry
+import io.github.toserk1024.cfdash.data.model.SecurityOverview
+import io.github.toserk1024.cfdash.data.model.SecurityTrendPoint
 import io.github.toserk1024.cfdash.data.model.TokenVerifyResult
 import io.github.toserk1024.cfdash.data.model.User
 import io.github.toserk1024.cfdash.data.model.Zone
@@ -148,6 +154,30 @@ class CloudflareRepository(private val client: CloudflareClient) {
     suspend fun getAccountZoneBreakdown(accountId: String, range: AnalyticsRange): List<ZoneAnalyticsItem> {
         val resp = client.graphql(AnalyticsParser.accountZoneBreakdownQuery(accountId, range))
         return AnalyticsParser.parseZoneItems(resp, range)
+    }
+
+    /** 安全：获取 24h HTTP 概况（总请求/命中）+ 每小时趋势（httpRequests1hGroups，需 Analytics Read 权限） */
+    suspend fun getHttpSecurity(zoneId: String): Pair<List<SecurityTrendPoint>, SecurityOverview> {
+        val resp = client.graphql(SecurityAnalyticsParser.overviewQuery(zoneId))
+        return SecurityAnalyticsParser.parseHttpHourly(resp)
+    }
+
+    /** 安全：获取 24h 缓解（firewallEventsAdaptiveGroups，action 缓解动作累计）+ 每小时缓解趋势 */
+    suspend fun getMitigation(zoneId: String): Pair<List<SecurityTrendPoint>, Long> {
+        val resp = client.graphql(SecurityAnalyticsParser.mitigationQuery(zoneId))
+        return SecurityAnalyticsParser.parseMitigation(resp)
+    }
+
+    /** 安全：获取分组分布（按所选维度 Top N；国家/设备/IP/HTTP版本/缓存状态 走 httpRequestsAdaptiveGroups，操作/来源 走 firewallEventsAdaptiveGroups） */
+    suspend fun getSecurityBreakdown(zoneId: String, groupBy: SecurityGroupBy): List<SecurityBreakdownItem> {
+        val resp = client.graphql(SecurityAnalyticsParser.breakdownQuery(zoneId, groupBy))
+        return SecurityAnalyticsParser.parseBreakdown(resp, groupBy.dataset)
+    }
+
+    /** 安全：获取安全事件日志（firewallEventsAdaptive 最近 200 条，客户端按筛选过滤） */
+    suspend fun getSecurityLogs(zoneId: String): List<SecurityLogEntry> {
+        val resp = client.graphql(SecurityAnalyticsParser.logsQuery(zoneId))
+        return SecurityAnalyticsParser.parseLogs(resp)
     }
 
     /** 分页获取 DNS 记录（type/name 支持筛选） */

@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
@@ -81,6 +82,8 @@ import io.github.toserk1024.cfdash.ui.dns.DnsViewModel
 import io.github.toserk1024.cfdash.ui.network.NetworkTab
 import io.github.toserk1024.cfdash.ui.network.NetworkViewModel
 import io.github.toserk1024.cfdash.ui.profile.ProfileScreen
+import io.github.toserk1024.cfdash.ui.security.SecurityTab
+import io.github.toserk1024.cfdash.ui.security.SecurityViewModel
 import io.github.toserk1024.cfdash.ui.speed.SpeedTab
 import io.github.toserk1024.cfdash.ui.speed.SpeedViewModel
 import io.github.toserk1024.cfdash.ui.stats.StatsContent
@@ -94,8 +97,8 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 /**
- * 主界面：自绘侧边栏 + 七个常驻 Tab（域名/DNS/统计/缓存/速度/网络/我的）。
- * 全局域名选择器（ZoneViewModel）统一驱动 域名/DNS/统计/缓存/速度/网络 六 Tab；
+ * 主界面：自绘侧边栏 + 八个常驻 Tab（域名/DNS/统计/缓存/速度/网络/安全/我的）。
+ * 全局域名选择器（ZoneViewModel）统一驱动 域名/DNS/统计/缓存/速度/网络/安全 七 Tab；
  * 横栏右侧域名按钮始终显示，统计切换按钮（账户/域名级）仅统计 Tab 显示（带动画）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -114,7 +117,8 @@ fun HomeScreen(
     statsViewModel: StatsViewModel = viewModel(),
     cacheViewModel: CacheViewModel = viewModel(),
     speedViewModel: SpeedViewModel = viewModel(),
-    networkViewModel: NetworkViewModel = viewModel()
+    networkViewModel: NetworkViewModel = viewModel(),
+    securityViewModel: SecurityViewModel = viewModel()
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(initialTab) }
     val homeState by homeViewModel.uiState.collectAsState()
@@ -129,6 +133,7 @@ fun HomeScreen(
         statsViewModel.setZone(selectedZone?.id)
         speedViewModel.setZone(selectedZone)
         networkViewModel.setZone(selectedZone)
+        securityViewModel.setZone(selectedZone)
     }
 
     // 多用户：切换/退出后 homeKey 变化 → 重新加载当前激活用户数据
@@ -148,7 +153,7 @@ fun HomeScreen(
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val tabTitles = listOf("域名", "DNS", "统计", "缓存", "速度", "网络", "我的")
+    val tabTitles = listOf("域名", "DNS", "统计", "缓存", "速度", "网络", "安全", "我的")
 
     // 域名选择器覆盖层开关
     var showZonePicker by remember { mutableStateOf(false) }
@@ -273,9 +278,24 @@ fun HomeScreen(
                         )
                     }
                 }
-                // 我的 Tab（常驻）
+                // 安全 Tab（常驻）
                 if ((visitedMask and 0b1000000) != 0) {
                     SlidingTab(selected = selectedTab == 6, targetOffset = slideOffsetFor(selectedTab, 6, screenWidthPx)) {
+                        val securityState by securityViewModel.uiState.collectAsState()
+                        SecurityTab(
+                            state = securityState,
+                            onGroupBy = securityViewModel::setGroupBy,
+                            onActionFilter = securityViewModel::setActionFilter,
+                            onSourceFilter = securityViewModel::setSourceFilter,
+                            onCountryFilter = securityViewModel::setCountryFilter,
+                            onRefresh = securityViewModel::refresh,
+                            onRetry = securityViewModel::load
+                        )
+                    }
+                }
+                // 我的 Tab（常驻）
+                if ((visitedMask and 0b10000000) != 0) {
+                    SlidingTab(selected = selectedTab == 7, targetOffset = slideOffsetFor(selectedTab, 7, screenWidthPx)) {
                         ProfileScreen(
                             uiState = homeState,
                             onRetry = homeViewModel::loadUser
@@ -385,10 +405,16 @@ fun HomeScreen(
                         onClick = { scope.launch { drawerState.close() }; selectedTab = 5 }
                     )
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Person, contentDescription = null) },
-                        label = { Text("我的") },
+                        icon = { Icon(Icons.Default.Security, contentDescription = null) },
+                        label = { Text("安全") },
                         selected = selectedTab == 6,
                         onClick = { scope.launch { drawerState.close() }; selectedTab = 6 }
+                    )
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        label = { Text("我的") },
+                        selected = selectedTab == 7,
+                        onClick = { scope.launch { drawerState.close() }; selectedTab = 7 }
                     )
 
                     Spacer(modifier = Modifier.weight(1f))

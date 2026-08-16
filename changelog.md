@@ -2,6 +2,22 @@
 
 ## 2026.08.16
 
+### 新增侧边栏「安全」Tab（Security Analytics，安全概况 + 24h 趋势 + 分组分布 + 日志）
+
+- **侧边栏新增「安全」菜单项**（第 8 个常驻 Tab，索引 6，`Security` 图标），进入安全分析页；侧边栏顺序：域名 / DNS / 统计 / 缓存 / 速度 / 网络 / 安全 / 我的（`HomeScreen.kt`）
+- **安全概况**：100% **水平堆叠条形图**（自绘 Canvas/Row 方案，Vico 3.x 不支持横向条形图），三数据 —— **回源（蓝）/ 命中（绿）/ 缓解（红）**，按比例横向排布 + 图例（名称/数量/占比）
+- **24 小时趋势折线图**：Vico 双序列折线 —— 总请求（橙）+ 缓解（红），X 轴按小时标签
+- **分组视图方式**（下拉选择框）：全部 / 国家 / 客户端设备类型 / 客户端 IP / HTTP 版本 / 缓存状态 / 安全性操作 / 安全性来源；选非「全部」时展示该维度 Top 分布（名称/数量/占比）。**来源浏览器 / 来源操作系统 已按用户确认删除**（`httpRequestsAdaptiveGroups` 无现成维度字段，不做 UA 本地解析）
+- **筛选器 + 安全事件日志**：操作 / 来源 / 国家 三个下拉筛选（从日志数据派生候选），客户端过滤后展示安全事件日志列表（时间 + 操作色标 + 来源 + 域名 + IP + 国家/设备/HTTP 版本/缓存状态）；顶部标注「安全事件为采样数据」提示
+- **数据层**（GraphQL，需 Analytics Read 权限）：
+  - 概况/24h 趋势 → `httpRequests1hGroups`（`sum{requests,cachedRequests}` 按 `datetime` 小时分组，24h 窗口）
+  - 缓解 → `firewallEventsAdaptiveGroups`（按 `datetimeHour`+`action` 分组，累加缓解动作 block/challenge/managedchallenge 等，排除 allow/log/solved/bypassed）
+  - 分组分布（国家/设备/IP/HTTP版本/缓存状态）→ `httpRequestsAdaptiveGroups`（`count_DESC`）；操作/来源 → `firewallEventsAdaptiveGroups`
+  - 日志 → `firewallEventsAdaptive`（最近 200 条）
+  - 缓解与总请求口径联合（缓解 + 命中 + 回源 ≈ 总请求，可能因采样存在微小差异）
+- **新增文件**：`data/model/SecurityAnalytics.kt`（模型 + `SecurityOverview`/`SecurityTrendPoint`/`SecurityGroupBy`/`SecurityLogEntry`/`SecurityAnalyticsParser` 查询构建与解析）+ `ui/security/SecurityViewModel.kt` + `ui/security/SecurityTab.kt` + `ui/security/SecurityCharts.kt`（水平堆叠条 + 24h 双折线）
+- **Repository 新增**：`getHttpSecurity` / `getMitigation` / `getSecurityBreakdown` / `getSecurityLogs`（`CloudflareRepository.kt`）
+
 ### 新增侧边栏「速度」Tab（协议/内容优化开关）
 
 - **侧边栏新增「速度」菜单项**（第 6 个常驻 Tab，索引 5，`Speed` 图标），进入速度优化页；侧边栏顺序：域名 / DNS / 统计数据 / 缓存 / 我的 / 速度（`HomeScreen.kt`）
