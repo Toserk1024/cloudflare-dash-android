@@ -17,8 +17,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -74,7 +74,7 @@ fun SpeedTab(
             .padding(16.dp)
     ) {
         // Tab 选项卡：协议优化 / 内容优化
-        TabRow(selectedTabIndex = if (section == SpeedSection.PROTOCOL) 0 else 1) {
+        PrimaryTabRow(selectedTabIndex = if (section == SpeedSection.PROTOCOL) 0 else 1) {
             Tab(selected = section == SpeedSection.PROTOCOL, onClick = { section = SpeedSection.PROTOCOL }, text = { Text("协议优化") })
             Tab(selected = section == SpeedSection.CONTENT, onClick = { section = SpeedSection.CONTENT }, text = { Text("内容优化") })
         }

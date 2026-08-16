@@ -32,7 +32,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -80,7 +80,7 @@ fun SecurityTab(
     onRetry: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        TabRow(selectedTabIndex = if (state.section == SecuritySection.OVERVIEW) 0 else 1) {
+        PrimaryTabRow(selectedTabIndex = if (state.section == SecuritySection.OVERVIEW) 0 else 1) {
             Tab(selected = state.section == SecuritySection.OVERVIEW, onClick = { onSection(SecuritySection.OVERVIEW) }, text = { Text("总览") })
             Tab(selected = state.section == SecuritySection.LOG, onClick = { onSection(SecuritySection.LOG) }, text = { Text("日志") })
         }
