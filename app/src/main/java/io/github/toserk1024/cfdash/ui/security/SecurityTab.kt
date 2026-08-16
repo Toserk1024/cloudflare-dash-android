@@ -477,7 +477,7 @@ private fun logValue(log: SecurityLogEntry, col: SecurityLogColumn): String = wh
     SecurityLogColumn.HTTP_VERSION -> log.httpVersion.orEmpty()
     SecurityLogColumn.PATH -> log.path.orEmpty()
     SecurityLogColumn.QUERY -> log.query.orEmpty()
-    SecurityLogColumn.RAY_ID -> log.rayId.orEmpty()
+    SecurityLogColumn.RAY_ID -> log.rayName.orEmpty()
     SecurityLogColumn.RULE_ID -> log.ruleId.orEmpty()
     SecurityLogColumn.SERVICE -> log.source.orEmpty()
     SecurityLogColumn.USER_AGENT -> log.userAgent.orEmpty()

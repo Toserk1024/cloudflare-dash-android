@@ -64,7 +64,7 @@ enum class SecurityFilterAttr(
     ASN("ASN", "clientAsn", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
     PATH("路径", "clientRequestPath", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
     QUERY("查询字符串", "clientRequestQuery", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
-    RAY_ID("Ray ID", "rayId", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
+    RAY_ID("Ray ID", "rayName", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
     RULE_ID("规则 ID", "ruleId", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
     SOURCE("来源", "source", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.CANDIDATES,
         listOf("waf", "rate_limit", "bot_management", "access_rules", "custom_rule", "managed_rule", "firewall_rules")),
@@ -108,7 +108,7 @@ enum class SecurityLogColumn(val label: String, val field: String) {
     HTTP_VERSION("HTTP 版本", "clientRequestHTTPProtocol"),
     PATH("路径", "clientRequestPath"),
     QUERY("查询字符串", "clientRequestQuery"),
-    RAY_ID("Ray ID", "rayId"),
+    RAY_ID("Ray ID", "rayName"),
     RULE_ID("规则 ID", "ruleId"),
     SERVICE("服务", "source"),
     USER_AGENT("用户代理", "userAgent");
@@ -133,7 +133,7 @@ data class SecurityLogEntry(
     val httpVersion: String?,
     val path: String?,
     val query: String?,
-    val rayId: String?,
+    val rayName: String?,
     val ruleId: String?,
     val userAgent: String?
 )
@@ -266,7 +266,7 @@ object SecurityAnalyticsParser {
             append(FW_ADAPTIVE).append("(limit: $LOG_LIMIT, filter: {datetime_geq: \"$s\", datetime_leq: \"$e\"")
             if (filter.isNotEmpty()) append(", $filter")
             append("}) {\n")
-            append(" datetime action source clientIP clientCountryName clientAsn clientRequestHTTPHost clientRequestHTTPMethodName clientRequestHTTPProtocol clientRequestPath clientRequestQuery userAgent rayId ruleId\n }\n }\n }\n }")
+            append(" datetime action source clientIP clientCountryName clientAsn clientRequestHTTPHost clientRequestHTTPMethodName clientRequestHTTPProtocol clientRequestPath clientRequestQuery userAgent rayName ruleId\n }\n }\n }\n }")
         }
     }
 
@@ -422,7 +422,7 @@ object SecurityAnalyticsParser {
                 httpVersion = o["clientRequestHTTPProtocol"]?.jsonPrimitive?.content,
                 path = o["clientRequestPath"]?.jsonPrimitive?.content,
                 query = o["clientRequestQuery"]?.jsonPrimitive?.content,
-                rayId = o["rayId"]?.jsonPrimitive?.content,
+                rayName = o["rayName"]?.jsonPrimitive?.content,
                 ruleId = o["ruleId"]?.jsonPrimitive?.content,
                 userAgent = o["userAgent"]?.jsonPrimitive?.content
             )
