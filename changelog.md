@@ -2,6 +2,14 @@
 
 ## 2026.08.16
 
+### 缓解修复 + 日志详情页 + 时间时区
+
+- **修复缓解始终为 0**：缓解改用 `firewallEventsAdaptive`（events）统计缓解动作（block/challenge/managedchallenge/connectionclose 等），概况与趋势缓解线均由此计算（`SecurityAnalytics.kt`）
+- **新增日志详情页**：点击日志行进入详情，13 字段合理展示（时间/措施/ASN/国家/IP/主机/方法/HTTP版本/路径/查询/RayID/规则/服务/UA），缺失用 `-`，带返回按钮（`SecurityTab.kt` LogDetail）
+- **默认日志列及顺序**：时间（恒第一列）→ 规则 / IP / 主机 / 国家（`SecurityLogColumn.DEFAULT`）
+- **趋势 marker 显示 4 线**：按住/点击显示「时间 + 请求/回源/命中/缓解 各值」（`SecurityCharts.kt`）
+- **时间使用系统时区**：趋势与日志时间按设备本地时区显示（含日期，如 `MM-dd HH时`），与 Cloudflare 返回的 UTC 数据正确转换（`SecurityAnalytics.kt`）
+
 ### 安全 Tab 多项修复与优化
 
 - **移除「半小时」时间范围**（半小时无整点数据且导致 Vico 空系列闪退）；3 小时粒度改为 5 分钟、12 小时改为 15 分钟（`SecurityTimeRange`）

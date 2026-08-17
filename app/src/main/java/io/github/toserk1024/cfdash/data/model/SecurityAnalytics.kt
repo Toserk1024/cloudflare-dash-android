@@ -122,8 +122,8 @@ enum class SecurityLogColumn(val label: String, val field: String) {
     USER_AGENT("用户代理", "userAgent");
 
     companion object {
-        /** 默认显示列 */
-        val DEFAULT = setOf(ACTION, COUNTRY, IP, HOST, HTTP_VERSION)
+        /** 默认显示列（时间恒为第一列，其余按顺序：规则 / IP / 主机 / 国家） */
+        val DEFAULT = setOf(RULE_ID, IP, HOST, COUNTRY)
         fun byName(name: String) = entries.firstOrNull { it.name == name }
     }
 }
@@ -199,6 +199,13 @@ object SecurityAnalyticsParser {
     private const val EVENTS_LIMIT = 1000
     private const val TOP_N = 5
 
+    /** 缓解动作集合（被 Cloudflare 安全功能缓解/挑战的 action） */
+    private val MITIGATE_ACTIONS = setOf(
+        "block", "challenge", "jschallenge", "managedchallenge", "connectionclose",
+        "managedchallengenoninteractivesolved", "managedchallengeinteractivesolved",
+        "precursorinterstitialpageissued"
+    )
+
     // ===== 查询构建 =====
 
     fun overviewQuery(zoneId: String, range: SecurityTimeRange, groupBy: SecurityGroupBy, filters: List<SecurityFilter>): String {
@@ -207,7 +214,9 @@ object SecurityAnalyticsParser {
             groupBy == SecurityGroupBy.ALL -> buildString {
                 append("query {\n viewer {\n zones(filter: {zoneTag: \"$zoneId\"}) {\n ")
                 append(H1_GROUPS).append("(limit: 48, filter: {datetime_geq: \"$s\", datetime_leq: \"$e\"}) {\n")
-                append(" sum { requests cachedRequests threatPathingMap { requests } }\n }\n }\n }\n }")
+                append(" sum { requests cachedRequests }\n }\n ")
+                append(FW_ADAPTIVE).append("(limit: $EVENTS_LIMIT, filter: {datetime_geq: \"$s\", datetime_leq: \"$e\"}) {\n")
+                append(" action\n }\n }\n }\n }")
             }
             groupBy.dataset == SecurityDataset.FIREWALL_ADAPTIVE -> {
                 // events 客户端聚合（source/action）
@@ -239,7 +248,9 @@ object SecurityAnalyticsParser {
             groupBy == SecurityGroupBy.ALL -> buildString {
                 append("query {\n viewer {\n zones(filter: {zoneTag: \"$zoneId\"}) {\n ")
                 append(H1_GROUPS).append("(limit: 48, filter: {datetime_geq: \"$s\", datetime_leq: \"$e\"}) {\n")
-                append(" dimensions { datetime }\n sum { requests cachedRequests threatPathingMap { requests } }\n }\n }\n }\n }")
+                append(" dimensions { datetime }\n sum { requests cachedRequests }\n }\n ")
+                append(FW_ADAPTIVE).append("(limit: ${EVENTS_LIMIT * 2}, filter: {datetime_geq: \"$s\", datetime_leq: \"$e\"}) {\n")
+                append(" datetime action\n }\n }\n }\n }")
             }
             groupBy.dataset == SecurityDataset.FIREWALL_ADAPTIVE -> {
                 val dim = groupBy.dimension!!
@@ -304,19 +315,21 @@ object SecurityAnalyticsParser {
         val zones = root.jsonObject["data"]?.jsonObject?.get("viewer")?.jsonObject?.get("zones") as? JsonArray ?: return emptyList()
         return when {
             groupBy == SecurityGroupBy.ALL -> {
-                var requests = 0L; var cached = 0L; var threats = 0L
+                var requests = 0L; var cached = 0L; var mitigated = 0L
                 (zones.firstOrNull()?.jsonObject?.get(H1_GROUPS) as? JsonArray)?.forEach { g ->
                     val s = g.jsonObject["sum"] as? JsonObject ?: return@forEach
                     requests += s["requests"]?.jsonPrimitive?.longOrNull ?: 0L
                     cached += s["cachedRequests"]?.jsonPrimitive?.longOrNull ?: 0L
-                    (s["threatPathingMap"] as? JsonArray)?.forEach { t ->
-                        threats += t.jsonObject["requests"]?.jsonPrimitive?.longOrNull ?: 0L
-                    }
+                }
+                // 缓解 = events 中缓解动作数
+                (zones.firstOrNull()?.jsonObject?.get(FW_ADAPTIVE) as? JsonArray)?.forEach { e ->
+                    val a = e.jsonObject["action"]?.jsonPrimitive?.content ?: return@forEach
+                    if (a in MITIGATE_ACTIONS) mitigated++
                 }
                 listOf(
-                    SecuritySegment("回源", (requests - cached - threats).coerceAtLeast(0)),
+                    SecuritySegment("回源", (requests - cached - mitigated).coerceAtLeast(0)),
                     SecuritySegment("命中", cached),
-                    SecuritySegment("缓解", threats)
+                    SecuritySegment("缓解", mitigated)
                 )
             }
             groupBy.dataset == SecurityDataset.FIREWALL_ADAPTIVE -> {
@@ -343,25 +356,30 @@ object SecurityAnalyticsParser {
                 val groups = zones.firstOrNull()?.jsonObject?.get(H1_GROUPS) as? JsonArray ?: return emptyList()
                 val req = LinkedHashMap<String, Long>()
                 val cached = LinkedHashMap<String, Long>()
-                val threats = LinkedHashMap<String, Long>()
+                val mitigated = LinkedHashMap<String, Long>()
                 groups.forEach { g ->
                     val o = g.jsonObject
                     val s = o["sum"] as? JsonObject ?: return@forEach
                     val label = o["dimensions"]?.jsonObject?.get("datetime")?.jsonPrimitive?.content?.let { formatTrendLabel(it, range) } ?: return@forEach
-                    val r = s["requests"]?.jsonPrimitive?.longOrNull ?: 0L
-                    val c = s["cachedRequests"]?.jsonPrimitive?.longOrNull ?: 0L
-                    val t = (s["threatPathingMap"] as? JsonArray)?.sumOf { it.jsonObject["requests"]?.jsonPrimitive?.longOrNull ?: 0L } ?: 0L
-                    req.merge(label, r) { a, b -> a + b }
-                    cached.merge(label, c) { a, b -> a + b }
-                    threats.merge(label, t) { a, b -> a + b }
+                    req.merge(label, s["requests"]?.jsonPrimitive?.longOrNull ?: 0L) { a, b -> a + b }
+                    cached.merge(label, s["cachedRequests"]?.jsonPrimitive?.longOrNull ?: 0L) { a, b -> a + b }
                 }
-                val labels = (req.keys + cached.keys + threats.keys).sorted()
+                // 缓解按时间 = events 中缓解动作数
+                (zones.firstOrNull()?.jsonObject?.get(FW_ADAPTIVE) as? JsonArray)?.forEach { e ->
+                    val o = e.jsonObject
+                    val a = o["action"]?.jsonPrimitive?.content ?: return@forEach
+                    if (a in MITIGATE_ACTIONS) {
+                        val label = o["datetime"]?.jsonPrimitive?.content?.let { formatTrendLabel(it, range) } ?: return@forEach
+                        mitigated.merge(label, 1L) { x, y -> x + y }
+                    }
+                }
+                val labels = (req.keys + cached.keys + mitigated.keys).sorted()
                 fun series(name: String, f: (String) -> Long) = SecurityTrendSeries(name, labels.map { SecurityTrendPoint(it, f(it)) })
                 listOf(
                     series("请求") { req[it] ?: 0L },
-                    series("回源") { (req[it] ?: 0L) - (cached[it] ?: 0L) - (threats[it] ?: 0L) },
+                    series("回源") { (req[it] ?: 0L) - (cached[it] ?: 0L) - (mitigated[it] ?: 0L) },
                     series("命中") { cached[it] ?: 0L },
-                    series("缓解") { threats[it] ?: 0L }
+                    series("缓解") { mitigated[it] ?: 0L }
                 )
             }
             groupBy.dataset == SecurityDataset.FIREWALL_ADAPTIVE -> {
@@ -455,8 +473,8 @@ object SecurityAnalyticsParser {
         val parsed = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
             .apply { timeZone = TimeZone.getTimeZone("UTC") }
             .parse(iso) ?: return iso
-        val out = if (range == SecurityTimeRange.H24) "HH时" else "HH:mm"
-        SimpleDateFormat(out, Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(parsed)
+        val out = if (range == SecurityTimeRange.H24) "MM-dd HH时" else "MM-dd HH:mm"
+        SimpleDateFormat(out, Locale.US).format(parsed)
     } catch (e: Exception) {
         iso
     }
@@ -465,9 +483,7 @@ object SecurityAnalyticsParser {
         val parsed = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
             .apply { timeZone = TimeZone.getTimeZone("UTC") }
             .parse(iso) ?: return iso
-        SimpleDateFormat("MM-dd HH:mm:ss", Locale.US)
-            .apply { timeZone = TimeZone.getTimeZone("UTC") }
-            .format(parsed)
+        SimpleDateFormat("MM-dd HH:mm:ss", Locale.US).format(parsed)
     } catch (e: Exception) {
         iso
     }

@@ -1,5 +1,6 @@
 package io.github.toserk1024.cfdash.ui.security
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
@@ -23,6 +25,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -162,6 +165,7 @@ private fun LogContent(
     onClearFilters: () -> Unit,
     onToggleLogColumn: (SecurityLogColumn) -> Unit
 ) {
+    var selectedLog by remember { mutableStateOf<SecurityLogEntry?>(null) }
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(12.dp)) {
@@ -178,7 +182,11 @@ private fun LogContent(
             state.logLoading -> CenterProgress()
             state.logError != null -> Text("⚠ ${state.logError}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 20.dp))
             state.allLogs.isEmpty() -> Text("暂无日志", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 20.dp))
-            else -> LogTable(state.allLogs, state.selectedLogColumns)
+            else -> if (selectedLog != null) {
+                LogDetail(selectedLog!!, onBack = { selectedLog = null })
+            } else {
+                LogTable(state.allLogs, state.selectedLogColumns, onLogClick = { selectedLog = it })
+            }
         }
     }
 }
@@ -436,9 +444,53 @@ private fun LabeledDropdown(label: String, current: String, options: List<String
     }
 }
 
+/** 日志详情页：13 字段合理展示，缺失用 - */
+@Composable
+private fun LogDetail(log: SecurityLogEntry, onBack: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("返回", style = MaterialTheme.typography.bodySmall)
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                Text("日志详情", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(4.dp))
+            SecurityLogColumn.entries.forEach { col ->
+                DetailRow(col.label, logValue(log, col).ifBlank { "-" })
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(110.dp)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
 /** 日志表格（自选列，横向滚动） */
 @Composable
-private fun LogTable(logs: List<SecurityLogEntry>, columns: Set<SecurityLogColumn>) {
+private fun LogTable(logs: List<SecurityLogEntry>, columns: Set<SecurityLogColumn>, onLogClick: (SecurityLogEntry) -> Unit) {
     val cols = columns.toList()
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -448,7 +500,7 @@ private fun LogTable(logs: List<SecurityLogEntry>, columns: Set<SecurityLogColum
                 cols.forEach { TableCell(it.label, bold = true) }
             }
             logs.forEach { log ->
-                Row(modifier = Modifier.horizontalScroll(scroll).padding(horizontal = 10.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.horizontalScroll(scroll).padding(horizontal = 10.dp, vertical = 3.dp).clickable { onLogClick(log) }, verticalAlignment = Alignment.CenterVertically) {
                     TableCell(log.datetime)
                     cols.forEach { TableCell(logValue(log, it)) }
                 }

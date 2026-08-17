@@ -50,6 +50,8 @@ import kotlin.math.roundToInt
 
 /** x 轴分类标签（extras 同步） */
 private val labelListKey = ExtraStore.Key<List<String>>()
+/** 系列名（marker 按索引取当前系列名） */
+private val seriesNamesKey = ExtraStore.Key<List<String>>()
 
 /** 段色板（与 Cloudflare 橙主题协调） */
 private val segmentColors = listOf(
@@ -175,7 +177,7 @@ fun SecurityTrendChart(
                     )
                 }
             }
-            extras { it[labelListKey] = allLabels }
+            extras { it[labelListKey] = allLabels; it[seriesNamesKey] = validSeries.map { s -> s.name } }
         }
     }
     CartesianChartHost(
@@ -205,11 +207,16 @@ fun SecurityTrendChart(
                 ),
                 valueFormatter = remember {
                     DefaultCartesianMarker.ValueFormatter { context, targets ->
-                        val target = targets.firstOrNull() ?: return@ValueFormatter ""
-                        val xLabel = context.model.extraStore[labelListKey].getOrNull(target.x.toInt()) ?: ""
-                        val yText = (target as? LineCartesianLayerMarkerTarget)
-                            ?.points?.firstOrNull()?.entry?.y?.toLong()?.let { formatCount(it) } ?: ""
-                        if (xLabel.isNotBlank()) "$xLabel\n$yText" else yText
+                        if (targets.isEmpty()) return@ValueFormatter ""
+                        val names = context.model.extraStore[seriesNamesKey]
+                        val lines = targets.mapNotNull { t ->
+                            val name = names.getOrNull(t.index) ?: ""
+                            val y = (t as? LineCartesianLayerMarkerTarget)?.points?.firstOrNull()?.entry?.y?.toLong() ?: 0L
+                            if (name.isBlank() && y == 0L) null else "$name: ${formatCount(y)}"
+                        }.joinToString("\n")
+                        if (lines.isBlank()) return@ValueFormatter ""
+                        val xLabel = context.model.extraStore[labelListKey].getOrNull(targets.first().x.toInt()) ?: ""
+                        if (xLabel.isNotBlank()) "$xLabel\n$lines" else lines
                     }
                 }
             )
