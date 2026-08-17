@@ -2,6 +2,16 @@
 
 ## 2026.08.16
 
+### 安全 Tab 多项修复与优化
+
+- **移除「半小时」时间范围**（半小时无整点数据且导致 Vico 空系列闪退）；3 小时粒度改为 5 分钟、12 小时改为 15 分钟（`SecurityTimeRange`）
+- **趋势图空系列防护**：过滤空序列 + 空 x 轴兜底，杜绝「Series can't be empty」闪退（`SecurityCharts.kt`）
+- **趋势图加 Vico marker**：按住/点击图表显示「时间 + 数值」（同统计页）（`SecurityCharts.kt`）
+- **总览/日志筛选器属性分离**：总览用原 7 属性（IP/国家/来源/操作/设备/HTTP版本/缓存状态），日志用 13 属性（`SecurityFilterAttr.OVERVIEW/LOG` + `FilterEditor.allowedAttrs`）
+- **日志「规则 ID」改「规则」**：改用 `description`（规则描述）字段而非 ruleId（`SecurityLogColumn`/`SecurityFilterAttr`/`parseLogs`）
+- **概况/趋势缓解改用 threatPathingMap**：规避 `httpRequests1hGroupsSum.threats` 已弃用（`SecurityAnalytics.kt`）
+- **「我的」关于卡片更新**：功能列表补充速度优化 / 网络优化 / 安全分析（`ProfileScreen.kt`）
+
 ### 筛选器运算符合理化 + 加号外置
 
 - **固定候选属性（方法 / HTTP 版本 / 操作 / 来源）仅支持「等于 / 不等于」**：选择此类属性时，运算符下拉自动剔除「包含 / 不包含」，若当前在其它运算符则自动重置为「等于」（`FilterEditor.allowedOps`）

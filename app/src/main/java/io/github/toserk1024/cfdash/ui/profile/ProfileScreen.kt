@@ -154,6 +154,9 @@ private fun AboutCard() {
             FeatureRow("DNS 管理", "记录的查看、新建、编辑、删除与批量操作")
             FeatureRow("数据统计", "账户级与域名级流量分析，Vico 图表可视化")
             FeatureRow("缓存清除", "按 URL / 主机 / 标签 / 前缀等方式清除 Cloudflare 缓存")
+            FeatureRow("速度优化", "HTTP/2、HTTP/3、Speed Brain 等协议与内容优化开关")
+            FeatureRow("网络优化", "IPv6、gRPC、WebSockets、洋葱路由等网络配置")
+            FeatureRow("安全分析", "安全概况、流量趋势、分组视图与安全事件日志筛选")
 
             Spacer(modifier = Modifier.height(8.dp))
             HorizontalDivider()

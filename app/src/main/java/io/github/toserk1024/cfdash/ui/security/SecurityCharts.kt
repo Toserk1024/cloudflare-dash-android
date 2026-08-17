@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,8 +36,12 @@ import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.compose.cartesian.data.lineModel
 import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.marker.DefaultCartesianMarker
+import com.patrykandpatrick.vico.compose.cartesian.marker.LineCartesianLayerMarkerTarget
+import com.patrykandpatrick.vico.compose.cartesian.marker.rememberDefaultCartesianMarker
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.common.Fill
+import com.patrykandpatrick.vico.compose.common.component.rememberTextComponent
 import com.patrykandpatrick.vico.compose.common.data.ExtraStore
 import io.github.toserk1024.cfdash.data.model.SecuritySegment
 import io.github.toserk1024.cfdash.data.model.SecurityTrendSeries
@@ -135,7 +140,8 @@ fun SecurityTrendChart(
     series: List<SecurityTrendSeries>,
     modifier: Modifier = Modifier
 ) {
-    if (series.isEmpty()) {
+    val validSeries = series.filter { it.points.isNotEmpty() }
+    if (validSeries.isEmpty()) {
         Box(
             modifier = modifier.fillMaxWidth().height(200.dp),
             contentAlignment = Alignment.Center
@@ -145,14 +151,23 @@ fun SecurityTrendChart(
         return
     }
     // 统一 x 轴：取全部 label 并集，缺失点补 0（保证多序列长度一致）
-    val allLabels = remember(series) {
-        series.flatMap { it.points.map { p -> p.label } }.distinct().sorted()
+    val allLabels = remember(validSeries) {
+        validSeries.flatMap { it.points.map { p -> p.label } }.distinct().sorted()
+    }
+    if (allLabels.isEmpty()) {
+        Box(
+            modifier = modifier.fillMaxWidth().height(200.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("暂无数据", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
     }
     val modelProducer = remember { CartesianChartModelProducer() }
-    LaunchedEffect(series, allLabels) {
+    LaunchedEffect(validSeries, allLabels) {
         modelProducer.runTransaction {
             lineModel {
-                series.forEach { s ->
+                validSeries.forEach { s ->
                     series(
                         y = allLabels.map { label ->
                             s.points.firstOrNull { it.label == label }?.count?.toFloat() ?: 0f
@@ -180,6 +195,22 @@ fun SecurityTrendChart(
             bottomAxis = HorizontalAxis.rememberBottom(
                 valueFormatter = CartesianValueFormatter { context, x, _ ->
                     context.model.extraStore[labelListKey].getOrNull(x.toInt()) ?: ""
+                }
+            ),
+            marker = rememberDefaultCartesianMarker(
+                label = rememberTextComponent(
+                    style = TextStyle(color = Color.White, fontSize = 12.sp, background = Color(0xCC000000)),
+                    lineCount = 2,
+                    overflow = TextOverflow.Visible
+                ),
+                valueFormatter = remember {
+                    DefaultCartesianMarker.ValueFormatter { context, targets ->
+                        val target = targets.firstOrNull() ?: return@ValueFormatter ""
+                        val xLabel = context.model.extraStore[labelListKey].getOrNull(target.x.toInt()) ?: ""
+                        val yText = (target as? LineCartesianLayerMarkerTarget)
+                            ?.points?.firstOrNull()?.entry?.y?.toLong()?.let { formatCount(it) } ?: ""
+                        if (xLabel.isNotBlank()) "$xLabel\n$yText" else yText
+                    }
                 }
             )
         ),

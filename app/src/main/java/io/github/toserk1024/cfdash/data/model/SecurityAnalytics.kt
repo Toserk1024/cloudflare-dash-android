@@ -13,16 +13,15 @@ import java.util.TimeZone
 
 /** 安全时间范围（最大 24h），作用于概况/趋势/日志/分组 */
 enum class SecurityTimeRange(val label: String, val millis: Long) {
-    HALF_HOUR("半小时", 30 * 60_000L),
     H3("3小时", 3 * 3600_000L),
     H12("12小时", 12 * 3600_000L),
     H24("1天", 24 * 3600_000L);
 
     val trendDimension: String
         get() = when (this) {
-            HALF_HOUR -> "datetimeFiveMinutes"
-            H3 -> "datetimeFifteenMinutes"
-            H12, H24 -> "datetimeHour"
+            H3 -> "datetimeFiveMinutes"
+            H12 -> "datetimeFifteenMinutes"
+            H24 -> "datetimeHour"
         }
 }
 
@@ -65,10 +64,19 @@ enum class SecurityFilterAttr(
     PATH("路径", "clientRequestPath", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
     QUERY("查询字符串", "clientRequestQuery", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
     RAY_ID("Ray ID", "rayName", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
-    RULE_ID("规则 ID", "ruleId", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
+    RULE_ID("规则", "description", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
     SOURCE("来源", "source", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.CANDIDATES,
         listOf("waf", "rate_limit", "bot_management", "access_rules", "custom_rule", "managed_rule", "firewall_rules")),
-    USER_AGENT("用户代理", "userAgent", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT)
+    USER_AGENT("用户代理", "userAgent", SecurityDataset.FIREWALL_ADAPTIVE, FilterValueKind.TEXT),
+    DEVICE("客户端设备类型", "clientDeviceType", SecurityDataset.HTTP_ADAPTIVE, FilterValueKind.CANDIDATES, SecurityCandidates.DEVICES),
+    CACHE_STATUS("缓存状态", "cacheStatus", SecurityDataset.HTTP_ADAPTIVE, FilterValueKind.CANDIDATES, SecurityCandidates.CACHE_STATUS);
+
+    companion object {
+        /** 总览页筛选器属性（原有 7 个，保持不回滚） */
+        val OVERVIEW = listOf(IP, COUNTRY, SOURCE, ACTION, DEVICE, HTTP_VERSION, CACHE_STATUS)
+        /** 日志页筛选器属性（13 个） */
+        val LOG = listOf(IP, COUNTRY, HOST, METHOD, HTTP_VERSION, ACTION, ASN, PATH, QUERY, RAY_ID, RULE_ID, SOURCE, USER_AGENT)
+    }
 }
 
 /** 筛选器条件（GraphQL 操作符后缀；无后缀=等于） */
@@ -109,7 +117,7 @@ enum class SecurityLogColumn(val label: String, val field: String) {
     PATH("路径", "clientRequestPath"),
     QUERY("查询字符串", "clientRequestQuery"),
     RAY_ID("Ray ID", "rayName"),
-    RULE_ID("规则 ID", "ruleId"),
+    RULE_ID("规则", "description"),
     SERVICE("服务", "source"),
     USER_AGENT("用户代理", "userAgent");
 
@@ -266,7 +274,7 @@ object SecurityAnalyticsParser {
             append(FW_ADAPTIVE).append("(limit: $LOG_LIMIT, filter: {datetime_geq: \"$s\", datetime_leq: \"$e\"")
             if (filter.isNotEmpty()) append(", $filter")
             append("}) {\n")
-            append(" datetime action source clientIP clientCountryName clientAsn clientRequestHTTPHost clientRequestHTTPMethodName clientRequestHTTPProtocol clientRequestPath clientRequestQuery userAgent rayName ruleId\n }\n }\n }\n }")
+            append(" datetime action source clientIP clientCountryName clientAsn clientRequestHTTPHost clientRequestHTTPMethodName clientRequestHTTPProtocol clientRequestPath clientRequestQuery userAgent rayName description\n }\n }\n }\n }")
         }
     }
 
@@ -425,7 +433,7 @@ object SecurityAnalyticsParser {
                 path = o["clientRequestPath"]?.jsonPrimitive?.content,
                 query = o["clientRequestQuery"]?.jsonPrimitive?.content,
                 rayName = o["rayName"]?.jsonPrimitive?.content,
-                ruleId = o["ruleId"]?.jsonPrimitive?.content,
+                ruleId = o["description"]?.jsonPrimitive?.content,
                 userAgent = o["userAgent"]?.jsonPrimitive?.content
             )
         }
@@ -447,7 +455,7 @@ object SecurityAnalyticsParser {
         val parsed = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
             .apply { timeZone = TimeZone.getTimeZone("UTC") }
             .parse(iso) ?: return iso
-        val out = if (range == SecurityTimeRange.H12 || range == SecurityTimeRange.H24) "HH时" else "HH:mm"
+        val out = if (range == SecurityTimeRange.H24) "HH时" else "HH:mm"
         SimpleDateFormat(out, Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(parsed)
     } catch (e: Exception) {
         iso

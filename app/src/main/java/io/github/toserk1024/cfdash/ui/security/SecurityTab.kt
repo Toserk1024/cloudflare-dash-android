@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -116,7 +117,7 @@ private fun OverviewContent(
                 }
             }
             Spacer(modifier = Modifier.height(10.dp))
-            FilterPanel(state.overviewFilters, onAddFilter, onRemoveFilter, onClearFilters)
+            FilterPanel(state.overviewFilters, SecurityFilterAttr.OVERVIEW, onAddFilter, onRemoveFilter, onClearFilters)
             Spacer(modifier = Modifier.height(10.dp))
 
             when {
@@ -170,7 +171,7 @@ private fun LogContent(
             }
         }
         Spacer(modifier = Modifier.height(10.dp))
-        FilterPanel(state.logFilters, onAddFilter, onRemoveFilter, onClearFilters)
+        FilterPanel(state.logFilters, SecurityFilterAttr.LOG, onAddFilter, onRemoveFilter, onClearFilters)
         Spacer(modifier = Modifier.height(10.dp))
 
         when {
@@ -247,6 +248,7 @@ private fun ColumnSelector(selected: Set<SecurityLogColumn>, onToggle: (Security
 @Composable
 private fun FilterPanel(
     filters: List<SecurityFilter>,
+    allowedAttrs: List<SecurityFilterAttr>,
     onAddFilter: (SecurityFilter) -> Unit,
     onRemoveFilter: (Int) -> Unit,
     onClearFilters: () -> Unit
@@ -258,7 +260,7 @@ private fun FilterPanel(
                 if (filters.isNotEmpty()) TextButton(onClick = onClearFilters) { Text("清除全部", style = MaterialTheme.typography.bodySmall) }
             }
             Spacer(modifier = Modifier.height(6.dp))
-            FilterEditor(onAddFilter)
+            FilterEditor(allowedAttrs, onAddFilter)
             if (filters.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 filters.forEachIndexed { index, f ->
@@ -277,15 +279,16 @@ private fun FilterPanel(
 
 /** 新建筛选器：属性/运算符/值 对应关系重构 */
 @Composable
-private fun FilterEditor(onAddFilter: (SecurityFilter) -> Unit) {
-    var attr by remember { mutableStateOf(SecurityFilterAttr.IP) }
+private fun FilterEditor(allowedAttrs: List<SecurityFilterAttr>, onAddFilter: (SecurityFilter) -> Unit) {
+    var attr by remember { mutableStateOf(allowedAttrs.firstOrNull() ?: SecurityFilterAttr.IP) }
+    LaunchedEffect(allowedAttrs) { if (attr !in allowedAttrs) attr = allowedAttrs.firstOrNull() ?: attr }
     var op by remember { mutableStateOf(SecurityFilterOp.EQ) }
     var values by remember { mutableStateOf(listOf<String>()) }
     var singleValue by remember { mutableStateOf("") }
     var countryQuery by remember { mutableStateOf("") }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        LabeledDropdown("属性", attr.label, SecurityFilterAttr.entries.map { it.label }) { sel ->
+        LabeledDropdown("属性", attr.label, allowedAttrs.map { it.label }) { sel ->
             SecurityFilterAttr.entries.firstOrNull { it.label == sel }?.let {
                 attr = it; values = emptyList(); singleValue = ""; countryQuery = ""
                 // 固定候选属性（方法/HTTP版本/操作/来源）仅支持等于/不等于，切到其它运算符时自动重置
