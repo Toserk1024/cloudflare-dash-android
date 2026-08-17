@@ -210,7 +210,7 @@ fun SecurityTrendChart(
                         if (targets.isEmpty()) return@ValueFormatter ""
                         val names = context.model.extraStore[seriesNamesKey]
                         val lines = targets.mapNotNull { t ->
-                            val name = names.getOrNull(t.index) ?: ""
+                            val name = names.getOrNull(targets.indexOf(t)) ?: ""
                             val y = (t as? LineCartesianLayerMarkerTarget)?.points?.firstOrNull()?.entry?.y?.toLong() ?: 0L
                             if (name.isBlank() && y == 0L) null else "$name: ${formatCount(y)}"
                         }.joinToString("\n")
