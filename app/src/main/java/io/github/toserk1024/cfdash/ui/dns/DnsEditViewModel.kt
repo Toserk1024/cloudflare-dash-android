@@ -3,6 +3,7 @@ package io.github.toserk1024.cfdash.ui.dns
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.data.model.DnsRecord
 import io.github.toserk1024.cfdash.data.model.DnsRecordRequest
 import io.github.toserk1024.cfdash.data.model.DnsRecordTypes
