@@ -67,7 +67,10 @@ class CloudflareClient(private val credentialProvider: () -> AuthCredential?) {
         path: String,
         query: Map<String, String> = emptyMap(),
         credentialOverride: AuthCredential? = null
-    ): ApiResponse<RespT> = decodeApiResponse(requestRaw("GET", path, null, query, credentialOverride))
+    ): ApiResponse<RespT> = withContext(Dispatchers.Default) {
+        // 反序列化放到 Default 线程：启动期并发请求时，解析大响应（安全日志/统计）不应占用主线程
+        decodeApiResponse(requestRaw("GET", path, null, query, credentialOverride))
+    }
 
     /** POST：body 使用具体类型序列化（reified），避免 Any 序列化失败 */
     internal suspend inline fun <reified RespT, reified BodyT> post(
@@ -75,9 +78,11 @@ class CloudflareClient(private val credentialProvider: () -> AuthCredential?) {
         body: BodyT,
         query: Map<String, String> = emptyMap(),
         credentialOverride: AuthCredential? = null
-    ): ApiResponse<RespT> = decodeApiResponse(
-        requestRaw("POST", path, CloudflareJson.encodeToString(body), query, credentialOverride)
-    )
+    ): ApiResponse<RespT> = withContext(Dispatchers.Default) {
+        decodeApiResponse(
+            requestRaw("POST", path, CloudflareJson.encodeToString(body), query, credentialOverride)
+        )
+    }
 
     /** PATCH：body 使用具体类型序列化（reified） */
     internal suspend inline fun <reified RespT, reified BodyT> patch(
@@ -85,15 +90,19 @@ class CloudflareClient(private val credentialProvider: () -> AuthCredential?) {
         body: BodyT,
         query: Map<String, String> = emptyMap(),
         credentialOverride: AuthCredential? = null
-    ): ApiResponse<RespT> = decodeApiResponse(
-        requestRaw("PATCH", path, CloudflareJson.encodeToString(body), query, credentialOverride)
-    )
+    ): ApiResponse<RespT> = withContext(Dispatchers.Default) {
+        decodeApiResponse(
+            requestRaw("PATCH", path, CloudflareJson.encodeToString(body), query, credentialOverride)
+        )
+    }
 
     internal suspend inline fun <reified RespT> delete(
         path: String,
         query: Map<String, String> = emptyMap(),
         credentialOverride: AuthCredential? = null
-    ): ApiResponse<RespT> = decodeApiResponse(requestRaw("DELETE", path, null, query, credentialOverride))
+    ): ApiResponse<RespT> = withContext(Dispatchers.Default) {
+        decodeApiResponse(requestRaw("DELETE", path, null, query, credentialOverride))
+    }
 
     /**
      * GraphQL 查询（POST /graphql）
@@ -106,7 +115,8 @@ class CloudflareClient(private val credentialProvider: () -> AuthCredential?) {
     ): JsonElement {
         val body = buildJsonObject { put("query", query) }.toString()
         val raw = requestRaw("POST", CloudflareApi.GRAPHQL, body, emptyMap(), credentialOverride)
-        val parsed = CloudflareJson.parseToJsonElement(raw)
+        // GraphQL 响应可能很大（日志/统计），同样放到 Default 线程解析
+        val parsed = withContext(Dispatchers.Default) { CloudflareJson.parseToJsonElement(raw) }
         (parsed.jsonObject["errors"] as? JsonArray)?.takeIf { it.isNotEmpty() }?.let { errs ->
             val msg = errs.joinToString("；") {
                 it.jsonObject["message"]?.jsonPrimitive?.content ?: "GraphQL 查询失败"

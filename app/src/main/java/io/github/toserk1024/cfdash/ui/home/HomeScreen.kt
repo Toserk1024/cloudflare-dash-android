@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -159,6 +160,9 @@ fun HomeScreen(
 
     // 域名选择器覆盖层开关
     var showZonePicker by remember { mutableStateOf(false) }
+
+    // 退出登录二次确认
+    var showLogoutConfirm by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // ===== 主内容 =====
@@ -436,7 +440,10 @@ fun HomeScreen(
                         icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                         label = { Text("退出登录", color = MaterialTheme.colorScheme.error) },
                         selected = false,
-                        onClick = { scope.launch { drawerState.close() }; onLogout() }
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            showLogoutConfirm = true
+                        }
                     )
                 }
             }
@@ -459,6 +466,26 @@ fun HomeScreen(
                     showZonePicker = false
                 },
                 onDismiss = { showZonePicker = false }
+            )
+        }
+
+        // ===== 退出登录二次确认 =====
+        if (showLogoutConfirm) {
+            AlertDialog(
+                onDismissRequest = { showLogoutConfirm = false },
+                title = { Text("退出登录") },
+                text = { Text("确定要退出当前账号吗？退出后需要重新输入凭据。") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showLogoutConfirm = false
+                            onLogout()
+                        }
+                    ) { Text("退出", color = MaterialTheme.colorScheme.error) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLogoutConfirm = false }) { Text("取消") }
+                }
             )
         }
     }

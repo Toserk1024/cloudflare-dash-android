@@ -107,6 +107,13 @@
 - **B. 表单懒加载**：`DnsRecordEditScreen` 由 `Column + verticalScroll` 改为 **`LazyColumn`**，字段按需组合（`items(fieldDefs, key)`），说明文案/字段列表用 `remember` 缓存，显著降低首帧成本
 - **A. 预热**：登录且首屏就绪后延迟 1.5s，把编辑页以 **0 尺寸**（`Box(Modifier.size(0.dp))`）组合一帧后立刻卸载，提前完成输入框/字体/Scaffold 的首次初始化；预热用 `recordId = null`（新建模式）**不发起任何网络请求**
 
+### 卡顿二次优化（反序列化移出主线程）+ 退出登录二次确认
+
+- **发现真正的主线程占用源**：`CloudflareClient` 的 `get/post/patch/delete` 在调用者线程（= 主线程）做 **JSON 反序列化**；启动期 6 个 ViewModel 并发拉数据（域名 / 统计 4 查询 / 安全 2 查询 / 速度 / 网络设置），响应体（尤其安全日志 200 条、统计多组数据）解析全部压在主线程 → 转场期间无帧可画
+  - 修复：四处请求统一包 `withContext(Dispatchers.Default) { decodeApiResponse(...) }`；`graphql()` 的 `parseToJsonElement` 同样移到 Default
+  - 顺带效果：所有页面的数据解析不再阻塞 UI 线程
+- **退出登录二次确认**：侧边栏「退出登录」不再直接执行，改为弹 `AlertDialog`（标题「退出登录」/ 正文「确定要退出当前账号吗？退出后需要重新输入凭据。」/ 确认按钮红色「退出」+「取消」）
+
 ## 2026.08.16
 
 ### 缓解修复 + 日志详情页 + 时间时区
