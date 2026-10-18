@@ -45,9 +45,10 @@ object ThemePreferences {
         if (prefs != null) return
         val p = context.applicationContext.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
         prefs = p
+        val storedHex = p.getString(KEY_COLOR, DEFAULT_COLOR_HEX) ?: DEFAULT_COLOR_HEX
         _state.value = ThemeConfig(
             dynamicColor = p.getBoolean(KEY_DYNAMIC, false),
-            colorHex = normalize(p.getString(KEY_COLOR, DEFAULT_COLOR_HEX)) ?: DEFAULT_COLOR_HEX
+            colorHex = normalize(storedHex) ?: DEFAULT_COLOR_HEX
         )
     }
 
