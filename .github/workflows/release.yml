@@ -2,6 +2,15 @@ name: Release APK
 
 on:
   workflow_dispatch:
+    inputs:
+      include_same_day:
+        description: '把「与上次发布同一天」的 changelog 条目也写入 Release Notes'
+        type: boolean
+        default: false
+
+# 创建 Release 需要写权限（GITHUB_TOKEN）
+permissions:
+  contents: write
 
 jobs:
   release:
@@ -59,32 +68,95 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          INCLUDE_SAME_DAY: ${{ inputs.include_same_day }}
         run: |
+          set -euo pipefail
+
           APK=app/build/outputs/apk/release/app-release.apk
           AAPT=$ANDROID_HOME/build-tools/36.0.0/aapt
-          # 从 APK 提取 versionName（格式：日期_自增序号，如 2026.08.08_5）
+
+          # versionName 形如 2026.10.18_3 → 去掉 _序号并加 v 作为 Tag
           VN=$($AAPT dump badging "$APK" | grep -oP "versionName='\K[^']+")
-          # Release 标题：去掉 name 后的 _序号，前面加 v（如 v2026.08.08）
           REV="${VN%_*}"
           TAG="v$REV"
-          # 获取上一个 release 的 tag，用于提取"自上次发布以来"的更新（保证多日版本发布）
-          LAST_TAG=$(gh release list --limit 1 --exclude-drafts --exclude-prereleases --json tagName -q '.[0].tagName' 2>/dev/null || true)
-          LAST_REV=""
-          if [ -n "$LAST_TAG" ]; then
-            LAST_REV="${LAST_TAG#v}"
+          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+
+          # Tag 已存在时直接失败（避免同日重复发布静默覆盖）
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release $TAG 已存在。如需再次发布，请先删除该 Release 与 Tag（gh release delete $TAG --yes --cleanup-tag）。"
+            exit 1
           fi
+
+          # 上一个 Release 的日期（用于确定 changelog 的增量范围）
+          LAST_TAG=$(gh release list --limit 1 --exclude-drafts --exclude-prereleases --json tagName -q '.[0].tagName' 2>/dev/null || true)
+          LAST_REV="${LAST_TAG#v}"
+          echo "上一个 Release：${LAST_TAG:-（无，首次发布）}"
+
           NOTES=/tmp/release_notes.md
-          {
-            echo "## $TAG 更新内容"
-            echo ""
-            if [ -n "$LAST_REV" ]; then
-              # 提取 changelog 中"上次发布日期之前（更新）"的所有子标题，覆盖跨多日的新增更新
-              awk -v d="$LAST_REV" '/^## /{cur=$0; sub(/^## /,"",cur); if(cur==d) exit} /^### /{print "- " substr($0,5)}' changelog.md
-            else
-              # 首次发布：提取全部子标题
-              awk '/^### /{print "- " substr($0,5)}' changelog.md
-            fi
-            echo ""
-            echo "详见 [changelog.md](https://github.com/Toserk1024/cloudflare-dash-android/blob/main/changelog.md)"
-          } > "$NOTES"
+          python3 - "$TAG" "$LAST_REV" "${INCLUDE_SAME_DAY:-false}" > "$NOTES" <<'PY'
+          import re
+          import sys
+
+          tag, last_rev, include_same_day = sys.argv[1], sys.argv[2], (sys.argv[3] == "true")
+
+          with open("changelog.md", encoding="utf-8") as f:
+              lines = f.read().splitlines()
+
+          # 兼容 "## 2026.10.18" 与 "##2026.10.18" 两种写法
+          date_re = re.compile(r"^##\s*(\d{4}\.\d{2}\.\d{2})\s*$")
+          blocks = []          # [(date, [lines...])]
+          current = None
+          for line in lines:
+              m = date_re.match(line.strip())
+              if m:
+                  current = [m.group(1), []]
+                  blocks.append(current)
+              elif current is not None:
+                  current[1].append(line)
+
+          def key(d):
+              return tuple(int(x) for x in d.split("."))
+
+          def cleanup(body):
+              # 去掉首尾空行，保持内部结构
+              while body and not body[0].strip():
+                  body.pop(0)
+              while body and not body[-1].strip():
+                  body.pop()
+              return body
+
+          selected = []
+          for date, body in blocks:
+              if not last_rev:
+                  keep = True                                  # 首次发布：全部收录
+              elif key(date) > key(last_rev):
+                  keep = True                                  # 上次发布之后的日期块
+              elif include_same_day and key(date) == key(last_rev):
+                  keep = True                                  # 手动选择：包含同日增量
+              else:
+                  keep = False
+              if keep:
+                  body = cleanup(body)
+                  if body:
+                      selected.append((date, body))
+
+          out = [f"## {tag} 更新内容", ""]
+          if not selected:
+              out.append("本次发布未在 `changelog.md` 中发现新增记录（可能为构建/配置类变更）。")
+          else:
+              for date, body in selected:
+                  # 保留原 ### 小标题与其下条目，日期块以 #### 形式标注
+                  out.append(f"#### {date}")
+                  out.append("")
+                  out.extend(body)
+                  out.append("")
+          out.append("---")
+          out.append("详见 [changelog.md](https://github.com/Toserk1024/cloudflare-dash-android/blob/main/changelog.md)")
+          print("\n".join(out).strip())
+          PY
+
+          echo "----- Release Notes -----"
+          cat "$NOTES"
+          echo "-------------------------"
+
           gh release create "$TAG" "$APK" --title "$TAG" --notes-file "$NOTES"
