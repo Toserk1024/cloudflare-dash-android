@@ -16,7 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -256,7 +256,7 @@ fun DnsRecordEditScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Button(
+            FilledTonalButton(
                 onClick = viewModel::submit,
                 enabled = !state.submitting,
                 modifier = Modifier.fillMaxWidth().height(52.dp)

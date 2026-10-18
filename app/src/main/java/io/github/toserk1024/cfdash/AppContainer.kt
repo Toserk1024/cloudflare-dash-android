@@ -3,6 +3,7 @@ package io.github.toserk1024.cfdash
 import android.content.Context
 import io.github.toserk1024.cfdash.data.api.CloudflareClient
 import io.github.toserk1024.cfdash.data.repository.CloudflareRepository
+import io.github.toserk1024.cfdash.data.storage.ThemePreferences
 import io.github.toserk1024.cfdash.data.storage.TokenStore
 
 /**
@@ -19,6 +20,7 @@ object AppContainer {
         if (::tokenStore.isInitialized) return
         val appContext = context.applicationContext
         tokenStore = TokenStore(appContext)
+        ThemePreferences.init(appContext)
         val client = CloudflareClient(tokenStore::getCredential)
         repository = CloudflareRepository(client)
     }

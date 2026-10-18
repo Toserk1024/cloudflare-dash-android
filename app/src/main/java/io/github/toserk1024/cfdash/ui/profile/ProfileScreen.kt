@@ -2,7 +2,11 @@ package io.github.toserk1024.cfdash.ui.profile
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Web
 import androidx.compose.material3.Card
@@ -26,17 +31,27 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.toserk1024.cfdash.BuildConfig
+import io.github.toserk1024.cfdash.data.storage.ThemePreferences
 import io.github.toserk1024.cfdash.ui.home.HomeViewModel.HomeUiState
 import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
 
@@ -126,8 +141,131 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
+                // 外观（主题颜色）
+                AppearanceCard()
+
+                Spacer(modifier = Modifier.height(20.dp))
+
                 // 关于信息
                 AboutCard()
+            }
+        }
+    }
+}
+
+/**
+ * 外观设置：主题颜色。
+ * - 开关「动态配色」：开 → 跟随系统壁纸取色（Android 12+）；关 → 展开自定义色（备选色 + hex 输入）
+ * - 改动即时生效并持久化（ThemePreferences）
+ */
+@Composable
+private fun AppearanceCard() {
+    val config by ThemePreferences.state.collectAsState()
+    val supportsDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+    var hexInput by remember(config.colorHex) { mutableStateOf(config.colorHex) }
+    var hexError by remember { mutableStateOf(false) }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Palette,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "主题颜色",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = config.dynamicColor,
+                    onCheckedChange = { ThemePreferences.setDynamicColor(it) },
+                    enabled = supportsDynamic
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = when {
+                    !supportsDynamic -> "动态配色需要 Android 12 及以上系统，当前设备不支持"
+                    config.dynamicColor -> "已开启：跟随系统壁纸自动取色"
+                    else -> "已关闭：使用下方向自定义主题色"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (!config.dynamicColor) {
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 备选色
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    ThemePreferences.PRESET_COLORS.forEach { (hex, _) ->
+                        val argb = ThemePreferences.toArgb(hex) ?: 0xFFF6821FL
+                        val selected = hex.equals(config.colorHex, ignoreCase = true)
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color(argb))
+                                .then(
+                                    if (selected) {
+                                        Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                                .clickable { ThemePreferences.setColorHex(hex) }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Hex 输入
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = hexInput,
+                        onValueChange = {
+                            hexInput = it
+                            hexError = false
+                        },
+                        label = { Text("自定义颜色 Hex", style = MaterialTheme.typography.bodySmall) },
+                        placeholder = { Text("#F6821F", style = MaterialTheme.typography.bodySmall) },
+                        singleLine = true,
+                        isError = hexError,
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(
+                        onClick = {
+                            val normalized = ThemePreferences.normalize(hexInput)
+                            if (normalized == null) {
+                                hexError = true
+                            } else {
+                                hexError = false
+                                ThemePreferences.setColorHex(normalized)
+                                hexInput = normalized
+                            }
+                        }
+                    ) { Text("应用") }
+                }
+                if (hexError) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "格式应为 #RRGGBB，例如 #F6821F",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     }

@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -97,7 +97,7 @@ fun CacheContent(
         Spacer(Modifier.height(20.dp))
 
         // 清除按钮
-        Button(
+        FilledTonalButton(
             onClick = viewModel::requestPurge,
             enabled = !state.busy,
             modifier = Modifier.fillMaxWidth()

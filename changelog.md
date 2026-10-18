@@ -27,6 +27,16 @@
 - **删除域名死代码**：移除 `Repository.deleteZone`（第三方客户端不提供域名删除这类高危入口）
 - **切换账号跨账号串数据**：切账号/退出时统一清空 `ZoneSelectionStore`、`ZoneSettingsCache`、`DnsRecordsSync`（单一事实源引入的全局状态必须一并清理），并为 `DnsRecordsSync` 增加 `clear()`
 
+### 修复取消误报 + 主题颜色可配置
+
+- **修复切换域名时速度/网络页闪出 `xxx: was cancelled`**：`ZoneSettingsLoader` 在请求被取消时（切换域名会取消旧请求）不再把 `CancellationException` 当成“设置加载失败”记录，而是继续向上抛；取消属于正常行为，不会出现在 UI 错误提示里
+- **主题颜色可配置**：
+  - 新增 `ThemePreferences`（明文 SharedPreferences 持久化 + `StateFlow` 即时生效）
+  - 「我的」页新增「主题颜色」卡片：**动态配色开关**（开启 = 跟随系统壁纸取色，需 Android 12+）；关闭后展示 **6 个备选色** + **Hex 输入框**（`#RRGGBB` 校验，即时生效）
+  - 关闭动态配色时使用自定义主色，且设置持久化，重启后保持
+- **主题色不再大面积填充按钮**：普通实心按钮统一改为 `FilledTonalButton`（中性容器色），品牌色只用于图标、选中态、开关、FAB 等强调位置；配色派生会自动计算 `onPrimary` 的黑白对比、`primaryContainer` 与中性 `secondaryContainer`
+- 深色模式继续使用纯黑 OLED 背景
+
 ## 2026.08.16
 
 ### 缓解修复 + 日志详情页 + 时间时区

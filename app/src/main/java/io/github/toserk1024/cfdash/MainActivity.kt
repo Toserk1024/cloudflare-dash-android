@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -30,6 +32,7 @@ import io.github.toserk1024.cfdash.navigation.AppNavHost
 import io.github.toserk1024.cfdash.navigation.Routes
 import io.github.toserk1024.cfdash.data.state.ZoneSelectionStore
 import io.github.toserk1024.cfdash.data.state.ZoneSettingsCache
+import io.github.toserk1024.cfdash.data.storage.ThemePreferences
 import io.github.toserk1024.cfdash.ui.common.AppReadySignal
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordsSync
 import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
@@ -50,7 +53,16 @@ class MainActivity : ComponentActivity() {
         AppContainer.init(this)
         enableEdgeToEdge()
         setContent {
-            MyApplicationTheme {
+            val themeConfig by ThemePreferences.state.collectAsState()
+            MyApplicationTheme(
+                darkTheme = isSystemInDarkTheme(),
+                dynamicColor = themeConfig.dynamicColor,
+                customPrimary = if (themeConfig.dynamicColor) {
+                    null
+                } else {
+                    Color(ThemePreferences.toArgb(themeConfig.colorHex) ?: 0xFFF6821FL)
+                }
+            ) {
                 MainScreen()
             }
         }

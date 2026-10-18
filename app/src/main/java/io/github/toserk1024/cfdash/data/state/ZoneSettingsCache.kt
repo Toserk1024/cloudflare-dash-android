@@ -1,6 +1,7 @@
 package io.github.toserk1024.cfdash.data.state
 
 import io.github.toserk1024.cfdash.data.repository.CloudflareRepository
+import kotlinx.coroutines.CancellationException
 
 /**
  * Zone 设置的内存缓存（zoneId → setting 名 → 值）。
@@ -60,6 +61,9 @@ object ZoneSettingsLoader {
 
         val full = ZoneSettingsCache.snapshot(zoneId) ?: try {
             repository.getAllZoneSettings(zoneId).also { ZoneSettingsCache.putAll(zoneId, it) }
+        } catch (e: CancellationException) {
+            // 切换域名会取消旧请求：取消不是错误，必须继续向上抛，不能当成"接口不可用"降级
+            throw e
         } catch (e: Exception) {
             // 全量接口不可用（权限/接口变更）时降级为单项请求，不直接报错
             emptyMap()
@@ -72,6 +76,9 @@ object ZoneSettingsLoader {
                 val value = repository.getZoneSetting(zoneId, key).value
                 values[key] = value
                 ZoneSettingsCache.put(zoneId, key, value)
+            } catch (e: CancellationException) {
+                // 同上：请求被取消（切换域名/离开页面）时直接中止，避免把 "was cancelled" 当成设置加载失败显示给用户
+                throw e
             } catch (e: Exception) {
                 errors.add("$key：${e.message ?: "加载失败"}")
             }
