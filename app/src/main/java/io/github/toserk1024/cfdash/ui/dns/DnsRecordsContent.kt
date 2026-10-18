@@ -215,6 +215,8 @@ fun DnsRecordsContent(
                                 selectionMode = state.selectionMode,
                                 selected = record.id in state.selectedIds,
                                 onSelectChange = { viewModel.toggleSelect(record.id) },
+                                // 增删时的位置/淡入动画（MD3 列表动效）
+                                modifier = Modifier.animateItem(),
                                 onEdit = { onEditRecord(record) },
                                 onDelete = { viewModel.requestDelete(record) }
                             )
@@ -295,12 +297,13 @@ private fun DnsRecordCard(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onSelectChange: (Boolean) -> Unit = {},
+    modifier: Modifier = Modifier,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
         onClick = onEdit,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 5.dp)
     ) {
@@ -356,7 +359,8 @@ private fun DnsRecordCard(
                     Text(
                         text = "已代理",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
+                        // MD3 语义：状态/强调辅色用 tertiary，不用 primary（primary 属于主操作与选中态）
+                        color = MaterialTheme.colorScheme.tertiary
                     )
                 }
                 if (!record.proxiable) {

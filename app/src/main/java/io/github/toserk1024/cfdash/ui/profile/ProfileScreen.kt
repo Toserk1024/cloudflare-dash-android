@@ -172,12 +172,12 @@ private fun AppearanceCard() {
                 Icon(
                     Icons.Default.Palette,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(22.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "主题颜色",
+                    text = "种子颜色（Theme seed）",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
@@ -192,9 +192,15 @@ private fun AppearanceCard() {
             Text(
                 text = when {
                     !supportsDynamic -> "动态配色需要 Android 12 及以上系统，当前设备不支持"
-                    config.dynamicColor -> "已开启：跟随系统壁纸自动取色"
-                    else -> "已关闭：使用下方向自定义主题色"
+                    config.dynamicColor -> "已开启：以系统壁纸主色作为种子色"
+                    else -> "已关闭：使用下方自定义种子色，Material 3 会据此派生整套配色"
                 },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "文本与图标使用 MD3 语义色（onSurface / onSurfaceVariant），不会被种子色覆盖。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -280,7 +286,7 @@ private fun AboutCard() {
                 Icon(
                     Icons.Default.Info,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(22.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -333,7 +339,7 @@ private fun AboutCard() {
                     Icon(
                         Icons.Filled.Web,
                         contentDescription = "开源仓库",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
@@ -365,7 +371,7 @@ private fun FeatureRow(title: String, desc: String) {
         Icon(
             Icons.Default.CheckCircle,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp)
         )
         Spacer(modifier = Modifier.width(8.dp))

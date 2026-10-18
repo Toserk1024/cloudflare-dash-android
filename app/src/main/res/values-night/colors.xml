@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色（OLED）：窗口背景纯黑，消除进入页面时的白闪 -->
+    <color name="window_background">#FF000000</color>
+</resources>

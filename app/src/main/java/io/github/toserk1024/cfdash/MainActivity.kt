@@ -4,6 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -57,8 +61,9 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme(
                 darkTheme = isSystemInDarkTheme(),
                 dynamicColor = themeConfig.dynamicColor,
-                customPrimary = if (themeConfig.dynamicColor) {
-                    null
+                seedColor = if (themeConfig.dynamicColor) {
+                    // 开启动态配色时 seed 来自系统，这里给默认值即可
+                    CloudflareOrange
                 } else {
                     Color(ThemePreferences.toArgb(themeConfig.colorHex) ?: 0xFFF6821FL)
                 }
@@ -84,7 +89,7 @@ private fun MainScreen() {
     // 当前所在 Home Tab（切换账号/重建导航栈后保持所在页面不变）
     var currentTab by remember { mutableIntStateOf(0) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         key(navResetKey) {
             val navController = rememberNavController()
 
@@ -155,6 +160,13 @@ private fun MainScreen() {
                 if (elapsed < MIN_LOADING_MS) delay(MIN_LOADING_MS - elapsed)
                 switching = false
             }
+        }
+        // 淡入淡出，避免遮罩硬切
+        AnimatedVisibility(
+            visible = switching,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(200))
+        ) {
             SwitchingLoadingOverlay()
         }
     }

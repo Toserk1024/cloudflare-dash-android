@@ -8,6 +8,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -20,7 +22,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -66,10 +67,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -94,7 +95,6 @@ import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
 import io.github.toserk1024.cfdash.ui.zones.ZoneDetailTab
 import io.github.toserk1024.cfdash.ui.zones.ZonePicker
 import io.github.toserk1024.cfdash.ui.zones.ZoneViewModel
-import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 /**
@@ -445,8 +445,8 @@ fun HomeScreen(
         // ===== 域名选择器覆盖层（全屏独立页面，覆盖整个含横栏，带动画）=====
         AnimatedVisibility(
             visible = showZonePicker,
-            enter = fadeIn(tween(200)),
-            exit = fadeOut(tween(150)),
+            enter = fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.96f),
+            exit = fadeOut(tween(160)) + scaleOut(tween(160), targetScale = 0.96f),
             modifier = Modifier.fillMaxSize()
         ) {
             ZonePicker(
@@ -475,11 +475,21 @@ private fun SlidingTab(
         animationSpec = tween(250, easing = FastOutSlowInEasing),
         label = "tabSlide"
     )
+    val alpha by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "tabAlpha"
+    )
     Box(
         modifier = Modifier
             .fillMaxSize()
             .zIndex(if (selected) 1f else 0f)
-            .offset { IntOffset(offsetX.roundToInt(), 0) }
+            // 用 graphicsLayer：位移与透明度都只影响绘制阶段，
+            // 8 个常驻 Tab 切换时不再逐帧触发布局重排（更丝滑、更省电）
+            .graphicsLayer {
+                translationX = offsetX
+                this.alpha = alpha
+            }
     ) {
         content()
     }

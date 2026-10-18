@@ -2,8 +2,11 @@ package io.github.toserk1024.cfdash.navigation
 
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
@@ -24,6 +27,9 @@ import io.github.toserk1024.cfdash.ui.onboarding.OnboardingScreen
 
 /** 导航防重入窗口（毫秒）：连点两次不会压入两层相同页面 */
 private const val NAV_DEBOUNCE_MS = 600L
+
+/** 页面转场时长（ms）：300ms 兼顾响应与观感 */
+private const val NAV_ANIM_MS = 300
 
 /**
  * 安全返回 Home：
@@ -56,11 +62,25 @@ fun AppNavHost(
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        enterTransition = { fadeIn(tween(220)) + slideInHorizontally { it / 4 } },
-        exitTransition = { fadeOut(tween(180)) },
-        popEnterTransition = { fadeIn(tween(180)) },
-        // 返回时源页（如域名详情）向右滑出，与进入从右滑入对称，退场动画可见
-        popExitTransition = { fadeOut(tween(180)) + slideOutHorizontally { -it / 4 } }
+        // Material Motion「shared-axis X」：
+        // 前进 = 新页从右滑入 + 旧页轻微缩小淡出；返回 = 当前页向右滑出 + 下层页放大淡入
+        enterTransition = {
+            fadeIn(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
+                slideInHorizontally(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) { it / 4 }
+        },
+        exitTransition = {
+            fadeOut(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
+                scaleOut(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing), targetScale = 0.94f)
+        },
+        popEnterTransition = {
+            fadeIn(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
+                scaleIn(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing), initialScale = 0.94f)
+        },
+        // 返回时当前页向右滑出（修正此前方向反了的问题：原来向左 = 与进入同向，观感像"继续前进"）
+        popExitTransition = {
+            fadeOut(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
+                slideOutHorizontally(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) { it / 4 }
+        }
     ) {
 
         // 免责声明启动页

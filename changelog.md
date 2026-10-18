@@ -57,6 +57,26 @@
   正是按钮“发灰、像被禁用”的原因
 - **实心按钮恢复 MD 默认样式**：5 处 `FilledTonalButton` 回到 `Button`（primary 填充），恢复原有清晰对比
 
+### 真·Material 3 主题（种子色派生）+ 动画全面补齐
+
+- **主题改为 MD3 标准生成管线**：引入 `com.materialkolor:material-kolor:5.0.1`（Material Color Utilities 封装），
+  用 `rememberDynamicColorScheme(seedColor, isDark, isAmoled)` 由**种子色派生整套配色**（primary/secondary/tertiary/neutral/neutralVariant），
+  等同 Material Theme Builder 产物；不再手写 ColorScheme 角色
+- **主题色 ≠ 文本/图标色**：清理 5 处把 `primary` 刷到文本/图标的误用 ——
+  域名选中文字改 `onSurface`、"已代理"状态改 `tertiary`、我的页 4 个图标改 `onSurfaceVariant`
+- **OLED 纯黑由库原生支持**：`isAmoled = true`，深色自动 AMOLED 方案；浅色保持 MD3 标准浅色
+- **动态配色同管线**：Android 12+ 跟随系统时，以系统 primary 作为种子色，仍走同一 MD3 生成流程
+- **设置页文案**：「主题颜色」→「种子颜色（Theme seed）」，并注明文本/图标使用语义色
+- **消灭进入页面白闪（根因修复）**：`themes.xml` 原先固定 `android:Theme.Material.Light`，窗口底色恒白；
+  现拆分为 `values` / `values-night` 两套主题 + `window_background` 颜色（#FAFAFA / #000000），
+  并在根布局按 `colorScheme.background` 兜底
+- **转场修正 + 升级为 Material Motion「shared-axis X」**（300ms，FastOutSlowIn）：
+  - 前进：新页从右滑入 + 旧页 `scaleOut(0.94)` 淡出
+  - 返回：当前页**向右**滑出（原方向写反，向左滑 = 观感像"继续前进"）+ 下层页 `scaleIn(0.94→1)`
+- **Tab 切换丝滑化**：`SlidingTab` 从 `Modifier.offset{}`（layout 阶段）改为 `graphicsLayer{ translationX / alpha }`（draw 阶段），
+  8 个常驻页切换不再逐帧重排；并补 180ms 透明度过渡
+- **其他动效**：域名选择器覆盖层 `fade + scale(0.96)`；切账号 Loading 遮罩淡入淡出；DNS 列表项 `animateItem()` 增删平滑
+
 ## 2026.08.16
 
 ### 缓解修复 + 日志详情页 + 时间时区

@@ -7,4 +7,6 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <!-- 窗口背景（Activity 首帧 / 转场间隙），与 Compose 主题背景一致，避免白闪 -->
+    <color name="window_background">#FFFAFAFA</color>
 </resources>

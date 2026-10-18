@@ -145,6 +145,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.vico.compose)
+    implementation(libs.material.kolor)
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.ui.tooling)
 }
