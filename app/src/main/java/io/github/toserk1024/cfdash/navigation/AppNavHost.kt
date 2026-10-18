@@ -2,8 +2,6 @@ package io.github.toserk1024.cfdash.navigation
 
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -62,24 +60,25 @@ fun AppNavHost(
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        // Material Motion「shared-axis X」：
-        // 前进 = 新页从右滑入 + 旧页轻微缩小淡出；返回 = 当前页向右滑出 + 下层页放大淡入
+        // 页面转场：前进/返回都让「两页同时运动」，避免不透明新页盖住旧页导致"看着没动画"
+        // 前进：新页从右滑入（it/3），旧页轻微左移淡出
+        // 返回：当前页向右滑出（it/3），下层页从左侧滑入（-it/3）+ fadeIn 让下层在渐变期间可见
         enterTransition = {
             fadeIn(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
-                slideInHorizontally(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) { it / 4 }
+                slideInHorizontally(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) { it / 3 }
         },
         exitTransition = {
             fadeOut(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
-                scaleOut(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing), targetScale = 0.94f)
+                slideOutHorizontally(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) { -it / 8 }
         },
         popEnterTransition = {
             fadeIn(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
-                scaleIn(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing), initialScale = 0.94f)
+                slideInHorizontally(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) { -it / 3 }
         },
-        // 返回时当前页向右滑出（修正此前方向反了的问题：原来向左 = 与进入同向，观感像"继续前进"）
+        // 返回时当前页向右滑出（与进入方向相反；此前写成向左 = 观感像"继续前进"）
         popExitTransition = {
             fadeOut(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
-                slideOutHorizontally(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) { it / 4 }
+                slideOutHorizontally(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) { it / 3 }
         }
     ) {
 

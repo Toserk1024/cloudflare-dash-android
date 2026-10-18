@@ -177,7 +177,7 @@ private fun AppearanceCard() {
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "种子颜色（Theme seed）",
+                    text = "主题色设置",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
@@ -192,8 +192,8 @@ private fun AppearanceCard() {
             Text(
                 text = when {
                     !supportsDynamic -> "动态配色需要 Android 12 及以上系统，当前设备不支持"
-                    config.dynamicColor -> "已开启：以系统壁纸主色作为种子色"
-                    else -> "已关闭：使用下方自定义种子色，Material 3 会据此派生整套配色"
+                    config.dynamicColor -> "已启用动态配色"
+                    else -> "使用自定义颜色"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
