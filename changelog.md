@@ -100,6 +100,13 @@
 - 删除自写的 `AnimatedAppNav.kt`、`AppScreen.kt`（改为库实现）
 - `Routes` 新增 `EMPTY` 透明占位路由；DNS 编辑页返回统一 `popBackStack(Routes.EMPTY, false)`，重复触发不会弹空栈
 
+### 首次进入卡顿优化（A 预热 + B 表单懒加载）
+
+- **现象**：App 启动后**第一次**进/退 DNS 编辑页，动画≈0 且有明显卡顿；把几个 Tab 点一遍后恢复正常
+- **根因**：转场期间目标页**首次组合 + 测量 + 首次绘制**（十余个 `OutlinedTextField`、Scaffold/TopAppBar、字体度量、输入法回调）成本达数百 ms，320ms 动画只渲染 1~2 帧就直接到终点
+- **B. 表单懒加载**：`DnsRecordEditScreen` 由 `Column + verticalScroll` 改为 **`LazyColumn`**，字段按需组合（`items(fieldDefs, key)`），说明文案/字段列表用 `remember` 缓存，显著降低首帧成本
+- **A. 预热**：登录且首屏就绪后延迟 1.5s，把编辑页以 **0 尺寸**（`Box(Modifier.size(0.dp))`）组合一帧后立刻卸载，提前完成输入框/字体/Scaffold 的首次初始化；预热用 `recordId = null`（新建模式）**不发起任何网络请求**
+
 ## 2026.08.16
 
 ### 缓解修复 + 日志详情页 + 时间时区

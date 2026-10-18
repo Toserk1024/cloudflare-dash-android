@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,6 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.compose.rememberNavController
 import io.github.toserk1024.cfdash.data.state.ZoneSelectionStore
 import io.github.toserk1024.cfdash.data.state.ZoneSettingsCache
@@ -44,6 +48,8 @@ import io.github.toserk1024.cfdash.data.storage.ThemePreferences
 import io.github.toserk1024.cfdash.navigation.AppNavHost
 import io.github.toserk1024.cfdash.navigation.Routes
 import io.github.toserk1024.cfdash.ui.common.AppReadySignal
+import io.github.toserk1024.cfdash.ui.dns.DnsEditViewModel
+import io.github.toserk1024.cfdash.ui.dns.DnsRecordEditScreen
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordsSync
 import io.github.toserk1024.cfdash.ui.home.HomeScreen
 import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
@@ -167,6 +173,44 @@ private fun MainScreen() {
                 onAccepted = { accepted = true },
                 onLoggedIn = { loggedIn = true }
             )
+
+            // ===== 预热：首次进入 DNS 编辑页之前，用 0 尺寸组合一次表单 =====
+            // 目的：把输入框/字体度量/Scaffold/TopAppBar 的首次初始化成本提前做掉，
+            // 避免"第一次进入时转场动画被首帧卡顿吞掉"（之后进入无需预热，因为相关缓存已就绪）
+            var warmup by remember { mutableStateOf(false) }
+            LaunchedEffect(accepted, loggedIn) {
+                if (accepted && loggedIn) {
+                    delay(1500) // 等首屏数据稳定
+                    warmup = true
+                    delay(64) // 至少铺一帧
+                    warmup = false
+                }
+            }
+            if (warmup) {
+                val warmupViewModel: DnsEditViewModel = viewModel(
+                    key = "dns_edit_warmup",
+                    factory = viewModelFactory {
+                        initializer {
+                            // 新建模式（recordId = null）不会触发任何网络请求
+                            DnsEditViewModel(
+                                repository = AppContainer.repository,
+                                zoneId = "warmup",
+                                recordId = null
+                            )
+                        }
+                    }
+                )
+                Box(modifier = Modifier.size(0.dp)) {
+                    DnsRecordEditScreen(
+                        zoneId = "warmup",
+                        recordId = null,
+                        zoneName = "warmup",
+                        onBack = {},
+                        onSaved = {},
+                        viewModel = warmupViewModel
+                    )
+                }
+            }
         }
 
         // 全屏 Loading 遮罩：等待首屏数据就绪（最少 400ms 防闪烁，最多 3s 兜底）
