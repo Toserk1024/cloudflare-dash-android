@@ -39,7 +39,8 @@ fun ZoneDetailTab(
     onSetDevMode: (Boolean) -> Unit,
     onSetUnderAttack: (Boolean) -> Unit,
     onSetIpv6: (Boolean) -> Unit,
-    onRetrySettings: () -> Unit
+    onRetrySettings: () -> Unit,
+    onRetryDetail: () -> Unit = {}
 ) {
     val zone = state.selectedZone
 
@@ -57,7 +58,7 @@ fun ZoneDetailTab(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("⚠ ${state.detailError}", color = MaterialTheme.colorScheme.error)
                 Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(onClick = { /* 由 HomeScreen 处理重新选择 */ }) {
+                OutlinedButton(onClick = onRetryDetail) {
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("重试")

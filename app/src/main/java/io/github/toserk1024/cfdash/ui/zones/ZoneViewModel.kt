@@ -7,6 +7,7 @@ import io.github.toserk1024.cfdash.data.model.Zone
 import io.github.toserk1024.cfdash.data.model.ZoneSetting
 import io.github.toserk1024.cfdash.data.repository.CloudflareRepository
 import io.github.toserk1024.cfdash.data.state.ZoneSelectionStore
+import io.github.toserk1024.cfdash.data.state.ZoneSettingsCache
 import io.github.toserk1024.cfdash.data.storage.TokenStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -183,6 +184,13 @@ class ZoneViewModel @JvmOverloads constructor(
         _uiState.update { it.copy(settingsError = null) }
         val zone = _uiState.value.selectedZone ?: return
         viewModelScope.launch { loadSettings(zone.id) }
+    }
+
+    /** 重新加载当前域名的详情 + 高级设置（用于详情加载失败后的「重试」按钮） */
+    fun reloadDetail() {
+        val zone = _uiState.value.selectedZone ?: return
+        ZoneSettingsCache.invalidate(zone.id)
+        loadDetailAndSettings(zone.id)
     }
 
     fun setDevelopmentMode(on: Boolean) =

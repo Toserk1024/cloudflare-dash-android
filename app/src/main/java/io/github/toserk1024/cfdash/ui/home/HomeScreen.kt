@@ -210,7 +210,8 @@ fun HomeScreen(
                             onSetDevMode = zoneViewModel::setDevelopmentMode,
                             onSetUnderAttack = zoneViewModel::setUnderAttack,
                             onSetIpv6 = zoneViewModel::setIpv6,
-                            onRetrySettings = zoneViewModel::refreshSettings
+                            onRetrySettings = zoneViewModel::refreshSettings,
+                            onRetryDetail = zoneViewModel::reloadDetail
                         )
                     }
                 }

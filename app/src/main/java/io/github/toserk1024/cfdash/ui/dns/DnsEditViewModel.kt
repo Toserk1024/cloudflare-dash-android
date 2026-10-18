@@ -53,26 +53,23 @@ class DnsEditViewModel @JvmOverloads constructor(
     }
 
     private fun loadRecord() {
+        val id = recordId ?: return
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             _uiState.update { it.copy(loading = true) }
             try {
-                val resp = repository.getDnsRecords(zoneId, page = 1, perPage = 100)
-                val record = resp.result?.find { it.id == recordId }
-                if (record != null) {
-                    _uiState.update {
-                        it.copy(
-                            recordType = record.type,
-                            name = record.name,
-                            fields = parseFields(record),
-                            ttl = record.ttl,
-                            proxied = record.proxied,
-                            comment = record.comment ?: "",
-                            loading = false
-                        )
-                    }
-                } else {
-                    _uiState.update { it.copy(loading = false, error = "未找到该记录") }
+                // 直接按 id 拉取单条记录（旧实现拉列表前 100 条再本地查找，记录超 100 条时必然失败）
+                val record = repository.getDnsRecord(zoneId, id)
+                _uiState.update {
+                    it.copy(
+                        recordType = record.type,
+                        name = record.name,
+                        fields = parseFields(record),
+                        ttl = record.ttl,
+                        proxied = record.proxied,
+                        comment = record.comment ?: "",
+                        loading = false
+                    )
                 }
             } catch (e: CancellationException) {
                 throw e

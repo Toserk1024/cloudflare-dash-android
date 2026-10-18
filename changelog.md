@@ -18,6 +18,15 @@
 - **单元测试**：新增 JUnit 测试 3 组（`AnalyticsParser` 解析、`AccountId` 账号 id 算法、`formatTtl` 格式化），并把 `testDebugUnitTest` 接入 CI（测试失败将阻断 APK 产出）
 - 说明：`AccountId` 抽为纯函数时**刻意保持原算法不变**（Token 用内容 hashCode、邮箱用小写），否则已保存账号的加密存储 key 会失配，等同于账号丢失
 
+### Bug 批量修复（6 项）
+
+- **DNS 记录编辑在记录数 > 100 时必然失败**：编辑页改为调用单条端点 `GET /zones/{id}/dns_records/{recordId}`（新增 `Repository.getDnsRecord`），不再“拉前 100 条再本地查找”
+- **账户级统计只能看第一个账号**：`/accounts` 结果缓存为一次请求，账户级统计新增账号选择器（账号数 > 1 时在统计页顶部显示，切换即清空统计缓存并重载）
+- **域名详情「重试」按钮点了没反应**：由空实现改为 `ZoneViewModel.reloadDetail()`（作废设置缓存，重新拉取详情与高级设置）
+- **Android 12+ 品牌色被系统取色覆盖**：`dynamicColor` 默认改为 `false`，固定 Cloudflare 橙主题
+- **删除域名死代码**：移除 `Repository.deleteZone`（第三方客户端不提供域名删除这类高危入口）
+- **切换账号跨账号串数据**：切账号/退出时统一清空 `ZoneSelectionStore`、`ZoneSettingsCache`、`DnsRecordsSync`（单一事实源引入的全局状态必须一并清理），并为 `DnsRecordsSync` 增加 `clear()`
+
 ## 2026.08.16
 
 ### 缓解修复 + 日志详情页 + 时间时区

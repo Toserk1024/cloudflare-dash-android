@@ -36,4 +36,9 @@ object DnsRecordsSync {
         }
         return changes
     }
+
+    /** 清空队列（切换账号 / 退出登录时调用，避免变更串到新账号） */
+    fun clear() {
+        pending.clear()
+    }
 }

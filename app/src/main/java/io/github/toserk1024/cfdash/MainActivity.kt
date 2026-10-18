@@ -28,7 +28,10 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.rememberNavController
 import io.github.toserk1024.cfdash.navigation.AppNavHost
 import io.github.toserk1024.cfdash.navigation.Routes
+import io.github.toserk1024.cfdash.data.state.ZoneSelectionStore
+import io.github.toserk1024.cfdash.data.state.ZoneSettingsCache
 import io.github.toserk1024.cfdash.ui.common.AppReadySignal
+import io.github.toserk1024.cfdash.ui.dns.DnsRecordsSync
 import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
 import io.github.toserk1024.cfdash.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
@@ -100,8 +103,9 @@ private fun MainScreen() {
                 onLoggedOut = {
                     // 退出登录：删除当前激活用户；若有剩余用户自动切换并重建导航栈刷新，否则回初始化
                     AppContainer.tokenStore.getActiveUser()?.id?.let { AppContainer.tokenStore.deleteUser(it) }
-                    // 账户变化，清除持久化的选中域名
+                    // 账户变化，清除持久化的选中域名与会话级内存缓存（两种分支都需要）
                     AppContainer.tokenStore.saveSelectedZoneId(null)
+                    clearSessionCaches()
                     if (AppContainer.tokenStore.hasCredential()) {
                         AppReadySignal.reset()
                         switching = true
@@ -114,8 +118,9 @@ private fun MainScreen() {
                     navController.navigate(Routes.ONBOARDING)
                 },
                 onUserSwitched = {
-                    // 切换账号：清除持久化域名选择，重建导航栈重新加载
+                    // 切换账号：清除持久化域名选择 + 清空会话内存缓存，重建导航栈重新加载
                     AppContainer.tokenStore.saveSelectedZoneId(null)
+                    clearSessionCaches()
                     AppReadySignal.reset()
                     switching = true
                     navResetKey++
@@ -141,6 +146,13 @@ private fun MainScreen() {
             SwitchingLoadingOverlay()
         }
     }
+}
+
+/** 切换账号 / 退出登录时清空会话级内存缓存，避免旧账号数据串到新账号 */
+private fun clearSessionCaches() {
+    ZoneSelectionStore.clear()
+    ZoneSettingsCache.clear()
+    DnsRecordsSync.clear()
 }
 
 /** 切换账号时的全屏加载画面：进度圈 + "Loading." 循环动画文字 */

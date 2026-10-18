@@ -90,11 +90,6 @@ class CloudflareRepository(private val client: CloudflareClient) {
         client.get<Zone>(CloudflareApi.ZONE.format(zoneId)).result
             ?: throw CloudflareException("获取域名详情失败")
 
-    /** 删除域名（破坏性操作） */
-    suspend fun deleteZone(zoneId: String) {
-        client.delete<JsonElement>(CloudflareApi.ZONE.format(zoneId))
-    }
-
     /** 获取 Zone 设置（如 development_mode / security_level / ipv6） */
     suspend fun getZoneSetting(zoneId: String, setting: String): ZoneSetting =
         client.get<ZoneSetting>(CloudflareApi.ZONE_SETTING.format(zoneId, setting)).result
@@ -196,6 +191,11 @@ class CloudflareRepository(private val client: CloudflareClient) {
         val resp = client.graphql(SecurityAnalyticsParser.logsQuery(zoneId, range, filters))
         return SecurityAnalyticsParser.parseLogs(resp)
     }
+
+    /** 获取单条 DNS 记录（编辑页回填用，避免拉全量列表后本地查找导致 >100 条时找不到） */
+    suspend fun getDnsRecord(zoneId: String, recordId: String): DnsRecord =
+        client.get<DnsRecord>(CloudflareApi.DNS_RECORD.format(zoneId, recordId)).result
+            ?: throw CloudflareException("未找到该记录")
 
     /** 分页获取 DNS 记录（type/name 支持筛选） */
     suspend fun getDnsRecords(

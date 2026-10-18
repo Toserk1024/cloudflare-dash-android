@@ -31,8 +31,8 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // Dynamic color 默认关闭：保持 Cloudflare 橙品牌色一致（开启后 Android 12+ 会被系统壁纸取色覆盖）
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
