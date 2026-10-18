@@ -77,6 +77,18 @@
   8 个常驻页切换不再逐帧重排；并补 180ms 透明度过渡
 - **其他动效**：域名选择器覆盖层 `fade + scale(0.96)`；切账号 Loading 遮罩淡入淡出；DNS 列表项 `animateItem()` 增删平滑
 
+### 导航动画彻底重构（弃用 Navigation Compose 转场）
+
+- **问题**：`NavHost` 的 `enter/exit/popEnter/popExit` 在本项目多次调参均无效果——返回时旧页被**不透明的新页遮住**，用户看到的是"硬闪回主页面"
+- **方案**：彻底移除对 Navigation Compose 转场的依赖，改为自建页面栈 + `AnimatedContent`：
+  - 新增 `navigation/AppScreen.kt`（页面定义：免责声明 / 登录 / Home / DNS 编辑）
+  - 新增 `navigation/AnimatedAppNav.kt`：用 `AnimatedContent` **同时渲染新旧两页**，并给**正在退出的页面设置 `zIndex = 1`（置于最上层）**
+  - 前进：新页从右侧滑入（整屏位移）+ 旧页左移 1/4 屏淡出
+  - 返回：**旧页在上层向右滑出整屏** + 下层页从左侧滑入 1/4 屏 → 两页都在动，物理上不可能看不见
+  - 系统返回键由 `BackHandler` 统一处理：子页面回 Home，Home 上交给系统退出
+  - `DnsEditViewModel` 增加直接接收参数的主构造（自建导航不再有 `SavedStateHandle` 参数），并保留原构造兼容
+- 删除 `navigation/AppNavHost.kt`（不再使用）；`MainActivity` 改为直接渲染 `AnimatedAppNav`
+
 ## 2026.08.16
 
 ### 缓解修复 + 日志详情页 + 时间时区

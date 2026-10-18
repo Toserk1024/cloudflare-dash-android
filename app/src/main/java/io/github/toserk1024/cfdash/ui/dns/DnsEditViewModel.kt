@@ -19,14 +19,24 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-/** DNS 记录新建/编辑 ViewModel（按类型渲染完整表单，data 序列化） */
-class DnsEditViewModel @JvmOverloads constructor(
-    savedStateHandle: SavedStateHandle,
-    private val repository: CloudflareRepository = AppContainer.repository
+/**
+ * DNS 记录新建/编辑 ViewModel（按类型渲染完整表单，data 序列化）
+ * 主构造直接接收参数（自建导航使用）；另保留 SavedStateHandle 构造以兼容导航参数创建方式。
+ */
+class DnsEditViewModel(
+    private val repository: CloudflareRepository,
+    private val zoneId: String,
+    private val recordId: String?
 ) : ViewModel() {
 
-    private val zoneId: String = checkNotNull(savedStateHandle.get<String>("zoneId"))
-    private val recordId: String? = savedStateHandle.get<String>("recordId")?.takeIf { it.isNotBlank() }
+    constructor(
+        savedStateHandle: SavedStateHandle,
+        repository: CloudflareRepository = AppContainer.repository
+    ) : this(
+        repository = repository,
+        zoneId = checkNotNull(savedStateHandle.get<String>("zoneId")),
+        recordId = savedStateHandle.get<String>("recordId")?.takeIf { it.isNotBlank() }
+    )
 
     /** 加载任务（重复加载时取消旧任务） */
     private var loadJob: Job? = null

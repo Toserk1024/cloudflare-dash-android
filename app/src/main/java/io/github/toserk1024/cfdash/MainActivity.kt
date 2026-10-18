@@ -31,12 +31,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.navigation.compose.rememberNavController
-import io.github.toserk1024.cfdash.navigation.AppNavHost
-import io.github.toserk1024.cfdash.navigation.Routes
 import io.github.toserk1024.cfdash.data.state.ZoneSelectionStore
 import io.github.toserk1024.cfdash.data.state.ZoneSettingsCache
 import io.github.toserk1024.cfdash.data.storage.ThemePreferences
+import io.github.toserk1024.cfdash.navigation.AnimatedAppNav
+import io.github.toserk1024.cfdash.navigation.AppScreen
 import io.github.toserk1024.cfdash.ui.common.AppReadySignal
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordsSync
 import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
@@ -62,7 +61,7 @@ class MainActivity : ComponentActivity() {
                 darkTheme = isSystemInDarkTheme(),
                 dynamicColor = themeConfig.dynamicColor,
                 seedColor = if (themeConfig.dynamicColor) {
-                    // 开启动态配色时 seed 来自系统，这里给默认值即可
+                    // 开启动态配色时种子色来自系统，这里给默认值即可
                     CloudflareOrange
                 } else {
                     Color(ThemePreferences.toArgb(themeConfig.colorHex) ?: 0xFFF6821FL)
@@ -79,48 +78,45 @@ private fun MainScreen() {
     // 登录态：存在任意已保存用户直接进主界面；否则进初始化界面
     var loggedIn by remember { mutableStateOf(AppContainer.tokenStore.hasCredential()) }
 
-    // 导航栈重建键：切换账号 / 退出到剩余账号时 +1 → 整体重建 NavController + NavHost，
-    // 使所有 ViewModel 以新激活账号重新加载。
+    // 页面栈重建键：切换账号 / 退出到剩余账号时 +1 → 重建页面栈，所有 ViewModel 以新账号重新加载
     var navResetKey by remember { mutableIntStateOf(0) }
 
     // 账号切换中的全屏 Loading 遮罩
     var switching by remember { mutableStateOf(false) }
 
-    // 当前所在 Home Tab（切换账号/重建导航栈后保持所在页面不变）
+    // 当前所在 Home Tab（重建页面栈后保持所在页面不变）
     var currentTab by remember { mutableIntStateOf(0) }
+
+    // 退出到无剩余用户：重建一次页面栈，让 startScreen 落到登录页
+    LaunchedEffect(loggedIn) {
+        if (!loggedIn) navResetKey++
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         key(navResetKey) {
-            val navController = rememberNavController()
-
-            // 退出到无剩余用户时（loggedIn=false）导航回初始化页
-            var firstLaunch by remember { mutableStateOf(true) }
-            LaunchedEffect(loggedIn) {
-                if (firstLaunch) {
-                    firstLaunch = false
-                    return@LaunchedEffect
-                }
-                if (!loggedIn) {
-                    navController.navigate(Routes.ONBOARDING) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                }
-            }
-
-            AppNavHost(
+            AnimatedAppNav(
                 // 启动逻辑：未同意免责声明→免责声明页；已同意→按登录态进主界面或登录页
-                startDestination = when {
-                    !AppContainer.tokenStore.isDisclaimerAccepted() -> Routes.DISCLAIMER
-                    loggedIn -> Routes.HOME
-                    else -> Routes.ONBOARDING
+                startScreen = when {
+                    !AppContainer.tokenStore.isDisclaimerAccepted() -> AppScreen.Disclaimer
+                    loggedIn -> AppScreen.Home
+                    else -> AppScreen.Onboarding
                 },
                 homeKey = navResetKey,
                 initialTab = currentTab,
                 onTabChange = { currentTab = it },
+                // 登录成功后同步 loggedIn=true（否则退出登录时 loggedIn 无变化导致不跳转）
+                onLoggedIn = { loggedIn = true },
+                onUserSwitched = {
+                    // 切换账号：清除持久化域名选择 + 清空会话内存缓存，重建页面栈重新加载
+                    AppContainer.tokenStore.saveSelectedZoneId(null)
+                    clearSessionCaches()
+                    AppReadySignal.reset()
+                    switching = true
+                    navResetKey++
+                },
                 onLoggedOut = {
-                    // 退出登录：删除当前激活用户；若有剩余用户自动切换并重建导航栈刷新，否则回初始化
+                    // 退出登录：删除当前激活用户；有剩余用户则重建刷新，否则回登录页
                     AppContainer.tokenStore.getActiveUser()?.id?.let { AppContainer.tokenStore.deleteUser(it) }
-                    // 账户变化，清除持久化的选中域名与会话级内存缓存（两种分支都需要）
                     AppContainer.tokenStore.saveSelectedZoneId(null)
                     clearSessionCaches()
                     if (AppContainer.tokenStore.hasCredential()) {
@@ -130,21 +126,7 @@ private fun MainScreen() {
                     } else {
                         loggedIn = false
                     }
-                },
-                onNewUser = {
-                    navController.navigate(Routes.ONBOARDING)
-                },
-                onUserSwitched = {
-                    // 切换账号：清除持久化域名选择 + 清空会话内存缓存，重建导航栈重新加载
-                    AppContainer.tokenStore.saveSelectedZoneId(null)
-                    clearSessionCaches()
-                    AppReadySignal.reset()
-                    switching = true
-                    navResetKey++
-                },
-                // 登录成功后同步 loggedIn=true（否则退出登录时 loggedIn 无变化导致不跳转）
-                onLoggedIn = { loggedIn = true },
-                navController = navController
+                }
             )
         }
 
