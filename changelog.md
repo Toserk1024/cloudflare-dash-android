@@ -44,6 +44,19 @@
 - `release.yml`（正式发布）保持默认，**R8 照常开启**
 - 注意：跳过 R8 的日常构建 APK 体积更大、未做代码裁剪，仅供测试验证，正式分发请用 Release workflow 的产物
 
+### 修复重复导航白屏 + 主题回归 Material 3 标准
+
+- **白屏且无法返回（严重 Bug）**：DNS 记录页反复进出、连点两下会重复执行 `navigate` / `popBackStack`，
+  连续两次 pop 会把 Home 一并弹出 → NavHost 栈空 → 界面白屏、系统返回键无栈可退，只能杀进程。修复：
+  - 进入 `dns_edit` 增加 **600ms 防重入** + `launchSingleTop`，连点只压一层
+  - 返回/保存统一改为 `popBackStack(Routes.HOME, inclusive = false)`：显式回 Home，重复触发也不会弹空栈；栈中已无 Home 时兜底重建
+  - `dns_edit` 页拦截系统返回键（`BackHandler`），同样走安全返回路径
+- **动态配色不再破坏 OLED 纯黑**：`dynamicDarkColorScheme` 只接管主色系，结果强制 `background/surface = Color.Black`
+- **主题回归 Material 3 标准（撤销此前的自作主张）**：只覆盖 `primary / onPrimary / primaryContainer / onPrimaryContainer`，
+  其余角色（secondary / tertiary / outline / surfaceVariant 等）全部使用 M3 默认派生。此前自定义的中性 `secondaryContainer` 与暗淡 `outline`，
+  正是按钮“发灰、像被禁用”的原因
+- **实心按钮恢复 MD 默认样式**：5 处 `FilledTonalButton` 回到 `Button`（primary 填充），恢复原有清晰对比
+
 ## 2026.08.16
 
 ### 缓解修复 + 日志详情页 + 时间时区

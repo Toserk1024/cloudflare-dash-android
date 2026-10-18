@@ -14,7 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -140,7 +140,7 @@ fun OnboardingScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                FilledTonalButton(
+                Button(
                     onClick = { viewModel.verifyGlobalKey(email, apiKey) },
                     enabled = state !is OnboardingState.Loading,
                     modifier = Modifier
@@ -215,7 +215,7 @@ fun OnboardingScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                FilledTonalButton(
+                Button(
                     onClick = { viewModel.verifyToken(token) },
                     enabled = state !is OnboardingState.Loading,
                     modifier = Modifier

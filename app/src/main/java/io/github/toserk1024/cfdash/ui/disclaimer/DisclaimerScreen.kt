@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -127,7 +127,7 @@ fun DisclaimerScreen(
                     Text("退出", fontWeight = FontWeight.SemiBold)
                 }
                 Spacer(modifier = Modifier.width(12.dp))
-                FilledTonalButton(
+                Button(
                     onClick = onAgree,
                     enabled = agreed,
                     modifier = Modifier.weight(1.4f).height(52.dp)

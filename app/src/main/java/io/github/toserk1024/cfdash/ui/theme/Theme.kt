@@ -15,12 +15,13 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 
 /**
- * 应用主题。
+ * 应用主题：**以 Material 3 标准为主**，只注入品牌主色。
  *
- * 设计约定（避免"主题色叠满按钮"）：
- * - primary（品牌强调色）只用于**强调**：图标 tint、选中态、Switch/Checkbox、FAB、文字按钮；
- * - 普通实心按钮统一走 secondaryContainer（中性灰），不再用 primary 大面积填充；
- * - 深色模式背景保持纯黑（OLED 省电）。
+ * 约定：
+ * - 除 `primary / onPrimary / primaryContainer / onPrimaryContainer` 外的所有颜色角色，
+ *   全部使用 Material 3 默认派生（不自定义 secondary/tertiary/neutral），
+ *   因此按钮、Chip 等组件保持 MD 默认观感（实心按钮 = primary 填充）。
+ * - 深色模式背景/表面强制纯黑（OLED）；跟随系统动态取色时同样保留纯黑。
  *
  * @param dynamicColor true = 跟随系统壁纸取色（Android 12+），此时忽略 [customPrimary]
  * @param customPrimary 自定义品牌主色；null = 默认 Cloudflare 橙
@@ -35,7 +36,15 @@ fun MyApplicationTheme(
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            if (darkTheme) {
+                // 动态取色只接管主色系，深色底仍保持 OLED 纯黑
+                dynamicDarkColorScheme(context).copy(
+                    background = Color.Black,
+                    surface = Color.Black
+                )
+            } else {
+                dynamicLightColorScheme(context)
+            }
         }
 
         else -> brandScheme(primary = customPrimary ?: CloudflareOrange, dark = darkTheme)
@@ -48,62 +57,29 @@ fun MyApplicationTheme(
     )
 }
 
-/** 基于品牌主色派生完整配色（自动计算 onPrimary 的黑白对比 / 容器色） */
+/** 只覆盖品牌主色相关的 4 个角色，其余沿用 Material 3 默认值 */
 private fun brandScheme(primary: Color, dark: Boolean): ColorScheme {
     val onPrimary = if (primary.luminance() > 0.55f) Color(0xFF141414) else Color.White
     val primaryContainer =
-        if (dark) primary.copy(alpha = 0.22f).compositeOver(Color.Black)
+        if (dark) primary.copy(alpha = 0.26f).compositeOver(Color.Black)
         else primary.copy(alpha = 0.14f).compositeOver(Color.White)
-    // 中性容器：给 FilledTonalButton / Chip / 选中背景使用
-    val neutralContainer = if (dark) Color(0xFF2A2A2A) else Color(0xFFECECEC)
-    val onNeutralContainer = if (dark) Color(0xFFE6E6E6) else Color(0xFF1C1C1C)
-    val neutral = if (dark) Color(0xFFBDBDBD) else Color(0xFF5F6368)
 
     return if (dark) {
         darkColorScheme(
             primary = primary,
             onPrimary = onPrimary,
             primaryContainer = primaryContainer,
-            onPrimaryContainer = primary,
-            secondary = neutral,
-            onSecondary = Color(0xFF141414),
-            secondaryContainer = neutralContainer,
-            onSecondaryContainer = onNeutralContainer,
-            tertiary = primary,
-            onTertiary = onPrimary,
-            tertiaryContainer = primaryContainer,
-            onTertiaryContainer = primary,
+            onPrimaryContainer = onPrimary,
+            // OLED：深色底纯黑
             background = Color.Black,
-            onBackground = Color(0xFFE6E6E6),
-            surface = Color.Black,
-            onSurface = Color(0xFFE6E6E6),
-            surfaceVariant = Color(0xFF1F1F1F),
-            onSurfaceVariant = Color(0xFFB0B0B0),
-            outline = Color(0xFF444444),
-            outlineVariant = Color(0xFF2C2C2C)
+            surface = Color.Black
         )
     } else {
         lightColorScheme(
             primary = primary,
             onPrimary = onPrimary,
             primaryContainer = primaryContainer,
-            onPrimaryContainer = primary,
-            secondary = neutral,
-            onSecondary = Color.White,
-            secondaryContainer = neutralContainer,
-            onSecondaryContainer = onNeutralContainer,
-            tertiary = primary,
-            onTertiary = onPrimary,
-            tertiaryContainer = primaryContainer,
-            onTertiaryContainer = primary,
-            background = Color(0xFFFAFAFA),
-            onBackground = Color(0xFF1A1A1A),
-            surface = Color.White,
-            onSurface = Color(0xFF1A1A1A),
-            surfaceVariant = Color(0xFFF1F1F1),
-            onSurfaceVariant = Color(0xFF5F6368),
-            outline = Color(0xFFBDBDBD),
-            outlineVariant = Color(0xFFE0E0E0)
+            onPrimaryContainer = onPrimary
         )
     }
 }
