@@ -41,11 +41,21 @@ fun MyApplicationTheme(
     }
     val effectiveSeed = systemScheme?.primary ?: seedColor
 
-    val colorScheme = rememberDynamicColorScheme(
+    // MD3 标准：由种子色派生整套配色（primary/secondary/tertiary/neutral…）
+    val baseScheme = rememberDynamicColorScheme(
         seedColor = effectiveSeed,
-        isDark = darkTheme,
-        isAmoled = darkTheme
+        isDark = darkTheme
     )
+
+    // 深色强制 AMOLED 纯黑底（其余角色保持 MD3 派生结果）
+    val colorScheme: ColorScheme = if (darkTheme) {
+        baseScheme.copy(
+            background = Color.Black,
+            surface = Color.Black
+        )
+    } else {
+        baseScheme
+    }
 
     MaterialTheme(
         colorScheme = colorScheme,

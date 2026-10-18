@@ -59,12 +59,12 @@
 
 ### 真·Material 3 主题（种子色派生）+ 动画全面补齐
 
-- **主题改为 MD3 标准生成管线**：引入 `com.materialkolor:material-kolor:5.0.1`（Material Color Utilities 封装），
-  用 `rememberDynamicColorScheme(seedColor, isDark, isAmoled)` 由**种子色派生整套配色**（primary/secondary/tertiary/neutral/neutralVariant），
+- **主题改为 MD3 标准生成管线**：引入 `com.materialkolor:material-kolor:4.1.1`（Material Color Utilities 封装；5.0.1 会强制 Compose 1.12 / compileSdk 37，与本项目 AGP 9.0 / compileSdk 36 冲突），
+  用 `rememberDynamicColorScheme(seedColor, isDark)` 由**种子色派生整套配色**（primary/secondary/tertiary/neutral/neutralVariant），
   等同 Material Theme Builder 产物；不再手写 ColorScheme 角色
+- **OLED 纯黑**：深色在派生结果上覆盖 `background / surface = Black`（不依赖库的 `isAmoled` 参数，避免版本兼容风险）
 - **主题色 ≠ 文本/图标色**：清理 5 处把 `primary` 刷到文本/图标的误用 ——
   域名选中文字改 `onSurface`、"已代理"状态改 `tertiary`、我的页 4 个图标改 `onSurfaceVariant`
-- **OLED 纯黑由库原生支持**：`isAmoled = true`，深色自动 AMOLED 方案；浅色保持 MD3 标准浅色
 - **动态配色同管线**：Android 12+ 跟随系统时，以系统 primary 作为种子色，仍走同一 MD3 生成流程
 - **设置页文案**：「主题颜色」→「种子颜色（Theme seed）」，并注明文本/图标使用语义色
 - **消灭进入页面白闪（根因修复）**：`themes.xml` 原先固定 `android:Theme.Material.Light`，窗口底色恒白；
