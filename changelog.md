@@ -37,6 +37,13 @@
 - **主题色不再大面积填充按钮**：普通实心按钮统一改为 `FilledTonalButton`（中性容器色），品牌色只用于图标、选中态、开关、FAB 等强调位置；配色派生会自动计算 `onPrimary` 的黑白对比、`primaryContainer` 与中性 `secondaryContainer`
 - 深色模式继续使用纯黑 OLED 背景
 
+### 构建提速：日常 CI 构建跳过 R8
+
+- `build.gradle.kts` 新增 `enableR8` 开关（`-PenableR8=<bool>`，默认 `true`）：`isMinifyEnabled` 与 `isShrinkResources` 同时受控
+- `build.yml`（每次 push 自动构建）改用 `assembleRelease -PenableR8=false`，跳过 R8 压缩以显著缩短构建时间；产物仍为 release 变体（正式签名、可安装）
+- `release.yml`（正式发布）保持默认，**R8 照常开启**
+- 注意：跳过 R8 的日常构建 APK 体积更大、未做代码裁剪，仅供测试验证，正式分发请用 Release workflow 的产物
+
 ## 2026.08.16
 
 ### 缓解修复 + 日志详情页 + 时间时区

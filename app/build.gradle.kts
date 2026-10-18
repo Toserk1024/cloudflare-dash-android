@@ -11,6 +11,11 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// ===== R8 开关 =====
+// 正式发布（release.yml）默认开启 R8；日常 CI 构建可用 -PenableR8=false 跳过，
+// 避免每次 push 都要等 R8 压缩（构建时间显著变长）。
+val enableR8: Boolean = (providers.gradleProperty("enableR8").orNull ?: "true").toBoolean()
+
 // ===== 动态版本号（构建时生成）=====
 val versionPropsFile = File(rootProject.projectDir, "version.properties")
 
@@ -83,8 +88,9 @@ android {
 
     buildTypes {
         release {
-            // 开启 R8 压缩（节约打包资源）
-            isMinifyEnabled = true
+            // R8 压缩（含资源裁剪）：默认开启，日常 CI 构建用 -PenableR8=false 关闭以缩短构建时间
+            isMinifyEnabled = enableR8
+            isShrinkResources = enableR8
             // 环境变量未配置时回退 debug 签名（保证构建不挂）；配置后使用正式签名
             signingConfig = if (System.getenv("BUILD_STORE_FILE") != null) {
                 signingConfigs.getByName("release")

@@ -59,7 +59,7 @@ jobs:
         run: ./gradlew testDebugUnitTest --no-daemon
 
       - name: Build release APK
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease -PenableR8=false --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v6
