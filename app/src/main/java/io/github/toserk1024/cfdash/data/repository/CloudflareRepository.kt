@@ -31,8 +31,11 @@ import io.github.toserk1024.cfdash.data.model.ZoneSetting
 import io.github.toserk1024.cfdash.data.model.ZoneSettingRequest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /** 业务仓储层：封装所有 Cloudflare API 调用 */
@@ -96,6 +99,25 @@ class CloudflareRepository(private val client: CloudflareClient) {
     suspend fun getZoneSetting(zoneId: String, setting: String): ZoneSetting =
         client.get<ZoneSetting>(CloudflareApi.ZONE_SETTING.format(zoneId, setting)).result
             ?: throw CloudflareException("获取设置 $setting 失败")
+
+    /**
+     * 一次性获取 Zone 的全部设置（减少逐项请求：切域名时 16+ 请求 → 1 请求）。
+     * 仅收集**字符串型**值；对象 / 布尔 / 数字型设置（如 nel）仍由单项接口获取。
+     */
+    suspend fun getAllZoneSettings(zoneId: String): Map<String, String> {
+        val resp: ApiResponse<JsonElement> = client.get(CloudflareApi.ZONE_SETTINGS.format(zoneId))
+        val items = resp.result as? JsonArray ?: return emptyMap()
+        val result = LinkedHashMap<String, String>()
+        items.forEach { item ->
+            val obj = item as? JsonObject ?: return@forEach
+            val key = obj["id"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+            val value = obj["value"] as? JsonPrimitive ?: return@forEach
+            if (!value.isString) return@forEach
+            val text = value.contentOrNull ?: return@forEach
+            result[key] = text
+        }
+        return result
+    }
 
     /** 更新 Zone 设置（PATCH {"value": ...}） */
     suspend fun updateZoneSetting(zoneId: String, setting: String, value: String): ZoneSetting =

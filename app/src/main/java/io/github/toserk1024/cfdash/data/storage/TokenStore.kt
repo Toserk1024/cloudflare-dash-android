@@ -147,16 +147,10 @@ class TokenStore(context: Context) {
             else -> null
         }
 
-    /** 用户唯一 id：GlobalKey 用邮箱（小写）；Token 用内容 hash */
-    private fun idOf(credential: AuthCredential): String = when (credential) {
-        is AuthCredential.Token -> "tok_${credential.value.hashCode()}"
-        is AuthCredential.GlobalKey -> "eml_${credential.email.lowercase()}"
-    }
+    /** 用户唯一 id（算法见 [AccountId]，与历史版本保持一致，避免已保存账号失效） */
+    private fun idOf(credential: AuthCredential): String = AccountId.of(credential)
 
-    private fun labelOf(credential: AuthCredential): String = when (credential) {
-        is AuthCredential.Token -> "Token 用户"
-        is AuthCredential.GlobalKey -> credential.email
-    }
+    private fun labelOf(credential: AuthCredential): String = AccountId.labelOf(credential)
 
     companion object {
         private const val FILE_NAME = "cf_secure_prefs"

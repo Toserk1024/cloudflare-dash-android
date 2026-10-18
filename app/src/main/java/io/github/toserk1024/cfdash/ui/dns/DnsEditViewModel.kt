@@ -3,10 +3,12 @@ package io.github.toserk1024.cfdash.ui.dns
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.data.model.DnsRecord
 import io.github.toserk1024.cfdash.data.model.DnsRecordRequest
 import io.github.toserk1024.cfdash.data.model.DnsRecordTypes
+import io.github.toserk1024.cfdash.data.repository.CloudflareRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -17,10 +19,16 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /** DNS 记录新建/编辑 ViewModel（按类型渲染完整表单，data 序列化） */
-class DnsEditViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
+class DnsEditViewModel @JvmOverloads constructor(
+    savedStateHandle: SavedStateHandle,
+    private val repository: CloudflareRepository = AppContainer.repository
+) : ViewModel() {
 
     private val zoneId: String = checkNotNull(savedStateHandle.get<String>("zoneId"))
     private val recordId: String? = savedStateHandle.get<String>("recordId")?.takeIf { it.isNotBlank() }
+
+    /** 加载任务（重复加载时取消旧任务） */
+    private var loadJob: Job? = null
 
     data class DnsEditUiState(
         val recordType: String = "A",
@@ -45,10 +53,11 @@ class DnsEditViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     }
 
     private fun loadRecord() {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.update { it.copy(loading = true) }
             try {
-                val resp = AppContainer.repository.getDnsRecords(zoneId, page = 1, perPage = 100)
+                val resp = repository.getDnsRecords(zoneId, page = 1, perPage = 100)
                 val record = resp.result?.find { it.id == recordId }
                 if (record != null) {
                     _uiState.update {
@@ -65,6 +74,8 @@ class DnsEditViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
                 } else {
                     _uiState.update { it.copy(loading = false, error = "未找到该记录") }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.update { it.copy(loading = false, error = e.message) }
             }
@@ -177,13 +188,15 @@ class DnsEditViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
             try {
                 val request = buildRequest(s)
                 val savedRecord = if (recordId != null) {
-                    AppContainer.repository.updateDnsRecord(zoneId, recordId, request)
+                    repository.updateDnsRecord(zoneId, recordId, request)
                 } else {
-                    AppContainer.repository.createDnsRecord(zoneId, request)
+                    repository.createDnsRecord(zoneId, request)
                 }
                 // 记录到同步队列：返回列表页时本地更新缓存，无需重新请求 API
                 DnsRecordsSync.add(zoneId, savedRecord)
                 _uiState.update { it.copy(submitting = false, saved = true) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.update { it.copy(submitting = false, error = e.message) }
             }

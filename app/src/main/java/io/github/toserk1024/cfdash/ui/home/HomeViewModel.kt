@@ -4,12 +4,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.data.model.User
+import io.github.toserk1024.cfdash.data.repository.CloudflareRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class HomeViewModel : ViewModel() {
+class HomeViewModel @JvmOverloads constructor(
+    private val repository: CloudflareRepository = AppContainer.repository
+) : ViewModel() {
 
     data class HomeUiState(
         val user: User? = null,
@@ -20,16 +25,22 @@ class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState
 
+    /** 当前加载任务（新请求会取消旧请求，避免快切账号时旧响应覆盖新状态） */
+    private var loadJob: Job? = null
+
     init {
         loadUser()
     }
 
     fun loadUser() {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null) }
             try {
-                val user = AppContainer.repository.getUser()
+                val user = repository.getUser()
                 _uiState.update { it.copy(user = user, loading = false, error = null) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.update { it.copy(loading = false, error = e.message ?: "加载用户信息失败") }
             }

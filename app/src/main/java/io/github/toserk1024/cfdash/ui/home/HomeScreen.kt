@@ -77,6 +77,7 @@ import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.data.model.DnsRecord
 import io.github.toserk1024.cfdash.ui.cache.CacheContent
 import io.github.toserk1024.cfdash.ui.cache.CacheViewModel
+import io.github.toserk1024.cfdash.ui.common.AppReadySignal
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordsContent
 import io.github.toserk1024.cfdash.ui.dns.DnsViewModel
 import io.github.toserk1024.cfdash.ui.network.NetworkTab
@@ -125,15 +126,16 @@ fun HomeScreen(
     val zoneState by zoneViewModel.uiState.collectAsState()
     val statsState by statsViewModel.uiState.collectAsState()
 
-    // 全局选中域名变化 → 同步 DNS / 缓存 / 统计（域名级）/ 速度 / 网络
+    // 域名选择由全局单一事实源（ZoneSelectionStore）驱动，DNS / 缓存 / 统计 / 速度 / 网络各自订阅；
+    // 安全页暂未接入（待其整体重构），此处仍直接同步，安全页代码与行为保持不变。
     val selectedZone = zoneState.selectedZone
     LaunchedEffect(selectedZone?.id) {
-        dnsViewModel.setZone(selectedZone)
-        cacheViewModel.setZone(selectedZone)
-        statsViewModel.setZone(selectedZone?.id)
-        speedViewModel.setZone(selectedZone)
-        networkViewModel.setZone(selectedZone)
         securityViewModel.setZone(selectedZone)
+    }
+
+    // 首屏就绪信号：切换账号的全屏 Loading 遮罩据此关闭（替代原先固定 delay(600) 的猜测）
+    LaunchedEffect(homeState.user, zoneState.loading) {
+        if (homeState.user != null && !zoneState.loading) AppReadySignal.markReady()
     }
 
     // 多用户：切换/退出后 homeKey 变化 → 重新加载当前激活用户数据
@@ -240,6 +242,9 @@ fun HomeScreen(
                             refreshing = statsState.refreshing,
                             enablePullRefresh = true,
                             partError = statsState.partError,
+                            accounts = statsState.accounts,
+                            accountId = statsState.accountId,
+                            onAccountChange = statsViewModel::setAccount,
                             onRangeChange = statsViewModel::setRange,
                             onRefresh = statsViewModel::refresh,
                             onRetry = statsViewModel::load

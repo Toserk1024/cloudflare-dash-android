@@ -114,6 +114,13 @@ android {
     }
 }
 
+// Kotlin 编译目标与 Java 17 对齐（此前仅设置了 compileOptions，Kotlin 侧未显式指定）
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
 
     implementation(libs.androidx.core.ktx)
@@ -132,5 +139,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.vico.compose)
+    testImplementation(libs.junit)
     debugImplementation(libs.androidx.ui.tooling)
 }

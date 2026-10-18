@@ -5,8 +5,12 @@ import androidx.lifecycle.viewModelScope
 import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.data.model.Zone
 import io.github.toserk1024.cfdash.data.model.ZoneSetting
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import io.github.toserk1024.cfdash.data.repository.CloudflareRepository
+import io.github.toserk1024.cfdash.data.state.ZoneSelectionStore
+import io.github.toserk1024.cfdash.data.state.ZoneSettingsCache
+import io.github.toserk1024.cfdash.data.state.ZoneSettingsLoader
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -14,12 +18,15 @@ import kotlinx.coroutines.launch
 
 /**
  * 网络优化 ViewModel：网络相关 Zone 设置。
- * 当前域名由全局域名选择器（HomeScreen 的 ZoneViewModel）传入。
+ * 当前域名来自全局单一事实源 [ZoneSelectionStore]。
  * 注意：IPv6（ipv6）由 ZoneViewModel 统一管理（域名页高级设置 + 网络 Tab 两处共享同一状态，天然同步），
- * 本 VM 只管理其余 6 项。
- * 特殊项：Pseudo IPv4 值为 off/add_header/overwrite_header（开关语义：开=add_header、关=off）。
+ * 本 VM 只管理其余 5 项（含 nel）。
+ * 特殊项：Pseudo IPv4 值为 off/add_header/overwrite_header（开关语义：开=add_header、关=off）；
+ * NEL（网络错误记录）值为对象 {"enabled": bool}，走专用单项接口。
  */
-class NetworkViewModel : ViewModel() {
+class NetworkViewModel @JvmOverloads constructor(
+    private val repository: CloudflareRepository = AppContainer.repository
+) : ViewModel() {
 
     data class NetworkUiState(
         val selectedZone: Zone? = null,
@@ -36,49 +43,70 @@ class NetworkViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(NetworkUiState())
     val uiState: StateFlow<NetworkUiState> = _uiState
 
-    /** 由 HomeScreen 响应全局选中域名变化时调用：切换域名即重载全部设置 */
-    fun setZone(zone: Zone?) {
+    private var loadJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            ZoneSelectionStore.selected.collect { zone -> applyZone(zone) }
+        }
+    }
+
+    private fun applyZone(zone: Zone?) {
+        if (_uiState.value.selectedZone?.id == zone?.id) {
+            if (zone != null) _uiState.update { it.copy(selectedZone = zone) }
+            return
+        }
+        loadJob?.cancel()
         _uiState.update {
             it.copy(
                 selectedZone = zone,
                 values = emptyMap(),
                 settingsBusy = emptySet(),
                 settingsError = null,
-                loading = false
+                loading = zone != null
             )
         }
         if (zone != null) loadSettings(zone.id)
     }
 
-    /** 并行加载全部网络设置（单项失败不阻塞其他） */
+    /** 并行加载全部网络设置（全量接口优先 + 缺失项回退，单项失败不阻塞其他） */
     private fun loadSettings(zoneId: String) {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.update { it.copy(loading = true, settingsError = null) }
-            coroutineScope {
-                ALL_SETTINGS.forEach { setting ->
-                    async {
-                        runCatching {
-                            if (setting == NETWORK_ERROR_LOGGING) {
-                                // NEL 值对象 {"enabled": bool}，走专用方法
-                                AppContainer.repository.getNel(zoneId)
-                            } else {
-                                parseValue(setting, AppContainer.repository.getZoneSetting(zoneId, setting).value)
-                            }
-                        }
-                            .onSuccess { v -> _uiState.update { st -> st.copy(values = st.values + (setting to v)) } }
-                            .onFailure { e -> _uiState.update { st -> st.copy(settingsError = e.message) } }
-                    }
+            try {
+                val stringKeys = ALL_SETTINGS.filter { it != NETWORK_ERROR_LOGGING }
+                val result = ZoneSettingsLoader.load(repository, zoneId, stringKeys)
+                val values = LinkedHashMap<String, Boolean?>()
+                result.values.forEach { (key, value) -> values[key] = parseValue(key, value) }
+                val errors = result.errors.toMutableList()
+                try {
+                    values[NETWORK_ERROR_LOGGING] = repository.getNel(zoneId)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    errors.add("nel：${e.message ?: "加载失败"}")
                 }
+                _uiState.update {
+                    it.copy(
+                        values = values,
+                        loading = false,
+                        settingsError = errors.takeIf { list -> list.isNotEmpty() }?.joinToString("；")
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update { it.copy(loading = false, settingsError = e.message) }
             }
-            _uiState.update { it.copy(loading = false) }
         }
     }
 
-    /** 仅重试加载全部设置（不重置选中域名） */
+    /** 仅重试加载全部设置（作废缓存后重新拉取） */
     fun refreshSettings() {
-        _uiState.update { it.copy(settingsError = null) }
         val zone = _uiState.value.selectedZone ?: return
-        _uiState.update { it.copy(values = emptyMap()) }
+        ZoneSettingsCache.invalidate(zone.id)
+        _uiState.update { it.copy(values = emptyMap(), settingsError = null) }
         loadSettings(zone.id)
     }
 
@@ -100,8 +128,10 @@ class NetworkViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(settingsBusy = it.settingsBusy + NETWORK_ERROR_LOGGING, settingsError = null) }
             try {
-                val enabled = AppContainer.repository.updateNel(zone.id, on)
+                val enabled = repository.updateNel(zone.id, on)
                 _uiState.update { st -> st.copy(values = st.values + (NETWORK_ERROR_LOGGING to enabled)) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.update { it.copy(settingsError = e.message) }
             } finally {
@@ -116,8 +146,11 @@ class NetworkViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(settingsBusy = it.settingsBusy + setting, settingsError = null) }
             try {
-                val s = AppContainer.repository.updateZoneSetting(zone.id, setting, value)
+                val s = repository.updateZoneSetting(zone.id, setting, value)
+                ZoneSettingsCache.put(zone.id, setting, s.value)
                 onSuccess(s)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.update { it.copy(settingsError = e.message) }
             } finally {

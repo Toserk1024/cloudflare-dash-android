@@ -10,10 +10,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -21,11 +27,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.toserk1024.cfdash.data.model.AccountRef
 import io.github.toserk1024.cfdash.data.model.AnalyticsRange
 
 /**
@@ -34,6 +46,7 @@ import io.github.toserk1024.cfdash.data.model.AnalyticsRange
  * + 维度分布饼图（国家/地区、状态码、缓存）+ 域名拆分柱状图（仅账号级，showZoneBreakdown=true）。
  * 单项图表加载失败不阻塞其他（data 内对应字段为 null，顶部展示 partError 提示）。
  * 账号级（enablePullRefresh=true）独立可滚动 + 下拉刷新；域名级内嵌页面 scroll 不启用下拉。
+ * 多账号：账号级且账号数 > 1 时，顶部显示统计账号选择器。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +60,9 @@ fun StatsContent(
     enablePullRefresh: Boolean = false,
     partError: String? = null,
     enabled: Boolean = true,
+    accounts: List<AccountRef> = emptyList(),
+    accountId: String? = null,
+    onAccountChange: (String) -> Unit = {},
     onRangeChange: (AnalyticsRange) -> Unit,
     onRefresh: () -> Unit = {},
     onRetry: () -> Unit
@@ -62,6 +78,9 @@ fun StatsContent(
                     range = range,
                     showZoneBreakdown = showZoneBreakdown,
                     enabled = enabled,
+                    accounts = accounts,
+                    accountId = accountId,
+                    onAccountChange = onAccountChange,
                     onRangeChange = onRangeChange,
                     onRetry = onRetry
                 )
@@ -76,13 +95,16 @@ fun StatsContent(
             range = range,
             showZoneBreakdown = showZoneBreakdown,
             enabled = enabled,
+            accounts = accounts,
+            accountId = accountId,
+            onAccountChange = onAccountChange,
             onRangeChange = onRangeChange,
             onRetry = onRetry
         )
     }
 }
 
-/** 统计数据主体内容（padding + 时间切换 + 指标卡 + 图表） */
+/** 统计数据主体内容（padding + 账号选择 + 时间切换 + 指标卡 + 图表） */
 @Composable
 private fun StatsContentBody(
     data: StatsData,
@@ -92,10 +114,18 @@ private fun StatsContentBody(
     range: AnalyticsRange,
     showZoneBreakdown: Boolean,
     enabled: Boolean,
+    accounts: List<AccountRef>,
+    accountId: String?,
+    onAccountChange: (String) -> Unit,
     onRangeChange: (AnalyticsRange) -> Unit,
     onRetry: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        // 统计账号选择（仅账号级、且存在多个账号时显示）
+        if (showZoneBreakdown) {
+            AccountSelector(accounts = accounts, currentId = accountId, onSelect = onAccountChange)
+        }
+
         // 时间范围切换
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             AnalyticsRange.entries.forEachIndexed { index, r ->
@@ -211,6 +241,52 @@ private fun StatsContentBody(
                 }
             }
         }
+    }
+}
+
+/** 统计账号选择器（仅在账号级 + 账号数 > 1 时渲染） */
+@Composable
+private fun AccountSelector(
+    accounts: List<AccountRef>,
+    currentId: String?,
+    onSelect: (String) -> Unit
+) {
+    if (accounts.size <= 1) return
+    var expanded by remember { mutableStateOf(false) }
+    val current = accounts.firstOrNull { it.id == currentId } ?: accounts.first()
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "统计账号：",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Box {
+                OutlinedButton(onClick = { expanded = true }) {
+                    Text(current.name.ifBlank { current.id }, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    accounts.forEach { acc ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = (if (acc.id == current.id) "✓ " else "") + acc.name.ifBlank { acc.id },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            onClick = {
+                                onSelect(acc.id)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026.10.18
+
+### 架构完善（框架批）：请求生命周期 + 单一事实源 + 设置接口统一 + 工程化
+
+- **请求可取消**：`CloudflareClient` 由同步 `execute()` 改为 `enqueue + suspendCancellableCoroutine`，协程取消时真正 `Call.cancel()`；离开页面/切换域名后不再空跑请求、不再白烧流量（新增 `data/api/OkHttpExt.kt`）
+- **自动重试**：仅对网络层错误与 5xx 重试（最多 3 次尝试，200ms/600ms 退避）；4xx 与取消不重试
+- **超时分级**：GraphQL Analytics 查询读超时放宽至 60s，REST 维持连接 20s / 读 30s
+- **错误中文化**：401 / 403 / 429 / 5xx 附带可操作提示（凭据失效、缺少权限、被限流、服务不可用），并保留 Cloudflare 原始错误信息
+- **竞态防护**：Zone / DNS / 统计 / 速度 / 网络 / 用户 / DNS 编辑共 7 个 ViewModel 的加载链路持有 `Job`，新请求先取消旧请求；取消异常一律回抛，避免“先发后到”覆盖新状态（典型：快速切域名后列表显示上一个域名的数据）
+- **单一事实源**：新增 `data/state/ZoneSelectionStore`（StateFlow），把原来 6 个 ViewModel 各自持有的 `selectedZone` 副本收敛为 1 份；`HomeScreen` 不再手动广播 6 次 `setZone`。安全页本轮保持原样（仍由 HomeScreen 直接同步，代码与行为未改动）
+- **设置接口统一**：新增 `GET /zones/{id}/settings` 全量接口 + `ZoneSettingsCache` / `ZoneSettingsLoader`（缓存 → 全量优先 → 缺失项回退单项 → 写回缓存），速度页 8 项与网络页 5 项设置从 13 次请求降为 1 次（`nel` 这类对象型设置自动回退单项）
+- **切账号 Loading 重做**：全屏黑底 + 进度圈 + `Loading.` → `Loading..` → `Loading...` 循环动画；关闭时机改为「首屏就绪信号（`AppReadySignal`） + 最少 400ms 防闪烁 + 最长 3s 兜底」，移除原先固定 `delay(600)` 的猜测
+- **依赖注入**：全部 ViewModel 改为 `@JvmOverloads` 构造参数注入（默认取 `AppContainer`），为单测与后续替换留出边界
+- **Application 入口**：新增 `App`，进程启动即初始化依赖容器；`MainActivity` 保留幂等调用
+- **构建/工程化**：Kotlin `jvmTarget` 显式对齐 Java 17；备份规则排除加密凭据存储 `cf_secure_prefs`（避免恢复备份后 MasterKey 不匹配导致凭据不可用）
+- **单元测试**：新增 JUnit 测试 3 组（`AnalyticsParser` 解析、`AccountId` 账号 id 算法、`formatTtl` 格式化），并把 `testDebugUnitTest` 接入 CI（测试失败将阻断 APK 产出）
+- 说明：`AccountId` 抽为纯函数时**刻意保持原算法不变**（Token 用内容 hashCode、邮箱用小写），否则已保存账号的加密存储 key 会失配，等同于账号丢失
+
 ## 2026.08.16
 
 ### 缓解修复 + 日志详情页 + 时间时区

@@ -5,8 +5,12 @@ import androidx.lifecycle.viewModelScope
 import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.data.model.Zone
 import io.github.toserk1024.cfdash.data.model.ZoneSetting
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import io.github.toserk1024.cfdash.data.repository.CloudflareRepository
+import io.github.toserk1024.cfdash.data.state.ZoneSelectionStore
+import io.github.toserk1024.cfdash.data.state.ZoneSettingsCache
+import io.github.toserk1024.cfdash.data.state.ZoneSettingsLoader
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -14,10 +18,12 @@ import kotlinx.coroutines.launch
 
 /**
  * 速度优化 ViewModel：协议优化 / 内容优化 两类 Zone 设置（均为 on/off 开关）。
- * 当前域名由全局域名选择器（HomeScreen 的 ZoneViewModel）传入，本 VM 不维护域名列表。
- * 开关样式沿用域名页高级设置（AdvancedSwitchRow + settingsBusy 独立防抖）。
+ * 当前域名来自全局单一事实源 [ZoneSelectionStore]。
+ * 设置加载走 [ZoneSettingsLoader]：优先一次全量请求（GET /zones/{id}/settings），缺失项再回退单项。
  */
-class SpeedViewModel : ViewModel() {
+class SpeedViewModel @JvmOverloads constructor(
+    private val repository: CloudflareRepository = AppContainer.repository
+) : ViewModel() {
 
     data class SpeedUiState(
         val selectedZone: Zone? = null,
@@ -34,44 +40,59 @@ class SpeedViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(SpeedUiState())
     val uiState: StateFlow<SpeedUiState> = _uiState
 
-    /** 由 HomeScreen 响应全局选中域名变化时调用：切换域名即重载全部设置 */
-    fun setZone(zone: Zone?) {
+    private var loadJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            ZoneSelectionStore.selected.collect { zone -> applyZone(zone) }
+        }
+    }
+
+    private fun applyZone(zone: Zone?) {
+        if (_uiState.value.selectedZone?.id == zone?.id) {
+            if (zone != null) _uiState.update { it.copy(selectedZone = zone) }
+            return
+        }
+        loadJob?.cancel()
         _uiState.update {
             it.copy(
                 selectedZone = zone,
                 values = emptyMap(),
                 settingsBusy = emptySet(),
                 settingsError = null,
-                loading = false
+                loading = zone != null
             )
         }
         if (zone != null) loadSettings(zone.id)
     }
 
-    /** 并行加载全部速度设置（单项失败不阻塞其他） */
+    /** 加载全部速度设置（全量接口优先 + 缺失项回退） */
     private fun loadSettings(zoneId: String) {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.update { it.copy(loading = true, settingsError = null) }
-            coroutineScope {
-                ALL_SETTINGS.forEach { setting ->
-                    async {
-                        runCatching { AppContainer.repository.getZoneSetting(zoneId, setting) }
-                            .onSuccess { s ->
-                                _uiState.update { st -> st.copy(values = st.values + (setting to parseValue(setting, s.value))) }
-                            }
-                            .onFailure { e -> _uiState.update { st -> st.copy(settingsError = e.message) } }
-                    }
+            try {
+                val result = ZoneSettingsLoader.load(repository, zoneId, ALL_SETTINGS)
+                _uiState.update { st ->
+                    st.copy(
+                        values = result.values.mapValues { (key, value) -> parseValue(key, value) },
+                        loading = false,
+                        settingsError = result.errors.takeIf { it.isNotEmpty() }?.joinToString("；")
+                    )
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update { it.copy(loading = false, settingsError = e.message) }
             }
-            _uiState.update { it.copy(loading = false) }
         }
     }
 
-    /** 仅重试加载全部设置（不重置选中域名） */
+    /** 仅重试加载全部设置（作废缓存后重新拉取） */
     fun refreshSettings() {
-        _uiState.update { it.copy(settingsError = null) }
         val zone = _uiState.value.selectedZone ?: return
-        _uiState.update { it.copy(values = emptyMap()) }
+        ZoneSettingsCache.invalidate(zone.id)
+        _uiState.update { it.copy(values = emptyMap(), settingsError = null) }
         loadSettings(zone.id)
     }
 
@@ -88,8 +109,11 @@ class SpeedViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(settingsBusy = it.settingsBusy + setting, settingsError = null) }
             try {
-                val s = AppContainer.repository.updateZoneSetting(zone.id, setting, value)
+                val s = repository.updateZoneSetting(zone.id, setting, value)
+                ZoneSettingsCache.put(zone.id, setting, s.value)
                 onSuccess(s)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.update { it.copy(settingsError = e.message) }
             } finally {
@@ -111,7 +135,7 @@ class SpeedViewModel : ViewModel() {
         const val EARLY_HINTS = "early_hints"
         const val ROCKET_LOADER = "rocket_loader"
 
-        /** 全部速度设置名（协议 + 内容），加载时并行遍历 */
+        /** 全部速度设置名（协议 + 内容） */
         val ALL_SETTINGS = listOf(
             HTTP2, HTTP2_ORIGIN, HTTP3, ZERO_RTT,
             SPEED_BRAIN, FONTS, EARLY_HINTS, ROCKET_LOADER

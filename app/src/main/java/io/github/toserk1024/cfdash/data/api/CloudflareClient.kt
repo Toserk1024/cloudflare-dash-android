@@ -8,7 +8,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -16,13 +15,19 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-/** Cloudflare API 异常（携带可读错误信息） */
-class CloudflareException(message: String, val httpCode: Int = 0) : Exception(message)
+/** Cloudflare API 异常（携带可读错误信息与 HTTP 状态码） */
+class CloudflareException(message: String, val httpCode: Int = HTTP_CODE_UNKNOWN) : Exception(message) {
+    companion object {
+        /** 网络层错误（连接失败/超时等），可重试 */
+        const val HTTP_CODE_NETWORK = -1
+        /** 未知错误（非网络层，不重试） */
+        const val HTTP_CODE_UNKNOWN = 0
+    }
+}
 
 /** 全局 Json 配置（忽略未知字段、默认值兜底） */
 @PublishedApi
@@ -47,10 +52,15 @@ class CloudflareClient(private val credentialProvider: () -> AuthCredential?) {
 
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
-    private val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+    private val defaultClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    /** GraphQL Analytics 查询可能较慢，单独放宽读超时 */
+    private val longTimeoutClient: OkHttpClient = defaultClient.newBuilder()
+        .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
     internal suspend inline fun <reified RespT> get(
@@ -106,13 +116,36 @@ class CloudflareClient(private val credentialProvider: () -> AuthCredential?) {
         return parsed
     }
 
-    /** 执行请求并返回原始响应体字符串 */
+    /**
+     * 执行请求并返回原始响应体字符串。
+     * - 可取消：协程取消会真正 `Call.cancel()`
+     * - 自动重试：仅网络层错误与 5xx（最多 3 次尝试，200ms / 600ms 退避）
+     * - 错误中文化：401 / 403 / 429 / 5xx 附带可操作提示
+     */
     internal suspend fun requestRaw(
         method: String,
         path: String,
         jsonBody: String?,
         query: Map<String, String>,
         credentialOverride: AuthCredential? = null
+    ): String = withRetry(
+        attempts = 3,
+        initialDelayMs = 200,
+        isRetryable = { e ->
+            val code = (e as? CloudflareException)?.httpCode
+            e is IOException ||
+                (code != null && (code == CloudflareException.HTTP_CODE_NETWORK || code >= 500))
+        }
+    ) {
+        executeOnce(method, path, jsonBody, query, credentialOverride)
+    }
+
+    private suspend fun executeOnce(
+        method: String,
+        path: String,
+        jsonBody: String?,
+        query: Map<String, String>,
+        credentialOverride: AuthCredential?
     ): String = withContext(Dispatchers.IO) {
         val credential = credentialOverride ?: credentialProvider()
             ?: throw CloudflareException("未配置认证信息，请先登录")
@@ -146,8 +179,10 @@ class CloudflareClient(private val credentialProvider: () -> AuthCredential?) {
             else -> throw CloudflareException("不支持的请求方法: $method")
         }
 
+        val client = if (method == "POST" && path == CloudflareApi.GRAPHQL) longTimeoutClient else defaultClient
+
         try {
-            okHttpClient.newCall(req).execute().use { resp ->
+            client.awaitCall(req).use { resp ->
                 val raw = resp.body?.string() ?: ""
                 if (resp.code !in 200..299) {
                     throw parseError(raw, resp.code)
@@ -157,21 +192,33 @@ class CloudflareClient(private val credentialProvider: () -> AuthCredential?) {
         } catch (e: CloudflareException) {
             throw e
         } catch (e: IOException) {
-            throw CloudflareException("网络请求失败: ${e.message ?: "请检查网络连接"}")
+            throw CloudflareException(
+                "网络请求失败：${e.message ?: "请检查网络连接"}",
+                CloudflareException.HTTP_CODE_NETWORK
+            )
         }
     }
 
     private fun parseError(raw: String, code: Int): CloudflareException {
-        return try {
-            val err = decodeApiResponse<JsonElement>(raw)
-            val msg = err.errors.joinToString("；") { it.message }
-            CloudflareException(
-                msg.ifEmpty { "请求失败 (HTTP $code)" },
-                code
-            )
+        val apiMessage = try {
+            decodeApiResponse<JsonElement>(raw).errors.joinToString("；") { it.message }.trim()
         } catch (e: Exception) {
-            CloudflareException("请求失败 (HTTP $code)", code)
+            ""
         }
+        val hint = when (code) {
+            401 -> "认证失败：凭据无效或已过期，请重新登录"
+            403 -> "权限不足：当前凭据缺少该操作所需的 Cloudflare 权限，请在控制台为 Token 补充权限"
+            429 -> "请求过于频繁：已被 Cloudflare 限流，请稍后再试"
+            in 500..599 -> "Cloudflare 服务暂时不可用（HTTP $code）"
+            else -> null
+        }
+        val message = when {
+            hint != null && apiMessage.isNotBlank() -> "$hint（$apiMessage）"
+            hint != null -> hint
+            apiMessage.isNotBlank() -> apiMessage
+            else -> "请求失败 (HTTP $code)"
+        }
+        return CloudflareException(message, code)
     }
 
     /** 校验认证字段只能包含 ASCII 可打印字符（OkHttp 禁止 header 含非 ASCII 字符） */

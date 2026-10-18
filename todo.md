@@ -5,7 +5,39 @@
 
 ## 待办需求（攒批中，未实施）
 
-（当前无待办需求，新需求请继续在此追加）
+### [待决策] 安全 Tab 数据与 Cloudflare 官网不一致（重做统计口径）
+
+- **来源**：用户反馈（2026-10-18）。此前已多次提出该需求，上代模型声称已实现并写入 changelog（含「修复缓解始终为 0」），todo 相应条目被移除，但**实际数据始终与官网对不上**，需求未真正达成。
+- **现象**：安全概况占比、趋势曲线、分组分布、日志顺序与内容均与官网 Security → Overview 不一致。
+- **已定位根因（代码审查确认，非调参可解）**：
+  1. **量纲混用（致命）**：`firewallEventsAdaptive` 的事件条数（limit 1000/2000，被截断）与 `httpRequests1hGroups` 的请求数放入同一 100% 堆叠条相减 → 缓解恒≈0%、回源虚高（`SecurityAnalytics.kt:317-333`）。
+  2. **自创指标**：「回源 / 命中 / 缓解」三段分解在官网并不存在，对照必然对不上。
+  3. **统计对象错**：分组视图用 `httpRequestsAdaptiveGroups`（全站 HTTP 流量分布），而非「被缓解事件」分布（`SecurityAnalytics.kt:232-240`）。
+  4. **筛选器失效**：`groupBy = ALL` 时 `overviewQuery` / `trendQuery` 完全不拼 filter（`SecurityAnalytics.kt:214-220、248-254`）。
+  5. **粒度声明与实现不符**：`trendDimension` 定义了 5min / 15min，但 ALL 分支固定查 1hGroups（`SecurityAnalytics.kt:20-26 vs 250-253`）。
+  6. **日志无排序**：`firewallEventsAdaptive(limit:200)` 无 `orderBy`（`SecurityAnalytics.kt:285`）→ 顺序不确定，「最新在前」不成立。
+- **待用户决策的方案**：
+  - A（推荐）真对齐官网：废弃「回源」概念，改为 总请求 / 已缓解（含占比） / 缓解趋势 / 缓解动作与来源 TopN / Top 国家，缓解改用**聚合**而非明细。
+  - B 保留三段但自洽：缓存命中 / 未命中回源 / 被缓解，三者互斥、同量纲、同数据源。
+  - C 最小刀：仅去除明细截断，其余不动（仍对不上官网）。
+- **前置验证（禁止猜字段）**：① `httpRequestsAdaptiveGroups` 是否支持 `securityAction` / `securitySource` 维度；② `firewallEventsAdaptiveGroups` 聚合版是否真不可访问；③ `firewallEventsAdaptive` 是否支持 `count` 聚合。
+- **状态**：等待用户指示，未实施。
+
+### [待决策] 图表能力不足（疑似非库缺陷，需先验证再决定是否换库）
+
+- **来源**：用户反馈（2026-10-18）。用户认为当前图表库（Vico）功能不足以表达 CDN 这类复杂场景，提出更换图表库；经代码审查，**主因并非库能力不足，而是上一代只用到了最基础的三个能力**。
+- **审查结论**：
+  - 项目实际用到：单序列折线（`lineModel`）、单序列柱状（`columnModel`）、饼图（`pieSeries`）+ 自定义 marker。
+  - Vico 3.x 已具备但**未被使用**：堆叠柱/堆叠面积（`rememberStackedCartesianLayer`）、拖拽平移与双指缩放（`rememberVicoScrollState` / `Zoom`）、左右双 Y 轴、区间高亮、多序列联动 marker、负值/对数轴。
+  - 安全页的「100% 堆叠条」是 **Compose Canvas 手绘矩形**，完全未走图表库（`SecurityCharts.kt:75-112`）。
+- **CDN 场景缺口清单（①~⑩）**：① 多序列同图；② 双 Y 轴；③ 堆叠面积/柱；④ 时间轴缩放+平移+区间选择；⑤ 十字准线+多点联合 tooltip；⑥ 大点数（30d 多维度数千点）流畅度；⑦ 平滑/阶梯曲线；⑧ 对数轴；⑨ 热力图/地理/桑基等高级图型；⑩ 图表联动（选时间窗口联动全页）。
+- **候选路线（待用户决策）**：
+  - **A（推荐先验证）** Vico 深挖：迁移成本≈0，能力覆盖 ①~⑧。
+  - **B** MPAndroidChart：交互最成熟，但官方仓库 2022 年后基本停更 + Compose 集成割裂。
+  - **C** ECharts（WebView 桥接）：能力上限最高（含热力图/地理/桑基/dataZoom/brush），代价是 WebView 体积、内存与手势冲突。
+  - **D** SKIA/Canvas 自研：无上限但等于自养图表引擎。
+- **建议的验证动作（零风险）**：先用现有 Vico 做「多序列 + 双轴 + 堆叠面积 + 双指缩放 + 十字准线」5 项 demo，真机看效果后再决定是否换库。
+- **状态**：等待用户开工指令，未实施。
 
 ## Pending 队列（用户反馈待修复/优化，先不实施）
 

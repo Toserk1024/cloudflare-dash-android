@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.data.model.Zone
+import io.github.toserk1024.cfdash.data.repository.CloudflareRepository
+import io.github.toserk1024.cfdash.data.state.ZoneSelectionStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -20,9 +23,11 @@ enum class PurgeMode(val label: String, val hint: String, val placeholder: Strin
 
 /**
  * 缓存清除 ViewModel。
- * 当前域名由全局域名选择器（HomeScreen 的 ZoneViewModel）传入，本 VM 不再维护域名列表/选择。
+ * 当前域名来自全局单一事实源 [ZoneSelectionStore]（本 VM 不再持有域名选择的入口，只保留当前值用于展示）。
  */
-class CacheViewModel : ViewModel() {
+class CacheViewModel @JvmOverloads constructor(
+    private val repository: CloudflareRepository = AppContainer.repository
+) : ViewModel() {
 
     data class CacheUiState(
         val selectedZone: Zone? = null,
@@ -38,8 +43,19 @@ class CacheViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(CacheUiState())
     val uiState: StateFlow<CacheUiState> = _uiState
 
-    /** 由 HomeScreen 响应全局选中域名变化时调用 */
-    fun setZone(zone: Zone?) {
+    init {
+        viewModelScope.launch {
+            ZoneSelectionStore.selected.collect { zone -> applyZone(zone) }
+        }
+    }
+
+    private fun applyZone(zone: Zone?) {
+        val same = _uiState.value.selectedZone?.id == zone?.id
+        if (same) {
+            // 同一域名的对象更新：只刷新展示数据，不清空用户正在输入的内容
+            if (zone != null) _uiState.update { it.copy(selectedZone = zone) }
+            return
+        }
         _uiState.update {
             it.copy(
                 selectedZone = zone,
@@ -86,7 +102,7 @@ class CacheViewModel : ViewModel() {
             _uiState.update { it.copy(busy = true, showConfirm = false, error = null, resultMessage = null, resultSuccess = null) }
             try {
                 val values = if (mode == PurgeMode.EVERYTHING) emptyList() else parseInput()
-                AppContainer.repository.purgeCache(
+                repository.purgeCache(
                     zoneId = zone.id,
                     purgeEverything = mode == PurgeMode.EVERYTHING,
                     files = if (mode == PurgeMode.URL) values else emptyList(),
@@ -95,6 +111,8 @@ class CacheViewModel : ViewModel() {
                     prefixes = if (mode == PurgeMode.PREFIX) values else emptyList()
                 )
                 _uiState.update { it.copy(busy = false, resultSuccess = true, resultMessage = "缓存清除成功") }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.update { it.copy(busy = false, resultSuccess = false, resultMessage = e.message ?: "缓存清除失败") }
             }
