@@ -19,6 +19,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,6 +34,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.navigation.compose.rememberNavController
 import io.github.toserk1024.cfdash.data.state.ZoneSelectionStore
 import io.github.toserk1024.cfdash.data.state.ZoneSettingsCache
@@ -96,9 +101,22 @@ private fun MainScreen() {
             // NavController 建在 key 内：切账号重建时同时清空导航栈，避免停在上个账号的子页
             val navController = rememberNavController()
 
+            // Home 常驻后，其 ViewModel 归属是 Activity，key() 重建不会销毁它们；
+            // 因此为 Home 单独提供 ViewModelStore，随 navResetKey 一起重建 → 切账号后域名/缓存重新加载
+            val homeViewModelStore = remember(navResetKey) { ViewModelStore() }
+            DisposableEffect(homeViewModelStore) {
+                onDispose { homeViewModelStore.clear() }
+            }
+            val homeViewModelStoreOwner = remember(homeViewModelStore) {
+                object : ViewModelStoreOwner {
+                    override val viewModelStore: ViewModelStore get() = homeViewModelStore
+                }
+            }
+
             // ===== 底层：Home 常驻，不进导航栈、不随子页销毁 =====
             if (accepted && loggedIn) {
-                HomeScreen(
+                CompositionLocalProvider(LocalViewModelStoreOwner provides homeViewModelStoreOwner) {
+                    HomeScreen(
                     homeKey = navResetKey,
                     initialTab = currentTab,
                     onTabChange = { currentTab = it },
@@ -134,7 +152,8 @@ private fun MainScreen() {
                         switching = true
                         navResetKey++
                     }
-                )
+                    )
+                }
             }
 
             // ===== 上层：覆盖层导航（Home 永远在下方存活，转场只动覆盖层）=====
