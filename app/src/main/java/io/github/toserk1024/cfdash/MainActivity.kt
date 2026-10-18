@@ -24,6 +24,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -31,23 +32,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.rememberNavController
 import io.github.toserk1024.cfdash.data.state.ZoneSelectionStore
 import io.github.toserk1024.cfdash.data.state.ZoneSettingsCache
 import io.github.toserk1024.cfdash.data.storage.ThemePreferences
-import io.github.toserk1024.cfdash.navigation.AnimatedAppNav
-import io.github.toserk1024.cfdash.navigation.AppScreen
+import io.github.toserk1024.cfdash.navigation.AppNavHost
+import io.github.toserk1024.cfdash.navigation.Routes
 import io.github.toserk1024.cfdash.ui.common.AppReadySignal
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordsSync
+import io.github.toserk1024.cfdash.ui.home.HomeScreen
 import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
 import io.github.toserk1024.cfdash.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
 
 /** 切换账号 Loading 遮罩：最少显示时长（防闪烁） */
 private const val MIN_LOADING_MS = 400L
-/** 切换账号 Loading 遮罩：最长等待（兜底，避免网络异常时永远遮着） */
+/** 切换账号 Loading 遮罩：最长等待（兜底） */
 private const val MAX_LOADING_MS = 3000L
 /** 就绪信号轮询间隔 */
 private const val READY_POLL_MS = 50L
+/** 导航防重入窗口（毫秒） */
+private const val NAV_DEBOUNCE_MS = 600L
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,7 +66,6 @@ class MainActivity : ComponentActivity() {
                 darkTheme = isSystemInDarkTheme(),
                 dynamicColor = themeConfig.dynamicColor,
                 seedColor = if (themeConfig.dynamicColor) {
-                    // 开启动态配色时种子色来自系统，这里给默认值即可
                     CloudflareOrange
                 } else {
                     Color(ThemePreferences.toArgb(themeConfig.colorHex) ?: 0xFFF6821FL)
@@ -75,58 +79,74 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun MainScreen() {
-    // 登录态：存在任意已保存用户直接进主界面；否则进初始化界面
+    var accepted by remember { mutableStateOf(AppContainer.tokenStore.isDisclaimerAccepted()) }
     var loggedIn by remember { mutableStateOf(AppContainer.tokenStore.hasCredential()) }
-
-    // 页面栈重建键：切换账号 / 退出到剩余账号时 +1 → 重建页面栈，所有 ViewModel 以新账号重新加载
     var navResetKey by remember { mutableIntStateOf(0) }
-
-    // 账号切换中的全屏 Loading 遮罩
     var switching by remember { mutableStateOf(false) }
-
-    // 当前所在 Home Tab（重建页面栈后保持所在页面不变）
     var currentTab by remember { mutableIntStateOf(0) }
+    var lastNavAt by remember { mutableLongStateOf(0L) }
 
-    // 退出到无剩余用户：重建一次页面栈，让 startScreen 落到登录页
+    // 退出到无剩余用户：重建一次，让 startDestination 落到登录页
     LaunchedEffect(loggedIn) {
         if (!loggedIn) navResetKey++
     }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         key(navResetKey) {
-            AnimatedAppNav(
-                // 启动逻辑：未同意免责声明→免责声明页；已同意→按登录态进主界面或登录页
-                startScreen = when {
-                    !AppContainer.tokenStore.isDisclaimerAccepted() -> AppScreen.Disclaimer
-                    loggedIn -> AppScreen.Home
-                    else -> AppScreen.Onboarding
-                },
-                homeKey = navResetKey,
-                initialTab = currentTab,
-                onTabChange = { currentTab = it },
-                // 登录成功后同步 loggedIn=true（否则退出登录时 loggedIn 无变化导致不跳转）
-                onLoggedIn = { loggedIn = true },
-                onUserSwitched = {
-                    // 切换账号：清除持久化域名选择 + 清空会话内存缓存，重建页面栈重新加载
-                    AppContainer.tokenStore.saveSelectedZoneId(null)
-                    clearSessionCaches()
-                    AppReadySignal.reset()
-                    switching = true
-                    navResetKey++
-                },
-                onLoggedOut = {
-                    // 退出登录：删除当前激活用户；有剩余用户则重建刷新，否则回登录页
-                    AppContainer.tokenStore.getActiveUser()?.id?.let { AppContainer.tokenStore.deleteUser(it) }
-                    AppContainer.tokenStore.saveSelectedZoneId(null)
-                    clearSessionCaches()
-                    if (AppContainer.tokenStore.hasCredential()) {
+            // NavController 建在 key 内：切账号重建时同时清空导航栈，避免停在上个账号的子页
+            val navController = rememberNavController()
+
+            // ===== 底层：Home 常驻，不进导航栈、不随子页销毁 =====
+            if (accepted && loggedIn) {
+                HomeScreen(
+                    homeKey = navResetKey,
+                    initialTab = currentTab,
+                    onTabChange = { currentTab = it },
+                    onDnsEdit = { zoneId, recordId, zoneName ->
+                        val now = System.currentTimeMillis()
+                        if (zoneId.isNotBlank() && now - lastNavAt > NAV_DEBOUNCE_MS) {
+                            lastNavAt = now
+                            navController.navigate(Routes.dnsEdit(zoneId, recordId, zoneName)) {
+                                launchSingleTop = true
+                            }
+                        }
+                    },
+                    onLogout = {
+                        AppContainer.tokenStore.getActiveUser()?.id
+                            ?.let { AppContainer.tokenStore.deleteUser(it) }
+                        AppContainer.tokenStore.saveSelectedZoneId(null)
+                        clearSessionCaches()
+                        if (AppContainer.tokenStore.hasCredential()) {
+                            AppReadySignal.reset()
+                            switching = true
+                            navResetKey++
+                        } else {
+                            loggedIn = false
+                        }
+                    },
+                    onNewUser = {
+                        navController.navigate(Routes.ONBOARDING)
+                    },
+                    onUserSwitched = {
+                        AppContainer.tokenStore.saveSelectedZoneId(null)
+                        clearSessionCaches()
                         AppReadySignal.reset()
                         switching = true
                         navResetKey++
-                    } else {
-                        loggedIn = false
                     }
-                }
+                )
+            }
+
+            // ===== 上层：覆盖层导航（Home 永远在下方存活，转场只动覆盖层）=====
+            AppNavHost(
+                navController = navController,
+                startDestination = when {
+                    !accepted -> Routes.DISCLAIMER
+                    loggedIn -> Routes.EMPTY
+                    else -> Routes.ONBOARDING
+                },
+                onAccepted = { accepted = true },
+                onLoggedIn = { loggedIn = true }
             )
         }
 
@@ -143,7 +163,6 @@ private fun MainScreen() {
                 switching = false
             }
         }
-        // 淡入淡出，避免遮罩硬切
         AnimatedVisibility(
             visible = switching,
             enter = fadeIn(tween(200)),

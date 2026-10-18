@@ -89,6 +89,17 @@
   - `DnsEditViewModel` 增加直接接收参数的主构造（自建导航不再有 `SavedStateHandle` 参数），并保留原构造兼容
 - 删除 `navigation/AppNavHost.kt`（不再使用）；`MainActivity` 改为直接渲染 `AnimatedAppNav`
 
+### 导航架构定稿：Home 常驻 + 覆盖层导航（动画回到库实现）
+
+- **根因确认**：返回动画"没有"并非转场参数问题，而是**返回瞬间 Home 需要全量重组**（8 个常驻 Tab、Vico 图表、200 行日志表），单帧成本过高导致 320ms 动画只渲染 1~2 帧就直接跳到终点 → 观感等于"硬闪回"
+- **解决方案（页面不销毁）**：
+  - **Home 移出导航栈**，常驻在 NavHost 之下（`MainActivity` 直接渲染 `HomeScreen`），切子页时 **Home 从不销毁、不重组**
+  - NavHost 只承载覆盖层页面：`EMPTY`（透明占位）/ 免责声明 / 登录 / DNS 编辑
+  - 打开 DNS 编辑 = 覆盖层从右滑入；返回 = 覆盖层向右滑出，下方 Home 稳定显示 → **动画期间无重建成本，必然流畅**
+  - 转场交回 **Navigation Compose** 提供的 `enter / popEnter / exit / popExit`
+- 删除自写的 `AnimatedAppNav.kt`、`AppScreen.kt`（改为库实现）
+- `Routes` 新增 `EMPTY` 透明占位路由；DNS 编辑页返回统一 `popBackStack(Routes.EMPTY, false)`，重复触发不会弹空栈
+
 ## 2026.08.16
 
 ### 缓解修复 + 日志详情页 + 时间时区
