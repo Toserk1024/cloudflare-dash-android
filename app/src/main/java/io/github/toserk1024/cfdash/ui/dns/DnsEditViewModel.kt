@@ -29,6 +29,8 @@ class DnsEditViewModel(
     private val recordId: String?
 ) : ViewModel() {
 
+    /** 通过 SavedStateHandle 创建（Navigation Compose 默认工厂用；@JvmOverloads 保证生成单参构造） */
+    @JvmOverloads
     constructor(
         savedStateHandle: SavedStateHandle,
         repository: CloudflareRepository = AppContainer.repository

@@ -7,6 +7,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -14,6 +17,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import io.github.toserk1024.cfdash.AppContainer
 import io.github.toserk1024.cfdash.ui.disclaimer.DisclaimerScreen
+import io.github.toserk1024.cfdash.ui.dns.DnsEditViewModel
 import io.github.toserk1024.cfdash.ui.dns.DnsRecordEditScreen
 import io.github.toserk1024.cfdash.ui.onboarding.OnboardingScreen
 
@@ -112,13 +116,27 @@ fun AppNavHost(
             val zoneId = entry.arguments?.getString("zoneId").orEmpty()
             val recordId = entry.arguments?.getString("recordId")?.takeIf { it.isNotBlank() }
             val zoneName = entry.arguments?.getString("zoneName")?.takeIf { it.isNotBlank() }
+            // 显式构造 ViewModel，避免依赖默认工厂的反射构造（此前闪退正是因此）
+            val editViewModel: DnsEditViewModel = viewModel(
+                key = "dns_edit_${zoneId}_${recordId.orEmpty()}",
+                factory = viewModelFactory {
+                    initializer {
+                        DnsEditViewModel(
+                            repository = AppContainer.repository,
+                            zoneId = zoneId,
+                            recordId = recordId
+                        )
+                    }
+                }
+            )
             DnsRecordEditScreen(
                 zoneId = zoneId,
                 recordId = recordId,
                 zoneName = zoneName,
                 // 显式回到 EMPTY（Home 占位），重复触发也安全，不会把 Home 之外的栈弹空
                 onBack = { navController.popBackStack(Routes.EMPTY, inclusive = false) },
-                onSaved = { navController.popBackStack(Routes.EMPTY, inclusive = false) }
+                onSaved = { navController.popBackStack(Routes.EMPTY, inclusive = false) },
+                viewModel = editViewModel
             )
         }
     }
