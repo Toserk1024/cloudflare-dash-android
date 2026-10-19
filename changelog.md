@@ -12,7 +12,20 @@
 - **`settings.gradle.kts` 新增 JitPack 仓库**（MPAndroidChart 4.x 仅发布在 JitPack），排在官方源之后、国内镜像之前
 - **CI 同步**：`build.yml` / `release.yml` 的 SDK 组件改为 `platforms;android-37.0` + `build-tools;37.0.0`；`release.yml` 中读取 versionName 的 `aapt` 路径同步改为 37.0.0（否则 Release 流程取不到版本号）
   - **踩坑记录**：SDK 37 的平台包**不存在** `platforms;android-37`，官方仓库里是带小版本号的 `platforms;android-37.0 / 37.1 / 37.2`（均在 stable 渠道）；`build-tools;37.0.0` 命名正常，无需调整
-- **下一批次（未实施）**：统计页 3 个图表迁移到 MP（`TrendLineChart` / `BreakdownPieChart` / `ZoneBarChart`），安全页保持 Vico + Canvas 不动
+### 统计页图表迁移到 MPAndroidChart 4.x（批次 2）
+
+统计页三个图表改用 **MPAndroidChart 4.0.1 官方 Compose 模块**（`MPChartCompose`），**安全页保持原样**（趋势图仍 Vico、堆叠条仍 Canvas 手绘）。
+
+- **依赖**：新增 `MPChartLib` + `MPChartCompose`（`v4.0.1`，仅 JitPack 发布，仓库已在批次 1 加好）；Vico 保留，两套图表库并存
+- **新增样式层** `ui/charts/MpChartStyle.kt`：把 Material 3 色板翻译成 MP 属性 —— 去掉描述/图例/轴线、只留淡横向网格、10sp 轴标签、圆角柱、渐变面积填充、环形饼图（圆角扇区）
+- **趋势折线**：平滑曲线（`CUBIC_BEZIER`）+ 竖向渐变填充 + 高亮点圆环；点击任一点由 `marker` 槽位弹出 Compose 浮层（时间 + 数值）
+- **维度环图**：环形 + 圆角扇区 + 中心显示「总计 / 数值」，图例仍由 Compose 侧 `LegendRow` 渲染
+- **域名柱状图**：圆角柱 + 每柱专属配色渐变，横轴标签隐藏（信息由下方图例列表承担，避免重复）
+- **手势全部保留**：缩放、拖拽、双击缩放、点击高亮均使用库默认行为，未做任何关闭
+- **动画**：数据变化用 `animateChanges = true`（300ms 平滑过渡）
+- **R8**：加 `-keep class com.github.mikephil.charting.** { *; }`，避免 release 混淆后图表不绘制/marker 错位
+- **已知副作用（用户已确认接受）**：图表区域内纵向滑动不会滚动页面、该区域下拉刷新不触发
+- **待实机验证**：观感与 Cloudflare 面板对比、深色模式配色、切域名/切账号后数据刷新
 
 ## 2026.10.18
 

@@ -24,7 +24,8 @@
 | 协程 | kotlinx-coroutines-android | 1.9.0 |
 | 图标 | material-icons-extended（完整图标库，release R8 裁剪未引用图标，体积几乎无增量） | BOM 管理 |
 | ViewModel | lifecycle-viewmodel-compose | 2.8.7 |
-| 图表 | Vico（Compose 原生，仅 compose 模块，3.x 无独立 core） | 3.2.3 |
+| 图表 | Vico（Compose 原生，仅 compose 模块，3.x 无独立 core）—— 现仅安全页趋势图在用 | 3.2.3 |
+| 图表 | MPAndroidChart 4.x 官方 Compose 模块（`MPChartCompose` + `MPChartLib`，JitPack）—— 统计页 3 个图表 | v4.0.1 |
 
 依赖定义位置：`gradle/libs.versions.toml` + `app/build.gradle.kts`。
 仓库镜像：阿里云/华为云优先（`settings.gradle.kts`），离线环境可构建。
@@ -58,7 +59,8 @@ app/src/main/java/io/github/toserk1024/cfdash/
     ├── theme/                    # Color/Theme/Type（Cloudflare 橙 #F6821F）
     ├── onboarding/               # OnboardingScreen + OnboardingViewModel（双认证：Global 默认 / Token）
     ├── home/                     # HomeScreen（侧边栏导航 + 水平平移过渡）+ HomeViewModel（用户信息）
-│   ├── stats/                    # StatsViewModel（账户/域名级统计，StatsMode 切换）+ StatsContent（复用组件）+ StatsData + StatsCharts（Vico 图表）
+│   ├── stats/                    # StatsViewModel（账户/域名级统计，StatsMode 切换）+ StatsContent（复用组件）+ StatsData + StatsCharts（MP 图表）
+│   ├── charts/                  # MpChartStyle（Material 3 色板 → MP 属性映射层，统计页图表共用）
 │   ├── zones/                    # ZoneViewModel（全局域名）+ ZonePicker（统一域名选择器，扁平表格）+ ZoneDetailTab（域名详情 Tab）
 │   ├── dns/                      # DnsRecordsContent + DnsRecordEditScreen + DnsViewModel + DnsEditViewModel
 │   ├── cache/                    # CacheContent（缓存清除 Tab，5 种方式）+ CacheViewModel + PurgeMode 枚举
@@ -182,6 +184,8 @@ pm install -r /data/local/tmp/cf-app.apk
 11. **GraphQL Analytics**：`client.graphql()` POST `/graphql`，响应为 data/errors 结构（非 ApiResponse 包装），errors 非空抛 CloudflareException；查询构建与解析统一在 `AnalyticsParser`（时间窗口 UTC、数据集映射 24h/7d/30d）；统计需 Token 具备 **Zone Analytics Read**（域名级）/ **Account Analytics Read**（账号级）权限，否则 403。**关键约束（schema 反查确认，踩坑记录）**：① **1d/1h Groups 的 dimensions 仅有 `date`（1d）/`datetime`（1h，"truncated to the hour"）**，无 datetimeHour、无国家/状态码/缓存维度；② **1d/1h Groups 的 orderBy 枚举无 `count_DESC`**（合法值仅 sum_*/uniq_*/avg_*/date/datetime 等聚合字段），故汇总/趋势查询**不使用 orderBy**，趋势序列客户端按时间标签排序；③ **国家/状态码维度分布用 Groups sum 的 `countryMap`/`responseStatusMap`**（`sum { countryMap { clientCountryName requests } responseStatusMap { edgeResponseStatus requests } }`，支持 7d/30d，一次查询返回国家+状态码两个分布）；④ **缓存分布无 cacheStatusMap**——由 `sum.cachedRequests/requests` 计算"命中/未命中"两切片（ViewModel 生成）；⑤ **`httpRequestsAdaptiveGroups` 查询范围限 1 天**（7d/30d 报 "cannot request a time range wider than 1d"），仅用于 **24h 域名拆分**（按 `clientRequestHTTPHost` 分组，orderBy 支持 count_DESC）；⑥ **`zones` 节点无 `name` 字段**（报 unknown field "name"），域名拆分 zoneName=host；⑦ filter 时间字段：1hGroups → `datetime_geq/leq`，1dGroups → `date_geq/leq`（yyyy-MM-dd）；⑧ 账号级 accountTag 用 `GET /accounts`（`/user` 的 `accounts` 字段可能为空）；⑨ 汇总与趋势查询均需 `uniq { uniques }`（独立访客，汇总漏查会导致独立访客恒为 0）。
 12. **Vico 图表（3.x，踩坑记录）**：仅依赖 `com.patrykandpatrick.vico:compose`（3.x 无独立 core 模块，minSdk≥23）；核心 API：`CartesianChartHost(rememberCartesianChart(rememberLineCartesianLayer/rememberColumnCartesianLayer, startAxis = VerticalAxis.rememberStart(), bottomAxis = HorizontalAxis.rememberBottom()), modelProducer)`；数据更新用 `CartesianChartModelProducer.runTransaction { lineModel/columnModel { series(y = list) } }`；**x 轴分类标签**：x 用序号（series 自动索引），标签经 `extras { it[key] = labels }` 同步，`HorizontalAxis.rememberBottom(valueFormatter = CartesianValueFormatter { context, x, _ -> context.model.extraStore[key][x.toInt()] })` 读取；饼图用 `PieChartHost(rememberPieChart(sliceProvider = PieChart.SliceProvider.series(slices), valueFormatter = PieValueFormatter {...}), modelProducer)` + `pieSeries { series(*values) }`；柱状图颜色 `rememberLineComponent(Fill(color), 16.dp)`，折线 `LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(color)))`。modelProducer 应持久化（remember/ViewModel），runTransaction 是挂起函数。
 
+13. **MPAndroidChart 4.x（统计页，踩坑记录）**：仅 JitPack 发布（`com.github.PhilJay.MPAndroidChart:MPChartLib` / `MPChartCompose`，版本 `v4.0.1`），**`MPChartCompose` 的 AAR 要求 `minCompileSdk=37`**（这是升 compileSdk 37 + AGP 9.2.1 + Compose BOM 2026.09.00 的唯一原因）。API 要点：`LineChart(data: LineData?, modifier, state, marker = { entry, _ -> ... }, animateChanges, setup, update)`；`setup` 只跑一次（读到的值被冻结），主题相关与 formatter 一律放 `update`（Compose 状态变化会重跑）；`ChartState` 提供 `selectedEntry` / `zoomX` / `animateX` / `highlight`；样式为 Kotlin 属性（`isDrawValuesEnabled`、`barCornerRadius`、`holeRadius`、`colors: List<Int>`、`fills: List<Fill>?`）。**手势默认全开**（缩放/拖拽/双击/点击），副作用：图表区域内纵向滑动不滚页面、该区域下拉刷新不触发。R8 需 `-keep class com.github.mikephil.charting.** { *; }`。安全页仍用 Vico + Canvas，未迁移。
+
 ## 8. 二次开发指南
 
 ### 8.1 新增一个页面/功能的通用步骤
@@ -199,7 +203,7 @@ pm install -r /data/local/tmp/cf-app.apk
 | 加 API 端点 | data/api/CloudflareApi.kt + Repository |
 | 加 Zone 设置开关 | data/model/ZoneSetting.kt + CloudflareApi/Repository + ZoneViewModel |
 | 加统计数据 | data/model/ZoneAnalytics.kt（AnalyticsParser 查询/解析 + 模型）+ Repository.getZoneAnalytics/getAccountAnalytics + ui/stats/StatsViewModel（StatsMode 切换）+ HomeScreen |
-| 加统计图表 | ui/stats/StatsCharts.kt（TrendLineChart/BreakdownPieChart/ZoneBarChart，Vico 3.x）+ StatsContent 卡片编排 + StatsData 聚合字段 + AnalyticsParser 对应查询 |
+| 加统计图表 | ui/stats/StatsCharts.kt（MP `LineChart`/`PieChart`/`BarChart`）+ ui/charts/MpChartStyle.kt（样式映射）+ StatsContent 卡片编排 + StatsData 聚合字段 + AnalyticsParser 对应查询 |
 | 改 DNS 记录字段 | data/model/DnsRecord.kt |
 | 改认证逻辑 | ui/onboarding/OnboardingViewModel.kt + AuthCredential.kt + TokenStore.kt |
 

@@ -145,6 +145,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.vico.compose)
+    // 统计页图表（MP 官方 Compose 模块，4.x 仅 JitPack 发布）；安全页仍用 Vico
+    implementation(libs.mpchart.compose)
+    implementation(libs.mpchart.lib)
     implementation(libs.material.kolor)
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.ui.tooling)

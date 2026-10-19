@@ -38,3 +38,9 @@
 -dontwarn com.google.errorprone.annotations.**
 -dontwarn javax.annotation.**
 -dontwarn org.codehaus.mojo.animal_sniffer.**
+
+# ===== MPAndroidChart 4.x（统计页图表）=====
+# 库内含大量自定义 View / Paint 与 Compose 包装，保守全量保留，避免 release（开 R8）后
+# 出现图表不绘制、marker 定位异常等仅混淆态才复现的问题
+-keep class com.github.mikephil.charting.** { *; }
+-dontwarn com.github.mikephil.charting.**
