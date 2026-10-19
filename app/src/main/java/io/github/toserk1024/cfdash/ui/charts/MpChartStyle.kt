@@ -35,7 +35,7 @@ internal fun Chart<*>.applyChartBase(labelColor: Int) {
 }
 
 /** 坐标轴：无轴线、无竖网格、淡横向网格、10sp 标签（Cloudflare 面板风格） */
-internal fun BarLineChartBase<*>.applyAxes(labelColor: Int, gridColor: Int) {
+internal fun BarLineChartBase<*>.applyAxes(labelColor: Int, gridLineColor: Int) {
     setExtraOffsets(2f, 8f, 8f, 4f)
     xAxis.position = XAxis.XAxisPosition.BOTTOM
     xAxis.apply {
@@ -49,7 +49,8 @@ internal fun BarLineChartBase<*>.applyAxes(labelColor: Int, gridColor: Int) {
     axisLeft.apply {
         isDrawAxisLineEnabled = false
         isDrawGridLinesEnabled = true
-        gridColor = gridColor
+        // 注意：参数名不能与属性 gridColor 同名，否则 apply 内左侧会解析成参数（val 不可赋值）
+        gridColor = gridLineColor
         gridLineWidth = 1f
         textColor = labelColor
         textSize = 10f
