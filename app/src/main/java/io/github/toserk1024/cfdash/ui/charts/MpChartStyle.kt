@@ -35,7 +35,7 @@ internal fun Chart<*>.applyChartBase(labelColor: Int) {
     noDataTextColor = labelColor
 }
 
-/** 坐标轴：无轴线、无竖网格、淡横向网格、10sp 标签（Cloudflare 面板风格） */
+/** 坐标轴：无轴线、无竖网格、淡横向网格、10sp 标签 */
 internal fun BarLineChartBase<*>.applyAxes(labelColor: Int, gridLineColor: Int) {
     // 手势策略：双指缩放只作用 X 轴（Y 轴缩放对趋势/柱状无意义），拖拽与双击缩放保留
     isScaleEnabled = true
@@ -127,7 +127,7 @@ internal fun BarDataSet<*>.applyBars(fills: List<Fill>) {
 @Composable
 internal fun rememberChartPalette(): List<Color> = baseChartColors
 
-/** chart-1 ~ chart-10：浅红 / 浅橙 / 黄 / 青柠 / 浅绿 / 青绿 / 浅蓝 / 靛蓝 / 浅紫 / 浅粉 */
+/** chart-1 ~ chart-10（统计色板，用户指定；Light / Dark 共用同一套） */
 private val baseChartColors = listOf(
     Color(0xFFF27A72), // chart-1 浅红
     Color(0xFFF2994A), // chart-2 浅橙

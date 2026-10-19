@@ -65,7 +65,8 @@ import kotlin.math.roundToInt
  * 约定：
  * - 手势：只允许 X 轴缩放（Y 轴锁定），拖拽 / 双击缩放 / 点击高亮保留；
  * - X 轴标签数量按「屏幕可容纳量」动态计算，缩放平移时由库按当前可视范围重算，永不折叠；
- * - 折线取主题 primary（跟随 MD）；环图/柱状用 [rememberChartPalette] 彩色板（仅与 surface 混合 12%），保证区分度；
+ * - 色板：图例顺序 = chart-1..10（跨图表固定）；折线用主题 primary，环图/柱状用 [rememberChartPalette]；
+ * - 环图：无圆角扇区 + 2dp 细缝 + 小扇区保底 2°；分类超过 6 类合并「其他」；
  * - 图例统一由 Compose 侧渲染（[LegendRow]），图表内部图例关闭。
  */
 
