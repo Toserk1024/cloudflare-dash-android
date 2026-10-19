@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -167,7 +168,8 @@ fun BreakdownPieChart(
     val sliceColors = remember(palette) { palette.map { it.toArgb() } }
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.mp()
     val centerColor = MaterialTheme.colorScheme.onSurface.mp()
-    val holeColor = MaterialTheme.colorScheme.surface.mp()
+    // 孔色直接取 Card 的默认容器色，保证与卡片底色完全一致（中间「总计」不再显透）
+    val holeColor = CardDefaults.cardColors().containerColor.mp()
     val data = remember(chartItems, sliceColors) {
         PieData(
             PieDataSet(

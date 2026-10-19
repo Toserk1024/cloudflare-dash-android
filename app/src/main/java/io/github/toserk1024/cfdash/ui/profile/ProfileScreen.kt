@@ -53,7 +53,6 @@ import androidx.compose.ui.unit.dp
 import io.github.toserk1024.cfdash.BuildConfig
 import io.github.toserk1024.cfdash.data.storage.ThemePreferences
 import io.github.toserk1024.cfdash.ui.home.HomeViewModel.HomeUiState
-import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
 
 /** 我的（Profile）Tab */
 @Composable
@@ -102,7 +101,7 @@ fun ProfileScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(shape = CircleShape, color = CloudflareOrange) {
+                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
                                 Box(
                                     modifier = Modifier.size(56.dp),
                                     contentAlignment = Alignment.Center
@@ -110,7 +109,7 @@ fun ProfileScreen(
                                     Text(
                                         text = user.username.firstOrNull()?.uppercase() ?: "C",
                                         style = MaterialTheme.typography.headlineMedium,
-                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }

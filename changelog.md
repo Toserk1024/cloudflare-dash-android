@@ -45,6 +45,9 @@
   - 说明：不重建时 `themes.xml` 的窗口背景不会重载，但根布局已用 `colorScheme.background` 铺底，深色切换无白闪
 - **抽屉菜单横屏可滚动**：`ModalDrawerSheet` 内容包裹 `Column(verticalScroll)`，横屏/小屏高度不足时可滑动查看全部 8 个入口与「退出登录」；原先占位的 `Spacer(weight(1f))` 改为固定间距（可滚动容器内 weight 无意义）
 
+- **环形图中心「总计」不再显透**：`holeColor` 改为直接取 `CardDefaults.cardColors().containerColor`，与所在卡片底色严格一致（此前取 `surface`，与卡片底色不同，视觉上像透出来）
+- **用户头像背景交给 MD 管理**：Home 抽屉与「我的」页的用户头像由固定品牌橙改为 `colorScheme.primaryContainer` + `onPrimaryContainer`，随种子色/深浅色变化，不再一味橙色
+
 ## 2026.10.18
 
 ### 架构完善（框架批）：请求生命周期 + 单一事实源 + 设置接口统一 + 工程化
