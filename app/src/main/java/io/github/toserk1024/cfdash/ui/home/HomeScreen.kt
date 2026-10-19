@@ -38,7 +38,6 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
@@ -99,8 +98,6 @@ import io.github.toserk1024.cfdash.ui.zones.ZonePicker
 import io.github.toserk1024.cfdash.ui.zones.ZoneViewModel
 import kotlinx.coroutines.launch
 
-/** 安全页暂时隐藏：改为 true 即可恢复侧边栏入口（页面代码与 Tab 内容保持原样） */
-private const val SHOW_SECURITY_TAB = false
 
 /**
  * 主界面：自绘侧边栏 + 八个常驻 Tab（域名/DNS/统计/缓存/速度/网络/安全/我的）。
@@ -126,10 +123,7 @@ fun HomeScreen(
     networkViewModel: NetworkViewModel = viewModel(),
     securityViewModel: SecurityViewModel = viewModel()
 ) {
-    // 安全页隐藏期间若上次停在安全 Tab，回落到「域名」
-    var selectedTab by rememberSaveable {
-        mutableIntStateOf(if (!SHOW_SECURITY_TAB && initialTab == 6) 0 else initialTab)
-    }
+    var selectedTab by rememberSaveable { mutableIntStateOf(initialTab) }
     val homeState by homeViewModel.uiState.collectAsState()
     val zoneState by zoneViewModel.uiState.collectAsState()
     val statsState by statsViewModel.uiState.collectAsState()
@@ -429,15 +423,6 @@ fun HomeScreen(
                         selected = selectedTab == 5,
                         onClick = { scope.launch { drawerState.close() }; selectedTab = 5 }
                     )
-                    // 安全页暂时隐藏（SHOW_SECURITY_TAB 控制，页面代码保持原样）
-                    if (SHOW_SECURITY_TAB) {
-                        NavigationDrawerItem(
-                            icon = { Icon(Icons.Default.Security, contentDescription = null) },
-                            label = { Text("安全") },
-                            selected = selectedTab == 6,
-                            onClick = { scope.launch { drawerState.close() }; selectedTab = 6 }
-                        )
-                    }
                     NavigationDrawerItem(
                         icon = { Icon(Icons.Default.Person, contentDescription = null) },
                         label = { Text("我的") },

@@ -8,6 +8,7 @@
 当前已实现：**双认证登录（Global API Key / API Token，Global 默认优先）、侧边栏导航（域名/DNS/统计/缓存/速度/网络/安全/我的）、统一域名选择器（全局共享，域名详情直接置于域名 Tab）、DNS 记录管理（列表/筛选/搜索/新建/编辑/删除）、域名高级设置（开发模式 / 五秒盾 / IPv6）、统计数据（账户级/域名级一键切换，24h/7d/30d，Vico 图表化：汇总卡 + 时间趋势折线图 + 国家/状态码/缓存维度饼图 + 账户级域名流量拆分柱状图）、缓存清除（侧边栏「缓存」Tab，支持全部/URL/主机名/标签/前缀 5 种方式）、速度优化（「速度」Tab，协议优化 HTTP/2、HTTP/3、0-RTT + 内容优化 Speed Brain、Cloudflare Fonts、Early Hints、Rocket Loader，分段按钮切换）、网络优化（「网络」Tab，IPv6/gRPC/WebSockets/Pseudo IPv4/IP 地理位置/网络错误记录/洋葱路由）、安全分析（「安全」Tab，安全概况回源/命中/缓解 100% 水平堆叠条 + 24h 趋势双折线 + 分组分布 + 筛选器与安全事件日志）、用户信息与退出登录**。
 
 **已移除功能**：添加域名（用户要求删除，相关代码已清理干净，如需恢复参考 §8.3）。
+**临时下线**：安全页入口（2026-10-19 用户要求暂时隐藏，后续重构）。仅删除侧边栏「安全」菜单项，`ui/security/*`、HomeScreen 内安全 Tab 内容、`visitedMask` 的 `0b1000000` 位、`SecurityViewModel` **全部保留未删** —— 恢复步骤见 §8.4。
 **未开发**：Workers、Zero Trust 等高级功能（用户明确暂不开发）。
 
 ## 2. 技术栈与依赖
@@ -211,6 +212,27 @@ pm install -r /data/local/tmp/cf-app.apk
 1. 恢复 data/model/Zone.kt 中的 `CreateZoneRequest`/`AccountRef`，新建 Account.kt
 2. Repository 恢复 `createZone(name, accountId)` + `getAccounts()`
 3. 新建 AddZoneScreen/AddZoneViewModel；在域名 Tab（ZoneDetailTab）或全局 ZoneViewModel 中加 FAB；Routes/AppNavHost 加 add_zone 路由
+
+### 8.4 恢复安全页入口（临时下线，如需）
+
+安全页只是**从侧边栏下掉了入口**，页面本体与数据链路全部保留，恢复只需 2 步：
+
+1. `ui/home/HomeScreen.kt` 侧边栏在「网络」项之后加回：
+
+```kotlin
+NavigationDrawerItem(
+    icon = { Icon(Icons.Default.Security, contentDescription = null) },
+    label = { Text("安全") },
+    selected = selectedTab == 6,
+    onClick = { scope.launch { drawerState.close() }; selectedTab = 6 }
+)
+```
+
+2. 补回 import：`androidx.compose.material.icons.filled.Security`
+
+无需改动：`SecurityTab`（`selectedTab == 6` 分支）、`visitedMask` 的 `0b1000000` 位、`SecurityViewModel` 注入、`ui/security/*` 全部代码。
+
+> 注意：安全页图表仍用 Vico（统计页已迁 MP），两套图表库并存属预期状态。
 
 ## 9. 版本记录
 版本演进记录已迁移至 [`changelog.md`](changelog.md)，此处不再维护。
