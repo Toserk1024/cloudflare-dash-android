@@ -1,11 +1,8 @@
 package io.github.toserk1024.cfdash.ui.charts
 
 import android.graphics.drawable.GradientDrawable
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import com.github.mikephil.charting.charts.BarLineChartBase
 import com.github.mikephil.charting.charts.Chart
@@ -91,13 +88,16 @@ internal fun LineDataSet<*>.applyLine(lineColor: Int) {
     isDrawHighlightCircleEnabled = true
 }
 
-/** 环形饼图：圆角扇区、隐藏扇区标签与数值（图例由 Compose 侧渲染） */
+/** 环形饼图：无圆角扇区 + 2dp 细缝 + 小扇区保底 2°（图例由 Compose 侧渲染） */
 internal fun PieChart.applyDonut(holeColor: Int, centerColor: Int, centerTextSizeSp: Float) {
     isDrawEntryLabelsEnabled = false
-    holeRadius = 68f
+    holeRadius = 66f
     transparentCircleRadius = 0f
     this.holeColor = holeColor
-    isDrawRoundedSlicesEnabled = true
+    // 圆角会让每个扇区两端起弧（观感像「(=」），且把占比极小扇区压到看不见，故关闭
+    isDrawRoundedSlicesEnabled = false
+    // 小占比扇区保底 2°，避免几乎不可见、也无法点击
+    minAngleForSlices = 2f
     centerTextColor = centerColor
     centerTextSize = centerTextSizeSp
     setExtraOffsets(0f, 0f, 0f, 0f)
@@ -119,29 +119,24 @@ internal fun BarDataSet<*>.applyBars(fills: List<Fill>) {
 }
 
 /**
- * 图表彩色板（维度分布用）：沿用原有 10 个色相，仅与 surface 做轻微混合。
+ * 图表彩色板（维度分布用）：固定的 10 色统计色序（chart-1 ~ chart-10）。
  *
- * 目的：既不刺眼、与 MD 主题协调（没有割裂感），又**保留足够的色彩区分度**，
- * 避免「全用 MD 同色系分不清国家/状态码」的问题。折线图不使用它（走主题 primary）。
+ * 这组浅色系专为统计数据设计：亮度接近、色相互相区分，深浅背景都可用，
+ * 不再与主题色混合（混合会发灰、降低区分度）。折线图不使用它（走主题 primary）。
  */
 @Composable
-internal fun rememberChartPalette(): List<Color> {
-    val scheme = MaterialTheme.colorScheme
-    return remember(scheme) {
-        baseChartColors.map { lerp(it, scheme.surface, 0.12f) }
-    }
-}
+internal fun rememberChartPalette(): List<Color> = baseChartColors
 
-/** 原有配色（Cloudflare 橙 + 蓝/绿/红/紫/橙黄/浅蓝/浅绿/浅紫/黄） */
+/** chart-1 ~ chart-10：浅红 / 浅橙 / 黄 / 青柠 / 浅绿 / 青绿 / 浅蓝 / 靛蓝 / 浅紫 / 浅粉 */
 private val baseChartColors = listOf(
-    Color(0xFFF6821F),
-    Color(0xFF2D9CDB),
-    Color(0xFF27AE60),
-    Color(0xFFEB5757),
-    Color(0xFF9B51E0),
-    Color(0xFFF2994A),
-    Color(0xFF56CCF2),
-    Color(0xFF6FCF97),
-    Color(0xFFBB6BD9),
-    Color(0xFFFFD166)
+    Color(0xFFF27A72), // chart-1 浅红
+    Color(0xFFF2994A), // chart-2 浅橙
+    Color(0xFFFFD166), // chart-3 黄
+    Color(0xFFC8E06E), // chart-4 青柠
+    Color(0xFF6FCF97), // chart-5 浅绿
+    Color(0xFF5FD3C8), // chart-6 青绿
+    Color(0xFF56CCF2), // chart-7 浅蓝
+    Color(0xFF7C8CE8), // chart-8 靛蓝
+    Color(0xFFBB6BD9), // chart-9 浅紫
+    Color(0xFFF08CB4)  // chart-10 浅粉
 )

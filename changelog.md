@@ -36,6 +36,14 @@
 - **饼图点击浮层**：名称在左（16sp 粗体）+ 右侧「百分比在上、数值在下」两行小字，整体垂直居中
 - **国家中文名**：新增 `data/model/CountryNames.kt`（约 90 个常用国家 + `A1`/`A2`/`T1` 等特殊值，未收录回退原代码），统计页「国家 / 地区」图例与浮层显示中文（`US → 美国`）；**安全页 `CountryMapping` 与页面代码未改动**，后续安全页重构时再统一
 
+### 图表配色 / 环形图样式 + 配置变化不重建 + 抽屉可滚动
+
+- **统计色板替换为 chart-1 ~ chart-10**：浅红 `#F27A72`、浅橙 `#F2994A`、黄 `#FFD166`、青柠 `#C8E06E`、浅绿 `#6FCF97`、青绿 `#5FD3C8`、浅蓝 `#56CCF2`、靛蓝 `#7C8CE8`、浅紫 `#BB6BD9`、浅粉 `#F08CB4`；**不再与主题色混合**（混合会发灰、降低区分度），折线图仍走主题 `primary`
+- **环形图标准化**：关闭 `isDrawRoundedSlicesEnabled`（此前每个扇区两端起弧，观感像「(=」）、扇区间隔 `sliceSpace = 2dp`、孔半径 `holeRadius = 66`、**小占比扇区保底 `minAngleForSlices = 2°`**（避免极小扇区看不见也无法点击）
+- **深色模式 / 横竖屏切换不再重新拉数据**：`AndroidManifest` 为 `MainActivity` 补 `android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|layoutDirection"` → 配置变化时 Activity 不重建，`remember` 的 ViewModelStore / 登录态 / 当前 Tab 全部保留，**只重排布局、不再回到 loading**（此前每次切换都会重建并重新请求全部数据）
+  - 说明：不重建时 `themes.xml` 的窗口背景不会重载，但根布局已用 `colorScheme.background` 铺底，深色切换无白闪
+- **抽屉菜单横屏可滚动**：`ModalDrawerSheet` 内容包裹 `Column(verticalScroll)`，横屏/小屏高度不足时可滑动查看全部 8 个入口与「退出登录」；原先占位的 `Spacer(weight(1f))` 改为固定间距（可滚动容器内 weight 无意义）
+
 ## 2026.10.18
 
 ### 架构完善（框架批）：请求生命周期 + 单一事实源 + 设置接口统一 + 工程化

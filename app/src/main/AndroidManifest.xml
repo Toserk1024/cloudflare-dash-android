@@ -19,7 +19,8 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.CloudflareDash">
+            android:theme="@style/Theme.CloudflareDash"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|layoutDirection">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

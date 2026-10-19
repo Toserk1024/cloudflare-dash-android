@@ -14,6 +14,8 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -337,6 +339,7 @@ fun HomeScreen(
                         .clickable { scope.launch { drawerState.close() } }
                 )
                 ModalDrawerSheet(modifier = Modifier.align(Alignment.CenterStart).width(300.dp)) {
+                    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                     val user = homeState.user
                     val activeUser = remember(homeKey) { AppContainer.tokenStore.getActiveUser() }
                     val allUsers = remember(homeKey) { AppContainer.tokenStore.getUsers() }
@@ -434,7 +437,7 @@ fun HomeScreen(
                         onClick = { scope.launch { drawerState.close() }; selectedTab = 7 }
                     )
 
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.height(12.dp))
                     HorizontalDivider()
                     NavigationDrawerItem(
                         icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
@@ -445,6 +448,7 @@ fun HomeScreen(
                             showLogoutConfirm = true
                         }
                     )
+                    } // 关闭抽屉滚动容器
                 }
             }
         }
