@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.toserk1024.cfdash.data.model.AccountRef
 import io.github.toserk1024.cfdash.data.model.AnalyticsRange
+import io.github.toserk1024.cfdash.data.model.CountryNames
 
 /**
  * 统计数据组件（账号级 / 域名级复用）。
@@ -214,7 +215,7 @@ private fun StatsContentBody(
                 data.country?.let { items ->
                     if (items.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(12.dp))
-                        ChartCard(title = "国家 / 地区") { BreakdownPieChart(items = items) }
+                        ChartCard(title = "国家 / 地区") { BreakdownPieChart(items = items.map { it.copy(name = CountryNames.zh(it.name)) }) }
                     }
                 }
                 data.status?.let { items ->

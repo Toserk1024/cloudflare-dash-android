@@ -1,7 +1,11 @@
 package io.github.toserk1024.cfdash.ui.charts
 
 import android.graphics.drawable.GradientDrawable
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import com.github.mikephil.charting.charts.BarLineChartBase
 import com.github.mikephil.charting.charts.Chart
@@ -36,6 +40,13 @@ internal fun Chart<*>.applyChartBase(labelColor: Int) {
 
 /** 坐标轴：无轴线、无竖网格、淡横向网格、10sp 标签（Cloudflare 面板风格） */
 internal fun BarLineChartBase<*>.applyAxes(labelColor: Int, gridLineColor: Int) {
+    // 手势策略：双指缩放只作用 X 轴（Y 轴缩放对趋势/柱状无意义），拖拽与双击缩放保留
+    isScaleEnabled = true
+    isScaleXEnabled = true
+    isScaleYEnabled = false
+    isDragEnabled = true
+    isDoubleTapToZoomEnabled = true
+    // 标签只落在整数序号上，避免缩放后出现非数据点的错位时间
     setExtraOffsets(2f, 8f, 8f, 4f)
     xAxis.position = XAxis.XAxisPosition.BOTTOM
     xAxis.apply {
@@ -44,6 +55,7 @@ internal fun BarLineChartBase<*>.applyAxes(labelColor: Int, gridLineColor: Int) 
         textColor = labelColor
         textSize = 10f
         yOffset = 8f
+        granularity = 1f
         isAvoidFirstLastClippingEnabled = true
     }
     axisLeft.apply {
@@ -104,4 +116,24 @@ internal fun BarDataSet<*>.applyBars(fills: List<Fill>) {
     isDrawValuesEnabled = false
     highlightAlpha = 0
     this.fills = fills.toMutableList()
+}
+
+/**
+ * MD 派生的图表色板：primary / tertiary / secondary 三个色相，各配 3 档明度（与 surface 混色）。
+ *
+ * 这样图表颜色天然跟随「种子色 + 深浅色」，不再出现固定橙黄与主题割裂的问题；
+ * 三个色相保证「同为 MD 色系但可区分」。
+ */
+@Composable
+internal fun rememberMdChartColors(): List<Color> {
+    val scheme = MaterialTheme.colorScheme
+    return remember(scheme) {
+        buildList {
+            listOf(scheme.primary, scheme.tertiary, scheme.secondary).forEach { base ->
+                add(base)
+                add(lerp(base, scheme.surface, 0.42f))
+                add(lerp(base, scheme.surface, 0.70f))
+            }
+        }
+    }
 }

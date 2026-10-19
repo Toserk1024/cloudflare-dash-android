@@ -2,6 +2,7 @@ package io.github.toserk1024.cfdash.ui.stats
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -55,43 +56,33 @@ import io.github.toserk1024.cfdash.ui.charts.applyDonut
 import io.github.toserk1024.cfdash.ui.charts.applyLine
 import io.github.toserk1024.cfdash.ui.charts.applySlices
 import io.github.toserk1024.cfdash.ui.charts.mp
-import io.github.toserk1024.cfdash.ui.theme.CloudflareOrange
+import io.github.toserk1024.cfdash.ui.charts.rememberMdChartColors
 import kotlin.math.roundToInt
 
 /**
  * 统计页图表（MPAndroidChart 4.x 官方 Compose 模块）。
  *
  * 约定：
- * - 手势全部保留（缩放 / 拖拽 / 双击缩放 / 点击高亮），不做任何关闭；
- * - 图例统一由 Compose 侧渲染（[LegendRow]），图表内部图例关闭；
- * - 样式集中在 `ui/charts/MpChartStyle.kt`，颜色随 Material 3 色板与主题切换刷新。
+ * - 手势：只允许 X 轴缩放（Y 轴锁定），拖拽 / 双击缩放 / 点击高亮保留；
+ * - X 轴标签数量按「屏幕可容纳量」动态计算，缩放平移时由库按当前可视范围重算，永不折叠；
+ * - 配色统一取 MD 派生色板 [rememberMdChartColors]，随种子色与深浅色变化；
+ * - 图例统一由 Compose 侧渲染（[LegendRow]），图表内部图例关闭。
  */
 
-/** 维度分布色板（与 Cloudflare 橙主题协调的多色系） */
-private val pieColors = listOf(
-    Color(0xFFF6821F), // Cloudflare 橙
-    Color(0xFF2D9CDB), // 蓝
-    Color(0xFF27AE60), // 绿
-    Color(0xFFEB5757), // 红
-    Color(0xFF9B51E0), // 紫
-    Color(0xFFF2994A), // 橙黄
-    Color(0xFF56CCF2), // 浅蓝
-    Color(0xFF6FCF97), // 浅绿
-    Color(0xFFBB6BD9), // 浅紫
-    Color(0xFFFFD166)  // 黄
-)
+/** X 轴短标签：24h 的 "MM-dd HH时" → "HH时"（省空间），其余保持 "MM-dd" */
+private fun shortAxisLabel(label: String): String {
+    val space = label.lastIndexOf(' ')
+    return if (space > 0 && label.endsWith("时")) label.substring(space + 1) else label
+}
 
-/** MP 需要的 android 颜色（一次性转换） */
-private val mpColors = pieColors.map { it.toArgb() }
-
-/** 折线趋势图（请求数/威胁数/带宽/独立访客等单指标时间序列） */
+/** 折线趋势图（请求数/威胁数/带宽等单指标时间序列） */
 @Composable
 fun TrendLineChart(
     points: List<AnalyticsSeriesPoint>,
     valueSelector: (AnalyticsSeriesPoint) -> Long,
     modifier: Modifier = Modifier,
     height: Dp = 200.dp,
-    lineColor: Color = CloudflareOrange,
+    lineColor: Color? = null,
     valueFormatter: (Long) -> String = ::formatCount
 ) {
     if (points.isEmpty()) {
@@ -102,10 +93,13 @@ fun TrendLineChart(
     val selector by rememberUpdatedState(valueSelector)
     val formatter by rememberUpdatedState(valueFormatter)
     val labels = remember(points) { points.map { it.label } }
+    val shortLabels = remember(labels) { labels.map { shortAxisLabel(it) } }
     val values = points.map { selector(it).toFloat() }
-    val color = lineColor.mp()
+    val stroke = lineColor ?: MaterialTheme.colorScheme.primary
+    val color = stroke.mp()
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.mp()
     val gridColor = MaterialTheme.colorScheme.outlineVariant.mp()
+    val maxLabelChars = remember(shortLabels) { shortLabels.maxOfOrNull { it.length } ?: 4 }
     val data = remember(labels, values, color) {
         LineData(
             LineDataSet(
@@ -114,33 +108,40 @@ fun TrendLineChart(
             ).apply { applyLine(color) }
         )
     }
-    LineChart(
-        data = data,
-        modifier = modifier.fillMaxWidth().height(height),
-        animateChanges = true,
-        marker = { entry, _ ->
-            ChartTooltip(
-                title = labels.getOrNull(entry.x.toInt()).orEmpty(),
-                value = formatter(entry.y.toLong())
-            )
-        },
-        setup = {
-            applyChartBase(labelColor)
-            applyAxes(labelColor, gridColor)
-            axisLeft.axisMinimum = 0f
-        },
-        update = {
-            applyChartBase(labelColor)
-            applyAxes(labelColor, gridColor)
-            axisLeft.axisMinimum = 0f
-            axisLeft.valueFormatter = IAxisValueFormatter { value, _ -> formatter(value.toLong()) }
-            xAxis.valueFormatter = IAxisValueFormatter { value, _ -> labels.getOrNull(value.toInt()).orEmpty() }
-            xAxis.axisMinimum = -0.5f
-            xAxis.axisMaximum = (labels.size - 1).toFloat() + 0.5f
-            xAxis.granularity = 1f
-            notifyDataSetChanged()
-        }
-    )
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        // 按可用宽度动态算能放几个标签：10sp 字号 ≈ 每字符 6dp，另加 14dp 间距
+        val labelWidthDp = 6f * maxLabelChars + 14f
+        val capacity = if (labelWidthDp > 0f) (maxWidth.value / labelWidthDp).toInt() else 2
+        val maxLabels = capacity.coerceIn(2, labels.size.coerceAtLeast(2))
+        LineChart(
+            data = data,
+            modifier = Modifier.fillMaxWidth().height(height),
+            animateChanges = true,
+            marker = { entry, _ ->
+                // 浮层保留完整时间（X 轴标签已缩短）
+                ChartTooltip(
+                    title = labels.getOrNull(entry.x.toInt()).orEmpty(),
+                    value = formatter(entry.y.toLong())
+                )
+            },
+            setup = {
+                applyChartBase(labelColor)
+                applyAxes(labelColor, gridColor)
+                axisLeft.axisMinimum = 0f
+            },
+            update = {
+                applyChartBase(labelColor)
+                applyAxes(labelColor, gridColor)
+                axisLeft.axisMinimum = 0f
+                axisLeft.valueFormatter = IAxisValueFormatter { value, _ -> formatter(value.toLong()) }
+                xAxis.valueFormatter = IAxisValueFormatter { value, _ -> shortLabels.getOrNull(value.toInt()).orEmpty() }
+                xAxis.labelCount = maxLabels
+                xAxis.axisMinimum = -0.5f
+                xAxis.axisMaximum = (labels.size - 1).toFloat() + 0.5f
+                notifyDataSetChanged()
+            }
+        )
+    }
 }
 
 /** 维度分布环图（Top N + 其他归并，下方图例展示名称/值/占比） */
@@ -158,15 +159,17 @@ fun BreakdownPieChart(
         return
     }
     val total = chartItems.sumOf { it.value }
+    val palette = rememberMdChartColors()
+    val sliceColors = remember(palette) { palette.map { it.toArgb() } }
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.mp()
     val centerColor = MaterialTheme.colorScheme.onSurface.mp()
     val holeColor = MaterialTheme.colorScheme.surface.mp()
-    val data = remember(chartItems) {
+    val data = remember(chartItems, sliceColors) {
         PieData(
             PieDataSet(
                 chartItems.mapIndexed { index, item -> PieEntry(item.value.toFloat(), item.name) },
                 ""
-            ).apply { applySlices(mpColors) }
+            ).apply { applySlices(sliceColors) }
         )
     }
     Column(modifier = modifier) {
@@ -174,6 +177,19 @@ fun BreakdownPieChart(
             data = data,
             modifier = Modifier.fillMaxWidth().height(200.dp),
             animateChanges = true,
+            marker = { entry, _ ->
+                val name = (entry as? PieEntry<*>)?.label.orEmpty()
+                val percent = if (total > 0) {
+                    "${(entry.y * 100.0 / total).roundToInt()}%"
+                } else {
+                    "0%"
+                }
+                ChartTooltip(
+                    title = name,
+                    value = formatCount(entry.y.toLong()),
+                    percent = percent
+                )
+            },
             setup = {
                 applyChartBase(labelColor)
                 applyDonut(holeColor, centerColor, 12f)
@@ -188,7 +204,7 @@ fun BreakdownPieChart(
         Spacer(modifier = Modifier.height(8.dp))
         chartItems.forEachIndexed { index, item ->
             LegendRow(
-                color = pieColors[index % pieColors.size],
+                color = palette[index % palette.size],
                 name = item.name,
                 value = item.value,
                 total = total
@@ -223,9 +239,11 @@ fun ZoneBarChart(
         return
     }
     val total = chartItems.sumOf { it.sum.requests }
+    val palette = rememberMdChartColors()
+    val barColors = remember(palette) { palette.map { it.toArgb() } }
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.mp()
     val gridColor = MaterialTheme.colorScheme.outlineVariant.mp()
-    val data = remember(chartItems) {
+    val data = remember(chartItems, barColors) {
         BarData(
             BarDataSet(
                 chartItems.mapIndexed { index, item ->
@@ -235,7 +253,7 @@ fun ZoneBarChart(
             ).apply {
                 applyBars(
                     chartItems.indices.map { index ->
-                        val color = mpColors[index % mpColors.size]
+                        val color = barColors[index % barColors.size]
                         Fill(color, alphaOf(color, 90))
                     }
                 )
@@ -264,18 +282,17 @@ fun ZoneBarChart(
                 axisLeft.axisMinimum = 0f
                 axisLeft.valueFormatter = IAxisValueFormatter { value, _ -> formatCount(value.toLong()) }
                 // 横轴标签由下方图例列表承担，避免与图例重复
-                xAxis.valueFormatter = IAxisValueFormatter { _, _ -> "" }
+                xAxis.isDrawLabelsEnabled = false
                 xAxis.axisMinimum = -0.5f
                 xAxis.axisMaximum = (chartItems.size - 1).toFloat() + 0.5f
-                xAxis.granularity = 1f
                 notifyDataSetChanged()
             }
         )
         Spacer(modifier = Modifier.height(8.dp))
-        // 下方图例列表：像饼图图例一样逐行列出每个 host 的名称/请求量/占比
+        // 下方图例列表：逐行列出每个 host 的名称/请求量/占比
         chartItems.forEachIndexed { index, item ->
             LegendRow(
-                color = pieColors[index % pieColors.size],
+                color = palette[index % palette.size],
                 name = item.zoneName,
                 value = item.sum.requests,
                 total = total
@@ -284,25 +301,49 @@ fun ZoneBarChart(
     }
 }
 
-/** 点击高亮时的浮层提示（Compose 侧渲染，由 MP 的 marker 槽位定位） */
+/**
+ * 点击浮层。
+ * - 折线 / 柱状：上下两行（名称 + 数值）
+ * - 饼图（[percent] 非空）：名称在左（大号粗体），右侧两行「百分比在上、数值在下」，整体垂直居中
+ */
 @Composable
-private fun ChartTooltip(title: String, value: String) {
+private fun ChartTooltip(title: String, value: String, percent: String? = null) {
     Surface(
         color = MaterialTheme.colorScheme.inverseSurface,
         contentColor = MaterialTheme.colorScheme.inverseOnSurface,
         shape = RoundedCornerShape(8.dp),
         shadowElevation = 2.dp
     ) {
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
-            if (title.isNotBlank()) {
+        if (percent == null) {
+            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                if (title.isNotBlank()) {
+                    Text(
+                        text = title,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text(text = value, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+        } else {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     text = title,
-                    fontSize = 11.sp,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(text = percent, fontSize = 13.sp)
+                    Text(text = value, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
             }
-            Text(text = value, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
