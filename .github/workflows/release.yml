@@ -60,7 +60,7 @@ jobs:
           fi
 
       - name: Install required SDK components
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        run: sdkmanager "platforms;android-37" "build-tools;37.0.0"
 
       - name: Build release APK
         run: ./gradlew assembleRelease --no-daemon
@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
 
           APK=app/build/outputs/apk/release/app-release.apk
-          AAPT=$ANDROID_HOME/build-tools/36.0.0/aapt
+          AAPT=$ANDROID_HOME/build-tools/37.0.0/aapt
 
           # versionName 形如 2026.10.18_3 → 去掉 _序号并加 v 作为 Tag
           VN=$($AAPT dump badging "$APK" | grep -oP "versionName='\K[^']+")

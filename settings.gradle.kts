@@ -28,6 +28,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // MPAndroidChart 4.x 仅发布在 JitPack（官方仓库拿不到），排在官方源之后
+        maven("https://jitpack.io")
 
         // ===== 兜底镜像（官方不可用时才会命中）=====
         maven("https://maven.aliyun.com/repository/google")

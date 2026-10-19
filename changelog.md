@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026.10.19
+
+### 图表库迁移准备（批次 1）：工具链升级 AGP 9.2.1 / Gradle 9.4.1 / compileSdk 37
+
+为接入 **MPAndroidChart 4.0.1 官方 Compose 模块**（`MPChartCompose` 的 AAR 声明 `minCompileSdk=37`）做的前置升级，**本批次不含任何图表代码改动**，Vico 与安全页、统计页图表全部保持原样。
+
+- **AGP 9.0.0 → 9.2.1**、**Gradle wrapper 9.1.0 → 9.4.1**（AGP 9.2.1 硬性最低 Gradle 9.4.1，已从 AGP 字节码核实）
+- **compileSdk 36 → 37**（`targetSdk` 保持 35 不变，**运行下限仍是 Android 7.0 / minSdk 24**，用户可用版本区间不变）
+- **Compose BOM 2026.06.01 → 2026.09.00**（ui 1.12.1 / material3 1.4.0）
+- **`settings.gradle.kts` 新增 JitPack 仓库**（MPAndroidChart 4.x 仅发布在 JitPack），排在官方源之后、国内镜像之前
+- **CI 同步**：`build.yml` / `release.yml` 的 SDK 组件改为 `platforms;android-37` + `build-tools;37.0.0`；`release.yml` 中读取 versionName 的 `aapt` 路径同步改为 37.0.0（否则 Release 流程取不到版本号）
+- **下一批次（未实施）**：统计页 3 个图表迁移到 MP（`TrendLineChart` / `BreakdownPieChart` / `ZoneBarChart`），安全页保持 Vico + Canvas 不动
+
 ## 2026.10.18
 
 ### 架构完善（框架批）：请求生命周期 + 单一事实源 + 设置接口统一 + 工程化

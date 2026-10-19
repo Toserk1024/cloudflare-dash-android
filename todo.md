@@ -23,9 +23,10 @@
 - **前置验证（禁止猜字段）**：① `httpRequestsAdaptiveGroups` 是否支持 `securityAction` / `securitySource` 维度；② `firewallEventsAdaptiveGroups` 聚合版是否真不可访问；③ `firewallEventsAdaptive` 是否支持 `count` 聚合。
 - **状态**：等待用户指示，未实施。
 
-### [待决策] 图表能力不足（疑似非库缺陷，需先验证再决定是否换库）
+### [进行中] 图表库迁移至 MPAndroidChart 4.x（官方 Compose 模块）
 
-- **来源**：用户反馈（2026-10-18）。用户认为当前图表库（Vico）功能不足以表达 CDN 这类复杂场景，提出更换图表库；经代码审查，**主因并非库能力不足，而是上一代只用到了最基础的三个能力**。
+- **来源**：用户反馈（2026-10-18）。用户认为 Vico 不足以表达 CDN 场景，提出换库；经代码审查，**主因并非库能力不足，而是上一代只用到了最基础的三个能力**。
+- **决策（2026-10-19）**：采用 **MPAndroidChart 4.0.1 官方 Compose 模块**（不自研桥接），目标是观感接近 Cloudflare 面板。
 - **审查结论**：
   - 项目实际用到：单序列折线（`lineModel`）、单序列柱状（`columnModel`）、饼图（`pieSeries`）+ 自定义 marker。
   - Vico 3.x 已具备但**未被使用**：堆叠柱/堆叠面积（`rememberStackedCartesianLayer`）、拖拽平移与双指缩放（`rememberVicoScrollState` / `Zoom`）、左右双 Y 轴、区间高亮、多序列联动 marker、负值/对数轴。
@@ -36,8 +37,13 @@
   - **B** MPAndroidChart：交互最成熟，但官方仓库 2022 年后基本停更 + Compose 集成割裂。
   - **C** ECharts（WebView 桥接）：能力上限最高（含热力图/地理/桑基/dataZoom/brush），代价是 WebView 体积、内存与手势冲突。
   - **D** SKIA/Canvas 自研：无上限但等于自养图表引擎。
-- **建议的验证动作（零风险）**：先用现有 Vico 做「多序列 + 双轴 + 堆叠面积 + 双指缩放 + 十字准线」5 项 demo，真机看效果后再决定是否换库。
-- **状态**：等待用户开工指令，未实施。
+- **已定方案与进度（2026-10-19）**：
+  - 选型：**B 方案 = MPAndroidChart 4.0.1 官方 Compose 模块**（`MPChartCompose`，仅 JitPack 发布；实测 AAR `minCompileSdk=37`）。底层仍是 `AndroidView` 宿主，但桥接由官方提供，不造轮子。
+  - 用户决策：① 工具链走最小升级（B1）；② 图表手势**全部保留**（缩放/拖拽/双击/点击 tooltip）；③ **安全页整体不动**（Vico 折线 + Canvas 堆叠条保持原样）。
+  - **批次 1（已完成，等 CI 验证）**：AGP 9.0.0→9.2.1、Gradle wrapper 9.1.0→9.4.1、compileSdk 36→37、Compose BOM 2026.06.01→2026.09.00、新增 JitPack 仓库、CI SDK 组件改 android-37 / build-tools 37.0.0（含 release.yml 的 aapt 路径）。
+  - **批次 2（待实施）**：统计页 3 个图表（`TrendLineChart` / `BreakdownPieChart` / `ZoneBarChart`）迁移到 MP；新增 `ui/charts/MpChartStyle.kt` 做主题映射；Vico 依赖保留（安全页在用）。
+  - **已知副作用（用户已接受）**：图表区域内纵向滑动不滚动页面、该区域下拉刷新不触发。
+- **状态**：批次 1 已实施并推送，待用户实机验证零回归；批次 2 等用户指令。
 
 ## Pending 队列（用户反馈待修复/优化，先不实施）
 
