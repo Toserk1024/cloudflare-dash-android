@@ -119,21 +119,29 @@ internal fun BarDataSet<*>.applyBars(fills: List<Fill>) {
 }
 
 /**
- * MD 派生的图表色板：primary / tertiary / secondary 三个色相，各配 3 档明度（与 surface 混色）。
+ * 图表彩色板（维度分布用）：沿用原有 10 个色相，仅与 surface 做轻微混合。
  *
- * 这样图表颜色天然跟随「种子色 + 深浅色」，不再出现固定橙黄与主题割裂的问题；
- * 三个色相保证「同为 MD 色系但可区分」。
+ * 目的：既不刺眼、与 MD 主题协调（没有割裂感），又**保留足够的色彩区分度**，
+ * 避免「全用 MD 同色系分不清国家/状态码」的问题。折线图不使用它（走主题 primary）。
  */
 @Composable
-internal fun rememberMdChartColors(): List<Color> {
+internal fun rememberChartPalette(): List<Color> {
     val scheme = MaterialTheme.colorScheme
     return remember(scheme) {
-        buildList {
-            listOf(scheme.primary, scheme.tertiary, scheme.secondary).forEach { base ->
-                add(base)
-                add(lerp(base, scheme.surface, 0.42f))
-                add(lerp(base, scheme.surface, 0.70f))
-            }
-        }
+        baseChartColors.map { lerp(it, scheme.surface, 0.12f) }
     }
 }
+
+/** 原有配色（Cloudflare 橙 + 蓝/绿/红/紫/橙黄/浅蓝/浅绿/浅紫/黄） */
+private val baseChartColors = listOf(
+    Color(0xFFF6821F),
+    Color(0xFF2D9CDB),
+    Color(0xFF27AE60),
+    Color(0xFFEB5757),
+    Color(0xFF9B51E0),
+    Color(0xFFF2994A),
+    Color(0xFF56CCF2),
+    Color(0xFF6FCF97),
+    Color(0xFFBB6BD9),
+    Color(0xFFFFD166)
+)

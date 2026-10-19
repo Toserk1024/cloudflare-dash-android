@@ -56,7 +56,7 @@ import io.github.toserk1024.cfdash.ui.charts.applyDonut
 import io.github.toserk1024.cfdash.ui.charts.applyLine
 import io.github.toserk1024.cfdash.ui.charts.applySlices
 import io.github.toserk1024.cfdash.ui.charts.mp
-import io.github.toserk1024.cfdash.ui.charts.rememberMdChartColors
+import io.github.toserk1024.cfdash.ui.charts.rememberChartPalette
 import kotlin.math.roundToInt
 
 /**
@@ -65,7 +65,7 @@ import kotlin.math.roundToInt
  * 约定：
  * - 手势：只允许 X 轴缩放（Y 轴锁定），拖拽 / 双击缩放 / 点击高亮保留；
  * - X 轴标签数量按「屏幕可容纳量」动态计算，缩放平移时由库按当前可视范围重算，永不折叠；
- * - 配色统一取 MD 派生色板 [rememberMdChartColors]，随种子色与深浅色变化；
+ * - 折线取主题 primary（跟随 MD）；环图/柱状用 [rememberChartPalette] 彩色板（仅与 surface 混合 12%），保证区分度；
  * - 图例统一由 Compose 侧渲染（[LegendRow]），图表内部图例关闭。
  */
 
@@ -99,7 +99,6 @@ fun TrendLineChart(
     val color = stroke.mp()
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.mp()
     val gridColor = MaterialTheme.colorScheme.outlineVariant.mp()
-    val maxLabelChars = remember(shortLabels) { shortLabels.maxOfOrNull { it.length } ?: 4 }
     val data = remember(labels, values, color) {
         LineData(
             LineDataSet(
@@ -109,9 +108,13 @@ fun TrendLineChart(
         )
     }
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        // 按可用宽度动态算能放几个标签：10sp 字号 ≈ 每字符 6dp，另加 14dp 间距
-        val labelWidthDp = 6f * maxLabelChars + 14f
-        val capacity = if (labelWidthDp > 0f) (maxWidth.value / labelWidthDp).toInt() else 2
+        // 严格容量估算：中文≈11dp/字、数字字母≈6.8dp/字，扣掉 Y 轴与左右留白 48dp，
+        // 再留 10% 安全余量，宁可少显示几个也不要标签贴在一起
+        val labelWidthDp = shortLabels.maxOfOrNull { label ->
+            label.sumOf { ch -> if (ch.code > 0x2E80) 11.0 else 6.8 }
+        } ?: 24.0
+        val usableWidthDp = (maxWidth.value - 48f).coerceAtLeast(60f)
+        val capacity = ((usableWidthDp / (labelWidthDp + 24.0)) * 0.9).toInt().coerceAtLeast(2)
         val maxLabels = capacity.coerceIn(2, labels.size.coerceAtLeast(2))
         LineChart(
             data = data,
@@ -159,7 +162,7 @@ fun BreakdownPieChart(
         return
     }
     val total = chartItems.sumOf { it.value }
-    val palette = rememberMdChartColors()
+    val palette = rememberChartPalette()
     val sliceColors = remember(palette) { palette.map { it.toArgb() } }
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.mp()
     val centerColor = MaterialTheme.colorScheme.onSurface.mp()
@@ -239,7 +242,7 @@ fun ZoneBarChart(
         return
     }
     val total = chartItems.sumOf { it.sum.requests }
-    val palette = rememberMdChartColors()
+    val palette = rememberChartPalette()
     val barColors = remember(palette) { palette.map { it.toArgb() } }
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.mp()
     val gridColor = MaterialTheme.colorScheme.outlineVariant.mp()
