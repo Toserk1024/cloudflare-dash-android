@@ -40,7 +40,7 @@
 - **已定方案与进度（2026-10-19）**：
   - 选型：**B 方案 = MPAndroidChart 4.0.1 官方 Compose 模块**（`MPChartCompose`，仅 JitPack 发布；实测 AAR `minCompileSdk=37`）。底层仍是 `AndroidView` 宿主，但桥接由官方提供，不造轮子。
   - 用户决策：① 工具链走最小升级（B1）；② 图表手势**全部保留**（缩放/拖拽/双击/点击 tooltip）；③ **安全页整体不动**（Vico 折线 + Canvas 堆叠条保持原样）。
-  - **批次 1（已完成，等 CI 验证）**：AGP 9.0.0→9.2.1、Gradle wrapper 9.1.0→9.4.1、compileSdk 36→37、Compose BOM 2026.06.01→2026.09.00、新增 JitPack 仓库、CI SDK 组件改 android-37 / build-tools 37.0.0（含 release.yml 的 aapt 路径）。
+  - **批次 1（已完成，等 CI 验证）**：AGP 9.0.0→9.2.1、Gradle wrapper 9.1.0→9.4.1、compileSdk 36→37、Compose BOM 2026.06.01→2026.09.00、新增 JitPack 仓库、CI SDK 组件改 `platforms;android-37.0` / `build-tools;37.0.0`（含 release.yml 的 aapt 路径）。**注意：SDK 37 平台包名带小版本号（android-37.0 / 37.1 / 37.2），不存在 `platforms;android-37`。**
   - **批次 2（待实施）**：统计页 3 个图表（`TrendLineChart` / `BreakdownPieChart` / `ZoneBarChart`）迁移到 MP；新增 `ui/charts/MpChartStyle.kt` 做主题映射；Vico 依赖保留（安全页在用）。
   - **已知副作用（用户已接受）**：图表区域内纵向滑动不滚动页面、该区域下拉刷新不触发。
 - **状态**：批次 1 已实施并推送，待用户实机验证零回归；批次 2 等用户指令。

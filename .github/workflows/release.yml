@@ -60,7 +60,13 @@ jobs:
           fi
 
       - name: Install required SDK components
-        run: sdkmanager "platforms;android-37" "build-tools;37.0.0"
+        # SDK 37 的平台包按小版本号命名（android-37.0/37.1/37.2），不存在 platforms;android-37。
+        # 额外建 android-37 符号链接，兼容按旧命名查找平台的工具链。
+        run: |
+          sdkmanager "platforms;android-37.0" "build-tools;37.0.0"
+          cd "$ANDROID_HOME/platforms"
+          [ -e android-37 ] || ln -s android-37.0 android-37
+          ls -l "$ANDROID_HOME/platforms"
 
       - name: Build release APK
         run: ./gradlew assembleRelease --no-daemon

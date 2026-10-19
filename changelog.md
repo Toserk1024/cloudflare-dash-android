@@ -10,7 +10,8 @@
 - **compileSdk 36 → 37**（`targetSdk` 保持 35 不变，**运行下限仍是 Android 7.0 / minSdk 24**，用户可用版本区间不变）
 - **Compose BOM 2026.06.01 → 2026.09.00**（ui 1.12.1 / material3 1.4.0）
 - **`settings.gradle.kts` 新增 JitPack 仓库**（MPAndroidChart 4.x 仅发布在 JitPack），排在官方源之后、国内镜像之前
-- **CI 同步**：`build.yml` / `release.yml` 的 SDK 组件改为 `platforms;android-37` + `build-tools;37.0.0`；`release.yml` 中读取 versionName 的 `aapt` 路径同步改为 37.0.0（否则 Release 流程取不到版本号）
+- **CI 同步**：`build.yml` / `release.yml` 的 SDK 组件改为 `platforms;android-37.0` + `build-tools;37.0.0`；`release.yml` 中读取 versionName 的 `aapt` 路径同步改为 37.0.0（否则 Release 流程取不到版本号）
+  - **踩坑记录**：SDK 37 的平台包**不存在** `platforms;android-37`，官方仓库里是带小版本号的 `platforms;android-37.0 / 37.1 / 37.2`（均在 stable 渠道）；`build-tools;37.0.0` 命名正常，无需调整
 - **下一批次（未实施）**：统计页 3 个图表迁移到 MP（`TrendLineChart` / `BreakdownPieChart` / `ZoneBarChart`），安全页保持 Vico + Canvas 不动
 
 ## 2026.10.18
