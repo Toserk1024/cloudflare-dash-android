@@ -18,7 +18,7 @@
 - **缓存清除**：按全部 / URL / 主机名 / 标签 / 前缀 5 种方式清除指定域名的 Cloudflare 缓存
 - **速度优化**：协议优化（HTTP/2 / HTTP/2 到源服务器 / HTTP/3 / 0-RTT 连接恢复，HTTP/2 Free 计划始终开启不可关闭）与内容优化（Speed Brain / Cloudflare Fonts / Early Hints / Rocket Loader）分段切换开关，沿用域名页高级设置样式
 - **网络优化**：IPv6 兼容性（与域名页高级设置共享开关）/ gRPC / WebSockets / Pseudo IPv4 / IP 地理位置 / 网络错误记录 / 洋葱路由
-- **安全分析**：安全概况（回源 / 命中 / 缓解 **100% 水平堆叠条形图**）+ **24 小时趋势折线**（请求 / 缓解）+ **分组视图**（国家 / 设备类型 / 客户端 IP / HTTP 版本 / 缓存状态 / 安全性操作 / 安全性来源）+ **筛选器与安全事件日志**（操作 / 来源 / 国家过滤，展示安全事件详情）
+- **安全分析**：**流量 / 事件 双子页**（默认流量）。流量页 = 安全概况（已缓解 / 由 Cloudflare 提供 / 由源服务器提供 **100% 堆叠条**）+ **趋势折线**（可按国家 / 浏览器 / 操作系统 / 设备 / IP / HTTP 版本 / 缓存状态 / 安全性操作 / 安全性来源分组）+ Top 统计四卡；事件页 = 筛选器 + 安全事件日志（滚到底自动续加载）。口径与 Cloudflare 官网对齐（`requestSource=eyeball`，24h 总数与官网一致）
 - **我的**：用户信息展示、功能简介、版本号、开源地址
 - **安全**：凭据使用 EncryptedSharedPreferences（Android Keystore）加密存储，仅保存在本机
 - **性能**：API 数据首次/下拉刷新时缓存到内存，搜索筛选纯本地完成；八个 Tab 常驻组合，切换仅水平平移过渡，流畅无重建
@@ -44,8 +44,7 @@
 - MVVM：ViewModel + StateFlow + Repository
 - OkHttp（Bearer 认证）+ kotlinx.serialization
 - Navigation Compose（单 Activity 多路由）
-- Vico（Compose 原生，安全页趋势图）
-- MPAndroidChart 4.x（统计页图表，官方 Compose 模块，经 JitPack 引入）
+- MPAndroidChart 4.x（统计页 + 安全页图表，官方 Compose 模块，经 JitPack 引入）
 - EncryptedSharedPreferences（安全存储）
 - Release 构建开启 **R8 压缩**；versionName 采用 `日期_自增序号`、versionCode 采用时间戳前 9 位
 
@@ -73,7 +72,7 @@ app/src/main/java/io/github/toserk1024/cfdash/
     ├── cache/                 # 缓存清除（5 种方式）
     ├── speed/                 # 速度优化（协议/内容优化开关，分段切换）
     ├── network/               # 网络优化（IPv6/gRPC/WebSockets/Pseudo IPv4 等开关）
-    ├── security/              # 安全分析（安全概况水平堆叠条 + 24h 趋势 + 分组分布 + 筛选器/日志）
+    ├── security/              # 安全分析（流量/事件双子页：概况堆叠条 + MP 趋势 + Top 卡 + 筛选器 + 事件日志）
     └── profile/               # 我的
 ```
 

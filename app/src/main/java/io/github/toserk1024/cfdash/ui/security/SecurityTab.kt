@@ -1,44 +1,47 @@
 package io.github.toserk1024.cfdash.ui.security
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,12 +50,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.github.toserk1024.cfdash.data.model.CountryMapping
 import io.github.toserk1024.cfdash.data.model.FilterValueKind
 import io.github.toserk1024.cfdash.data.model.SecurityFilter
@@ -63,89 +64,232 @@ import io.github.toserk1024.cfdash.data.model.SecurityLogColumn
 import io.github.toserk1024.cfdash.data.model.SecurityLogEntry
 import io.github.toserk1024.cfdash.data.model.SecurityTimeRange
 import io.github.toserk1024.cfdash.ui.security.SecurityViewModel.SecuritySection
+import io.github.toserk1024.cfdash.ui.security.SecurityViewModel.SecurityUiState
 
-/** 安全 Tab：TabRow 子项「总览 | 日志」，总览/日志筛选器隔离，日志列自选 */
+/**
+ * 安全页（重构版）：流量 / 事件 双子页。
+ *
+ * 流量页 = 概况（三段或分组占比）+ 趋势 + Top 统计；事件页 = 筛选器 + 日志表（每次 10 条，滚动自动续加载）。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SecurityTab(
-    state: SecurityViewModel.SecurityUiState,
+    state: SecurityUiState,
     onSection: (SecuritySection) -> Unit,
     onGroupBy: (SecurityGroupBy) -> Unit,
     onTimeRange: (SecurityTimeRange) -> Unit,
-    onLogTimeRange: (SecurityTimeRange) -> Unit,
-    onAddOverviewFilter: (SecurityFilter) -> Unit,
-    onRemoveOverviewFilter: (Int) -> Unit,
-    onClearOverviewFilters: () -> Unit,
-    onAddLogFilter: (SecurityFilter) -> Unit,
-    onRemoveLogFilter: (Int) -> Unit,
-    onClearLogFilters: () -> Unit,
+    onEventTimeRange: (SecurityTimeRange) -> Unit,
+    onAddTrafficFilter: (SecurityFilter) -> Unit,
+    onRemoveTrafficFilter: (Int) -> Unit,
+    onClearTrafficFilters: () -> Unit,
+    onAddEventFilter: (SecurityFilter) -> Unit,
+    onRemoveEventFilter: (Int) -> Unit,
+    onClearEventFilters: () -> Unit,
     onToggleLogColumn: (SecurityLogColumn) -> Unit,
-    onRefresh: () -> Unit,
-    onRetry: () -> Unit
+    onLoadMoreLogs: () -> Unit,
+    onRefresh: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        PrimaryTabRow(selectedTabIndex = if (state.section == SecuritySection.OVERVIEW) 0 else 1) {
-            Tab(selected = state.section == SecuritySection.OVERVIEW, onClick = { onSection(SecuritySection.OVERVIEW) }, text = { Text("总览") })
-            Tab(selected = state.section == SecuritySection.LOG, onClick = { onSection(SecuritySection.LOG) }, text = { Text("日志") })
+    var showFilterSheet by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // 子页切换
+        TabRow(selectedTabIndex = if (state.section == SecuritySection.TRAFFIC) 0 else 1) {
+            Tab(
+                selected = state.section == SecuritySection.TRAFFIC,
+                onClick = { onSection(SecuritySection.TRAFFIC) },
+                text = { Text("流量") }
+            )
+            Tab(
+                selected = state.section == SecuritySection.EVENTS,
+                onClick = { onSection(SecuritySection.EVENTS) },
+                text = { Text("事件") }
+            )
         }
-        Spacer(modifier = Modifier.height(12.dp))
+
+        // 工具条：筛选器 / 时间 / 列 / 刷新
+        val filters = if (state.section == SecuritySection.TRAFFIC) state.trafficFilters else state.eventFilters
+        val timeRange = if (state.section == SecuritySection.TRAFFIC) state.timeRange else state.eventTimeRange
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = { showFilterSheet = true }) {
+                Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = if (filters.isEmpty()) "筛选器" else "筛选器 ${filters.size}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            TimeRangeMenu(current = timeRange) {
+                if (state.section == SecuritySection.TRAFFIC) onTimeRange(it) else onEventTimeRange(it)
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            if (state.section == SecuritySection.EVENTS) {
+                LogColumnMenu(selected = state.selectedLogColumns, onToggle = onToggleLogColumn)
+            }
+            IconButton(onClick = onRefresh) {
+                Icon(Icons.Default.Refresh, contentDescription = "刷新", modifier = Modifier.size(18.dp))
+            }
+        }
+        HorizontalDivider()
+
         when (state.section) {
-            SecuritySection.OVERVIEW -> OverviewContent(state, onGroupBy, onTimeRange, onAddOverviewFilter, onRemoveOverviewFilter, onClearOverviewFilters, onRefresh, onRetry)
-            SecuritySection.LOG -> LogContent(state, onLogTimeRange, onAddLogFilter, onRemoveLogFilter, onClearLogFilters, onToggleLogColumn)
+            SecuritySection.TRAFFIC -> TrafficPage(
+                state = state,
+                onGroupBy = onGroupBy,
+                onRemoveFilter = onRemoveTrafficFilter,
+                onClearFilters = onClearTrafficFilters
+            )
+            SecuritySection.EVENTS -> EventsPage(
+                state = state,
+                onRemoveFilter = onRemoveEventFilter,
+                onClearFilters = onClearEventFilters,
+                onLoadMoreLogs = onLoadMoreLogs
+            )
         }
+    }
+
+    if (showFilterSheet) {
+        val attrs = if (state.section == SecuritySection.TRAFFIC) SecurityFilterAttr.TRAFFIC else SecurityFilterAttr.EVENT
+        FilterSheet(
+            attrs = attrs,
+            onDismiss = { showFilterSheet = false },
+            onAdd = { filter ->
+                if (state.section == SecuritySection.TRAFFIC) onAddTrafficFilter(filter) else onAddEventFilter(filter)
+                showFilterSheet = false
+            }
+        )
     }
 }
 
-// ===================== 总览子页 =====================
+// ===== 流量页 =====
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OverviewContent(
-    state: SecurityViewModel.SecurityUiState,
+private fun TrafficPage(
+    state: SecurityUiState,
     onGroupBy: (SecurityGroupBy) -> Unit,
-    onTimeRange: (SecurityTimeRange) -> Unit,
-    onAddFilter: (SecurityFilter) -> Unit,
+    onRemoveFilter: (Int) -> Unit,
+    onClearFilters: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        FilterChipsRow(state.trafficFilters, onRemoveFilter, onClearFilters)
+
+        state.trafficError?.let { err ->
+            ErrorCard(err)
+            return@Column
+        }
+        if (state.trafficLoading && state.overview.total == 0L) {
+            LoadingBlock()
+            return@Column
+        }
+
+        // 概况
+        val segments = if (state.groupBy == SecurityGroupBy.ALL) state.overview.segments else state.groupSegments
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = if (state.groupBy == SecurityGroupBy.ALL) "安全概况" else "按${state.groupBy.label}占比",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "共 ${formatSecurityCount(state.overview.total)} 个请求 · ${state.timeRange.label}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                SecurityOverviewBar(segments = segments, segmented = state.groupBy == SecurityGroupBy.ALL)
+            }
+        }
+
+        // 趋势
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "请求趋势",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    GroupByMenu(current = state.groupBy, onSelect = onGroupBy)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                SecurityTrendChart(
+                    series = state.trend,
+                    segmented = state.groupBy == SecurityGroupBy.ALL
+                )
+            }
+        }
+
+        // Top 统计
+        val top = state.topStats
+        if (top.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                top.getOrNull(0)?.let { SecurityTopStatCard(it.title, it.items, Modifier.weight(1f)) }
+                top.getOrNull(1)?.let { SecurityTopStatCard(it.title, it.items, Modifier.weight(1f)) }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                top.getOrNull(2)?.let { SecurityTopStatCard(it.title, it.items, Modifier.weight(1f)) }
+                top.getOrNull(3)?.let { SecurityTopStatCard(it.title, it.items, Modifier.weight(1f)) }
+            }
+        }
+
+        state.partError?.let {
+            Text(
+                text = "⚠ $it",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+// ===== 事件页 =====
+
+@Composable
+private fun EventsPage(
+    state: SecurityUiState,
     onRemoveFilter: (Int) -> Unit,
     onClearFilters: () -> Unit,
-    onRefresh: () -> Unit,
-    onRetry: () -> Unit
+    onLoadMoreLogs: () -> Unit
 ) {
-    PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    GroupBySelector(current = state.groupBy, onSelect = onGroupBy)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    TimeRangeSelector(current = state.timeRange, onChange = onTimeRange)
-                }
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            FilterPanel(state.overviewFilters, SecurityFilterAttr.OVERVIEW, onAddFilter, onRemoveFilter, onClearFilters)
-            Spacer(modifier = Modifier.height(10.dp))
-
-            when {
-                state.overviewLoading -> CenterProgress()
-                state.overviewError != null -> Column(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+    Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+            FilterChipsRow(state.eventFilters, onRemoveFilter, onClearFilters)
+        }
+        val err = state.eventsError
+        when {
+            err != null -> ErrorCard(err)
+            state.eventsLoading && state.logs.isEmpty() -> LoadingBlock()
+            state.logs.isEmpty() -> EmptySecurityChart("暂无事件日志")
+            else -> {
+                val visible = state.logs.take(state.logVisibleCount)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text("⚠ ${state.overviewError}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(onClick = onRetry) { Text("重试") }
-                }
-                else -> {
-                    ChartCard(if (state.groupBy == SecurityGroupBy.ALL) "安全概况" else "${state.groupBy.label}占比") {
-                        HorizontalStackBar(state.overview, state.groupBy == SecurityGroupBy.ALL)
+                    itemsIndexed(visible) { _, log ->
+                        LogRow(log, state.selectedLogColumns)
                     }
-                    if (!state.partError.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text("⚠ 部分数据加载失败：${state.partError}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                    }
-                    if (state.trend.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        ChartCard("趋势（${state.timeRange.label}）") {
-                            SecurityTrendChart(state.trend)
-                            TrendLegend(state.trend)
+                    if (state.loadingMoreLogs) {
+                        item { LoadingBlock() }
+                    } else if (state.logHasMore) {
+                        item {
+                            LaunchedEffect(state.logVisibleCount) { onLoadMoreLogs() }
+                            Box(modifier = Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
+                                Text("加载更多…", style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }
@@ -154,397 +298,321 @@ private fun OverviewContent(
     }
 }
 
-// ===================== 日志子页 =====================
-
 @Composable
-private fun LogContent(
-    state: SecurityViewModel.SecurityUiState,
-    onTimeRange: (SecurityTimeRange) -> Unit,
-    onAddFilter: (SecurityFilter) -> Unit,
-    onRemoveFilter: (Int) -> Unit,
-    onClearFilters: () -> Unit,
-    onToggleLogColumn: (SecurityLogColumn) -> Unit
-) {
-    var selectedLog by remember { mutableStateOf<SecurityLogEntry?>(null) }
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                TimeRangeSelector(state.logTimeRange, onTimeRange)
-                Spacer(modifier = Modifier.height(10.dp))
-                ColumnSelector(state.selectedLogColumns, onToggleLogColumn)
-            }
-        }
-        Spacer(modifier = Modifier.height(10.dp))
-        FilterPanel(state.logFilters, SecurityFilterAttr.LOG, onAddFilter, onRemoveFilter, onClearFilters)
-        Spacer(modifier = Modifier.height(10.dp))
-
-        when {
-            state.logLoading -> CenterProgress()
-            state.logError != null -> Text("⚠ ${state.logError}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 20.dp))
-            state.allLogs.isEmpty() -> Text("暂无日志", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 20.dp))
-            else -> if (selectedLog != null) {
-                LogDetail(selectedLog!!, onBack = { selectedLog = null })
-            } else {
-                LogTable(state.allLogs, state.selectedLogColumns, onLogClick = { selectedLog = it })
-            }
-        }
-    }
-}
-
-// ===================== 通用组件 =====================
-
-@Composable
-private fun CenterProgress() {
-    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-}
-
-@Composable
-private fun TimeRangeSelector(current: SecurityTimeRange, onChange: (SecurityTimeRange) -> Unit) {
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-        SecurityTimeRange.entries.forEachIndexed { index, r ->
-            SegmentedButton(
-                selected = current == r,
-                onClick = { onChange(r) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = SecurityTimeRange.entries.size)
-            ) { Text(r.label, maxLines = 1, fontSize = 12.sp) }
-        }
-    }
-}
-
-/** 分组视图：Label 在左侧 + 选择器只显示当前值（Dropdown） */
-@Composable
-private fun GroupBySelector(current: SecurityGroupBy, onSelect: (SecurityGroupBy) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("分组视图：", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Box {
-            OutlinedButton(onClick = { expanded = true }) {
-                Text(current.label, maxLines = 1)
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-            }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                SecurityGroupBy.entries.forEach { gb ->
-                    DropdownMenuItem(text = { Text(gb.label) }, onClick = { onSelect(gb); expanded = false })
-                }
-            }
-        }
-    }
-}
-
-/** 日志列选择（Dropdown 多选） */
-@Composable
-private fun ColumnSelector(selected: Set<SecurityLogColumn>, onToggle: (SecurityLogColumn) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        OutlinedButton(onClick = { expanded = true }) {
-            Text("显示列 ${selected.size}/${SecurityLogColumn.entries.size}", maxLines = 1)
-            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(selected.joinToString(" · ") { it.label }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-    Box {
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            SecurityLogColumn.entries.forEach { col ->
-                DropdownMenuItem(text = { Text("${if (col in selected) "✓ " else ""}${col.label}", maxLines = 1) }, onClick = { onToggle(col) })
-            }
-        }
-    }
-}
-
-/** 筛选器面板（tiny） */
-@Composable
-private fun FilterPanel(
-    filters: List<SecurityFilter>,
-    allowedAttrs: List<SecurityFilterAttr>,
-    onAddFilter: (SecurityFilter) -> Unit,
-    onRemoveFilter: (Int) -> Unit,
-    onClearFilters: () -> Unit
-) {
+private fun LogRow(log: SecurityLogEntry, columns: Set<SecurityLogColumn>) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("筛选器", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                if (filters.isNotEmpty()) TextButton(onClick = onClearFilters) { Text("清除全部", style = MaterialTheme.typography.bodySmall) }
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            FilterEditor(allowedAttrs, onAddFilter)
-            if (filters.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(6.dp))
-                filters.forEachIndexed { index, f ->
-                    FilterChip(
-                        selected = true,
-                        onClick = { onRemoveFilter(index) },
-                        label = { Text("${f.attr.label} ${f.op.label} ${f.values.joinToString("、")}", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall) },
-                        trailingIcon = { Icon(Icons.Default.Close, contentDescription = "移除", modifier = Modifier.size(16.dp)) },
-                        modifier = Modifier.padding(vertical = 1.dp)
+                Text(
+                    text = log.datetime,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = log.action,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                if (SecurityLogColumn.SERVICE in columns && !log.source.isNullOrBlank()) {
+                    Text(
+                        text = log.source.orEmpty(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-        }
-    }
-}
-
-/** 新建筛选器：属性/运算符/值 对应关系重构 */
-@Composable
-private fun FilterEditor(allowedAttrs: List<SecurityFilterAttr>, onAddFilter: (SecurityFilter) -> Unit) {
-    var attr by remember { mutableStateOf(allowedAttrs.firstOrNull() ?: SecurityFilterAttr.IP) }
-    LaunchedEffect(allowedAttrs) { if (attr !in allowedAttrs) attr = allowedAttrs.firstOrNull() ?: attr }
-    var op by remember { mutableStateOf(SecurityFilterOp.EQ) }
-    var values by remember { mutableStateOf(listOf<String>()) }
-    var singleValue by remember { mutableStateOf("") }
-    var countryQuery by remember { mutableStateOf("") }
-
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        LabeledDropdown("属性", attr.label, allowedAttrs.map { it.label }) { sel ->
-            SecurityFilterAttr.entries.firstOrNull { it.label == sel }?.let {
-                attr = it; values = emptyList(); singleValue = ""; countryQuery = ""
-                // 固定候选属性（方法/HTTP版本/操作/来源）仅支持等于/不等于，切到其它运算符时自动重置
-                if (attr.valueKind == FilterValueKind.CANDIDATES && op != SecurityFilterOp.EQ && op != SecurityFilterOp.NEQ) {
-                    op = SecurityFilterOp.EQ
-                }
-            }
-        }
-        Spacer(modifier = Modifier.width(6.dp))
-        val allowedOps = if (attr.valueKind == FilterValueKind.CANDIDATES)
-            listOf(SecurityFilterOp.EQ, SecurityFilterOp.NEQ)
-        else SecurityFilterOp.entries
-        LabeledDropdown("条件", op.label, allowedOps.map { it.label }) { sel ->
-            SecurityFilterOp.entries.firstOrNull { it.label == sel }?.let { op = it }
-        }
-    }
-    Spacer(modifier = Modifier.height(6.dp))
-
-    // 值控件按属性类型（valueKind）动态切换
-    when (attr.valueKind) {
-        FilterValueKind.COUNTRY -> CountryValueSelector(countryQuery, { countryQuery = it }, values,
-            { code -> values = if (code in values) values - code else (values + code).distinct() })
-        FilterValueKind.TEXT -> Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = singleValue,
-                onValueChange = { singleValue = it },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("输入值", style = MaterialTheme.typography.bodySmall) },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodySmall
-            )
-            // 包含/不包含时：加号在输入框后（外部），用于追加多值
-            if (op == SecurityFilterOp.CONTAINS || op == SecurityFilterOp.NOT_CONTAINS) {
-                Spacer(modifier = Modifier.width(6.dp))
-                IconButton(onClick = {
-                    if (singleValue.isNotBlank()) { values = (values + singleValue).distinct(); singleValue = "" }
-                }) { Icon(Icons.Default.Add, contentDescription = "添加多值") }
-            }
-        }
-        FilterValueKind.CANDIDATES -> CandidatesSelector(attr.candidates, values, { values = it })
-    }
-    // 已选多值 chips
-    if (values.isNotEmpty()) {
-        Spacer(modifier = Modifier.height(6.dp))
-        Column {
-            values.forEach { v ->
-                FilterChip(
-                    selected = true,
-                    onClick = { values = values - v },
-                    label = { Text(if (attr == SecurityFilterAttr.COUNTRY) CountryMapping.codeToName(v) else v, maxLines = 1, style = MaterialTheme.typography.bodySmall) },
-                    trailingIcon = { Icon(Icons.Default.Close, contentDescription = "移除", modifier = Modifier.size(14.dp)) },
-                    modifier = Modifier.padding(vertical = 1.dp)
+            if (SecurityLogColumn.RULE_ID in columns && !log.ruleId.isNullOrBlank()) {
+                Text(
+                    text = "规则：${log.ruleId}",
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-        }
-    }
-    Spacer(modifier = Modifier.height(6.dp))
-    FilledTonalButton(
-        onClick = {
-            val finalValues = when (attr.valueKind) {
-                FilterValueKind.COUNTRY -> values
-                FilterValueKind.TEXT -> if (op == SecurityFilterOp.CONTAINS || op == SecurityFilterOp.NOT_CONTAINS) values
-                    else if (singleValue.isNotBlank()) listOf(singleValue) else emptyList()
-                FilterValueKind.CANDIDATES -> values
-            }
-            if (finalValues.isNotEmpty()) {
-                onAddFilter(SecurityFilter(attr, op, finalValues))
-                values = emptyList(); singleValue = ""; countryQuery = ""
-            }
-        },
-        enabled = finalEnabled(attr, op, values, singleValue),
-        modifier = Modifier.fillMaxWidth()
-    ) { Text("添加筛选器", style = MaterialTheme.typography.bodySmall) }
-}
-
-private fun finalEnabled(attr: SecurityFilterAttr, op: SecurityFilterOp, values: List<String>, singleValue: String): Boolean = when (attr.valueKind) {
-    FilterValueKind.COUNTRY -> values.isNotEmpty()
-    FilterValueKind.TEXT -> if (op == SecurityFilterOp.CONTAINS || op == SecurityFilterOp.NOT_CONTAINS) values.isNotEmpty() else singleValue.isNotBlank()
-    FilterValueKind.CANDIDATES -> values.isNotEmpty()
-}
-
-/** 候选值选择框（FilterChip 组：方法/HTTP版本/操作/来源等） */
-@Composable
-private fun CandidatesSelector(candidates: List<String>, selected: List<String>, onSelect: (List<String>) -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        candidates.forEach { c ->
-            FilterChip(
-                selected = c in selected,
-                onClick = { onSelect(if (c in selected) selected - c else selected + c) },
-                label = { Text(c, maxLines = 1, style = MaterialTheme.typography.bodySmall) },
-                modifier = Modifier.padding(vertical = 1.dp)
-            )
-        }
-    }
-}
-
-/** 国家搜索：聚焦才展开候选 + 点击 toggle */
-@Composable
-private fun CountryValueSelector(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    selected: List<String>,
-    onToggle: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val candidates = remember(query) { CountryMapping.search(query) }
-    Box {
-        OutlinedTextField(
-            value = query,
-            onValueChange = { onQueryChange(it) },
-            modifier = Modifier.fillMaxWidth().onFocusChanged { expanded = it.isFocused },
-            placeholder = { Text("输入国家名或代码", style = MaterialTheme.typography.bodySmall) },
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodySmall
-        )
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            candidates.forEach { (code, name) ->
-                val checked = code in selected
-                DropdownMenuItem(
-                    text = { Text("${if (checked) "✓ " else ""}$name ($code)", maxLines = 1) },
-                    onClick = { onToggle(code); onQueryChange("") }
-                )
-            }
-        }
-    }
-}
-
-/** 带 Label 的下拉（tiny） */
-@Composable
-private fun LabeledDropdown(label: String, current: String, options: List<String>, onSelect: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Column {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Box {
-            OutlinedButton(onClick = { expanded = true }) {
-                Text(current, maxLines = 1, style = MaterialTheme.typography.bodySmall)
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-            }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                options.forEach { opt ->
-                    DropdownMenuItem(text = { Text(opt, maxLines = 1, overflow = TextOverflow.Ellipsis) }, onClick = { onSelect(opt); expanded = false })
-                }
-            }
-        }
-    }
-}
-
-/** 日志详情页：13 字段合理展示，缺失用 - */
-@Composable
-private fun LogDetail(log: SecurityLogEntry, onBack: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("返回", style = MaterialTheme.typography.bodySmall)
+                if (SecurityLogColumn.IP in columns && !log.clientIP.isNullOrBlank()) {
+                    Text(log.clientIP.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                if (SecurityLogColumn.COUNTRY in columns && !log.clientCountry.isNullOrBlank()) {
+                    Text(
+                        text = CountryMapping.codeToName(log.clientCountry.orEmpty()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                Text("日志详情", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider()
-            Spacer(modifier = Modifier.height(4.dp))
-            SecurityLogColumn.entries.forEach { col ->
-                DetailRow(col.label, logValue(log, col).ifBlank { "-" })
-            }
-        }
-    }
-}
-
-@Composable
-private fun DetailRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(110.dp)
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-/** 日志表格（自选列，横向滚动） */
-@Composable
-private fun LogTable(logs: List<SecurityLogEntry>, columns: Set<SecurityLogColumn>, onLogClick: (SecurityLogEntry) -> Unit) {
-    val cols = columns.toList()
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(vertical = 6.dp)) {
-            val scroll = rememberScrollState()
-            Row(modifier = Modifier.horizontalScroll(scroll).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                TableCell("时间", bold = true)
-                cols.forEach { TableCell(it.label, bold = true) }
-            }
-            logs.forEach { log ->
-                Row(modifier = Modifier.horizontalScroll(scroll).padding(horizontal = 10.dp, vertical = 3.dp).clickable { onLogClick(log) }, verticalAlignment = Alignment.CenterVertically) {
-                    TableCell(log.datetime)
-                    cols.forEach { TableCell(logValue(log, it)) }
+                if (SecurityLogColumn.HOST in columns && !log.host.isNullOrBlank()) {
+                    Text(
+                        text = log.host.orEmpty(),
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
+            if (SecurityLogColumn.PATH in columns && !log.path.isNullOrBlank()) {
+                Text(
+                    text = (log.path ?: "") + (log.query?.takeIf { it.isNotBlank() }?.let { "?$it" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+// ===== 筛选器 =====
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterSheet(
+    attrs: List<SecurityFilterAttr>,
+    onDismiss: () -> Unit,
+    onAdd: (SecurityFilter) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var attr by remember { mutableStateOf(attrs.first()) }
+    var op by remember { mutableStateOf(SecurityFilterOp.EQ) }
+    var selected by remember(attr) { mutableStateOf<Set<String>>(emptySet()) }
+    var text by remember(attr) { mutableStateOf("") }
+    var countryQuery by remember { mutableStateOf("") }
+    var attrMenu by remember { mutableStateOf(false) }
+
+    val ops = remember(attr) {
+        if (attr.allowContains) SecurityFilterOp.entries.toList()
+        else listOf(SecurityFilterOp.EQ, SecurityFilterOp.NEQ)
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text("添加筛选器", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+
+            // 属性选择
+            Box {
+                OutlinedTextField(
+                    value = attr.label,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("属性") },
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        TextButton(onClick = { attrMenu = true }) { Text("切换") }
+                    }
+                )
+                DropdownMenu(expanded = attrMenu, onDismissRequest = { attrMenu = false }) {
+                    attrs.forEach { a ->
+                        DropdownMenuItem(
+                            text = { Text(a.label) },
+                            onClick = { attr = a; attrMenu = false }
+                        )
+                    }
+                }
+            }
+
+            // 操作符
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ops.forEach { o ->
+                    FilterChipLike(text = o.label, selected = op == o) { op = o }
+                }
+            }
+
+            // 值控件
+            when (attr.valueKind) {
+                FilterValueKind.CHOICE -> FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    attr.candidates.forEach { c ->
+                        FilterChipLike(text = c, selected = c in selected) {
+                            selected = if (c in selected) selected - c else selected + c
+                        }
+                    }
+                }
+                FilterValueKind.COUNTRY -> {
+                    OutlinedTextField(
+                        value = countryQuery,
+                        onValueChange = { countryQuery = it },
+                        label = { Text("搜索国家") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        CountryMapping.search(countryQuery, 12).forEach { (code, name) ->
+                            FilterChipLike(text = "$name ($code)", selected = code in selected) {
+                                selected = if (code in selected) selected - code else selected + code
+                            }
+                        }
+                    }
+                }
+                FilterValueKind.TEXT -> OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("值") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onDismiss) { Text("取消") }
+                Spacer(modifier = Modifier.weight(1f))
+                TextButton(
+                    onClick = {
+                        val values = when (attr.valueKind) {
+                            FilterValueKind.TEXT -> listOf(text.trim())
+                            else -> selected.toList()
+                        }.filter { it.isNotBlank() }
+                        if (values.isNotEmpty()) onAdd(SecurityFilter(attr, op, values))
+                    },
+                    enabled = when (attr.valueKind) {
+                        FilterValueKind.TEXT -> text.isNotBlank()
+                        else -> selected.isNotEmpty()
+                    }
+                ) { Text("添加") }
+            }
         }
     }
 }
 
 @Composable
-private fun TableCell(text: String, bold: Boolean = false) {
-    Text(
-        text = text.ifBlank { "-" },
-        style = MaterialTheme.typography.bodySmall,
-        fontWeight = if (bold) FontWeight.SemiBold else null,
-        color = if (bold) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 6.dp).width(100.dp),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
+private fun FilterChipLike(text: String, selected: Boolean, onClick: () -> Unit) {
+    AssistChip(
+        onClick = onClick,
+        label = { Text(text, style = MaterialTheme.typography.labelSmall) },
+        leadingIcon = if (selected) {
+            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+        } else null
     )
 }
 
-private fun logValue(log: SecurityLogEntry, col: SecurityLogColumn): String = when (col) {
-    SecurityLogColumn.ACTION -> log.action
-    SecurityLogColumn.ASN -> log.clientAsn.orEmpty()
-    SecurityLogColumn.COUNTRY -> log.clientCountry?.let { CountryMapping.codeToName(it) }.orEmpty()
-    SecurityLogColumn.IP -> log.clientIP.orEmpty()
-    SecurityLogColumn.HOST -> log.host.orEmpty()
-    SecurityLogColumn.METHOD -> log.method.orEmpty()
-    SecurityLogColumn.HTTP_VERSION -> log.httpVersion.orEmpty()
-    SecurityLogColumn.PATH -> log.path.orEmpty()
-    SecurityLogColumn.QUERY -> log.query.orEmpty()
-    SecurityLogColumn.RAY_ID -> log.rayName.orEmpty()
-    SecurityLogColumn.RULE_ID -> log.ruleId.orEmpty()
-    SecurityLogColumn.SERVICE -> log.source.orEmpty()
-    SecurityLogColumn.USER_AGENT -> log.userAgent.orEmpty()
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FilterChipsRow(
+    filters: List<SecurityFilter>,
+    onRemove: (Int) -> Unit,
+    onClear: () -> Unit
+) {
+    if (filters.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            filters.forEachIndexed { index, f ->
+                AssistChip(
+                    onClick = { onRemove(index) },
+                    label = {
+                        Text(
+                            text = "${f.attr.label} ${f.op.label} ${f.values.joinToString("、")}",
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    trailingIcon = {
+                        Icon(Icons.Default.Close, contentDescription = "移除", modifier = Modifier.size(14.dp))
+                    }
+                )
+            }
+        }
+        TextButton(onClick = onClear, modifier = Modifier.height(28.dp)) {
+            Text("清除全部", style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+// ===== 菜单类组件 =====
+
+@Composable
+private fun TimeRangeMenu(current: SecurityTimeRange, onSelect: (SecurityTimeRange) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { expanded = true }) {
+            Text(current.label, style = MaterialTheme.typography.bodySmall)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            SecurityTimeRange.entries.forEach { r ->
+                DropdownMenuItem(
+                    text = { Text(r.label) },
+                    trailingIcon = if (r == current) {
+                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    } else null,
+                    onClick = { onSelect(r); expanded = false }
+                )
+            }
+        }
+    }
 }
 
 @Composable
-private fun ChartCard(title: String, content: @Composable () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(text = title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(10.dp))
-            content()
+private fun GroupByMenu(current: SecurityGroupBy, onSelect: (SecurityGroupBy) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { expanded = true }) {
+            Text("分组：${current.label}", style = MaterialTheme.typography.bodySmall)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            SecurityGroupBy.entries.forEach { g ->
+                DropdownMenuItem(
+                    text = { Text(g.label) },
+                    trailingIcon = if (g == current) {
+                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    } else null,
+                    onClick = { onSelect(g); expanded = false }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LogColumnMenu(selected: Set<SecurityLogColumn>, onToggle: (SecurityLogColumn) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { expanded = true }) {
+            Text("列 ${selected.size}/${SecurityLogColumn.entries.size}", style = MaterialTheme.typography.bodySmall)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            SecurityLogColumn.entries.forEach { col ->
+                DropdownMenuItem(
+                    text = { Text(col.label) },
+                    leadingIcon = {
+                        Checkbox(checked = col in selected, onCheckedChange = { onToggle(col) })
+                    },
+                    onClick = { onToggle(col) }
+                )
+            }
+        }
+    }
+}
+
+// ===== 通用小组件 =====
+
+@Composable
+private fun LoadingBlock() {
+    Box(
+        modifier = Modifier.fillMaxWidth().height(160.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(modifier = Modifier.size(28.dp))
+    }
+}
+
+@Composable
+private fun ErrorCard(message: String) {
+    Card(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = "⚠ $message",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
+            )
         }
     }
 }

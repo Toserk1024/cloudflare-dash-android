@@ -25,8 +25,7 @@
 | 协程 | kotlinx-coroutines-android | 1.9.0 |
 | 图标 | material-icons-extended（完整图标库，release R8 裁剪未引用图标，体积几乎无增量） | BOM 管理 |
 | ViewModel | lifecycle-viewmodel-compose | 2.8.7 |
-| 图表 | Vico（Compose 原生，仅 compose 模块，3.x 无独立 core）—— 现仅安全页趋势图在用 | 3.2.3 |
-| 图表 | MPAndroidChart 4.x 官方 Compose 模块（`MPChartCompose` + `MPChartLib`，JitPack）—— 统计页 3 个图表 | v4.0.1 |
+| 图表 | MPAndroidChart 4.x 官方 Compose 模块（`MPChartCompose` + `MPChartLib`，JitPack）—— 统计页 3 个图表 + 安全页趋势图（Vico 已于 2026-10-24 彻底移除） | v4.0.1 |
 
 依赖定义位置：`gradle/libs.versions.toml` + `app/build.gradle.kts`。
 仓库镜像：阿里云/华为云优先（`settings.gradle.kts`），离线环境可构建。
@@ -183,9 +182,22 @@ pm install -r /data/local/tmp/cf-app.apk
 9. **ProfileScreen 中 HomeUiState 是 HomeViewModel 嵌套类**，import 需写 `io.github.toserk1024.cfdash.ui.home.HomeViewModel.HomeUiState`。
 10. **双认证头**：`CloudflareClient.requestRaw` 按 `AuthCredential` 类型添加请求头（Token → `Authorization: Bearer`；GlobalKey → `X-Auth-Email` + `X-Auth-Key`），均校验 ASCII 可打印字符；验证走 `verifyCredential()`（Token → `/user/tokens/verify`，GlobalKey → `GET /user`）。修改 Zone 设置需 Token 具备 **Zone Settings Read/Edit** 权限，否则 403（高级卡片会显示错误 + 重试按钮）。
 11. **GraphQL Analytics**：`client.graphql()` POST `/graphql`，响应为 data/errors 结构（非 ApiResponse 包装），errors 非空抛 CloudflareException；查询构建与解析统一在 `AnalyticsParser`（时间窗口 UTC、数据集映射 24h/7d/30d）；统计需 Token 具备 **Zone Analytics Read**（域名级）/ **Account Analytics Read**（账号级）权限，否则 403。**关键约束（schema 反查确认，踩坑记录）**：① **1d/1h Groups 的 dimensions 仅有 `date`（1d）/`datetime`（1h，"truncated to the hour"）**，无 datetimeHour、无国家/状态码/缓存维度；② **1d/1h Groups 的 orderBy 枚举无 `count_DESC`**（合法值仅 sum_*/uniq_*/avg_*/date/datetime 等聚合字段），故汇总/趋势查询**不使用 orderBy**，趋势序列客户端按时间标签排序；③ **国家/状态码维度分布用 Groups sum 的 `countryMap`/`responseStatusMap`**（`sum { countryMap { clientCountryName requests } responseStatusMap { edgeResponseStatus requests } }`，支持 7d/30d，一次查询返回国家+状态码两个分布）；④ **缓存分布无 cacheStatusMap**——由 `sum.cachedRequests/requests` 计算"命中/未命中"两切片（ViewModel 生成）；⑤ **`httpRequestsAdaptiveGroups` 查询范围限 1 天**（7d/30d 报 "cannot request a time range wider than 1d"），仅用于 **24h 域名拆分**（按 `clientRequestHTTPHost` 分组，orderBy 支持 count_DESC）；⑥ **`zones` 节点无 `name` 字段**（报 unknown field "name"），域名拆分 zoneName=host；⑦ filter 时间字段：1hGroups → `datetime_geq/leq`，1dGroups → `date_geq/leq`（yyyy-MM-dd）；⑧ 账号级 accountTag 用 `GET /accounts`（`/user` 的 `accounts` 字段可能为空）；⑨ 汇总与趋势查询均需 `uniq { uniques }`（独立访客，汇总漏查会导致独立访客恒为 0）。
-12. **Vico 图表（3.x，踩坑记录）**：仅依赖 `com.patrykandpatrick.vico:compose`（3.x 无独立 core 模块，minSdk≥23）；核心 API：`CartesianChartHost(rememberCartesianChart(rememberLineCartesianLayer/rememberColumnCartesianLayer, startAxis = VerticalAxis.rememberStart(), bottomAxis = HorizontalAxis.rememberBottom()), modelProducer)`；数据更新用 `CartesianChartModelProducer.runTransaction { lineModel/columnModel { series(y = list) } }`；**x 轴分类标签**：x 用序号（series 自动索引），标签经 `extras { it[key] = labels }` 同步，`HorizontalAxis.rememberBottom(valueFormatter = CartesianValueFormatter { context, x, _ -> context.model.extraStore[key][x.toInt()] })` 读取；饼图用 `PieChartHost(rememberPieChart(sliceProvider = PieChart.SliceProvider.series(slices), valueFormatter = PieValueFormatter {...}), modelProducer)` + `pieSeries { series(*values) }`；柱状图颜色 `rememberLineComponent(Fill(color), 16.dp)`，折线 `LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(color)))`。modelProducer 应持久化（remember/ViewModel），runTransaction 是挂起函数。
+12. ~~**Vico 图表（3.x，踩坑记录）**~~（**2026-10-24 已移除依赖**，安全页迁至 MP；以下仅作历史参考）：仅依赖 `com.patrykandpatrick.vico:compose`（3.x 无独立 core 模块，minSdk≥23）；核心 API：`CartesianChartHost(rememberCartesianChart(rememberLineCartesianLayer/rememberColumnCartesianLayer, startAxis = VerticalAxis.rememberStart(), bottomAxis = HorizontalAxis.rememberBottom()), modelProducer)`；数据更新用 `CartesianChartModelProducer.runTransaction { lineModel/columnModel { series(y = list) } }`；**x 轴分类标签**：x 用序号（series 自动索引），标签经 `extras { it[key] = labels }` 同步，`HorizontalAxis.rememberBottom(valueFormatter = CartesianValueFormatter { context, x, _ -> context.model.extraStore[key][x.toInt()] })` 读取；饼图用 `PieChartHost(rememberPieChart(sliceProvider = PieChart.SliceProvider.series(slices), valueFormatter = PieValueFormatter {...}), modelProducer)` + `pieSeries { series(*values) }`；柱状图颜色 `rememberLineComponent(Fill(color), 16.dp)`，折线 `LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(color)))`。modelProducer 应持久化（remember/ViewModel），runTransaction 是挂起函数。
 
 13. **MPAndroidChart 4.x（统计页，踩坑记录）**：仅 JitPack 发布（`com.github.PhilJay.MPAndroidChart:MPChartLib` / `MPChartCompose`，版本 `v4.0.1`），**`MPChartCompose` 的 AAR 要求 `minCompileSdk=37`**（这是升 compileSdk 37 + AGP 9.2.1 + Compose BOM 2026.09.00 的唯一原因）。API 要点：`LineChart(data: LineData?, modifier, state, marker = { entry, _ -> ... }, animateChanges, setup, update)`；`setup` 只跑一次（读到的值被冻结），主题相关与 formatter 一律放 `update`（Compose 状态变化会重跑）；`ChartState` 提供 `selectedEntry` / `zoomX` / `animateX` / `highlight`；样式为 Kotlin 属性（`isDrawValuesEnabled`、`barCornerRadius`、`holeRadius`、`colors: List<Int>`、`fills: List<Fill>?`）。**手势默认全开**（缩放/拖拽/双击/点击），副作用：图表区域内纵向滑动不滚页面、该区域下拉刷新不触发。R8 需 `-keep class com.github.mikephil.charting.** { *; }`。安全页仍用 Vico + Canvas，未迁移。
+
+### 7.1 安全页数据口径（2026-10-24 用真实 Token 实测校准）
+
+| 项 | 结论 |
+|---|---|
+| 数据集 | 流量：`httpRequestsAdaptiveGroups`；事件：`firewallEventsAdaptive` |
+| 固定过滤 | `requestSource: "eyeball"`（终端用户真实请求，排除 `earlyHintsCache` / `edgeWorkerFetch`）→ 24h 合计 **17,774**，与官网 17.77k 一致 |
+| 计数 | 直接取 `count`，**不要乘 `avg.sampleInterval`**；`sum` 里**没有** `requests` 字段（只有 `edgeResponseBytes` / `visits` 等） |
+| 三段分类 | 已缓解 = `securityAction ∈ {block, challenge, js_challenge, managed_challenge, connection_close…}`；由 CF 提供 = 非缓解且（`cacheStatus ∈ {hit, revalidated, expired}` 或 `edgeResponseStatus ∈ 3xx`）；其余 = 由源站提供。互斥且合计 = 总量（实测 1,328 / 4,361 / 12,085） |
+| 时间窗口 | 8 档：30min（`datetimeMinute`）、6h/12h（`datetimeFiveMinutes`）、24h/72h（`datetimeHour`）、7d/14d/31d（`date`）；Adaptive 保留 ≥31 天，旧「只能查 1 天」结论作废 |
+| 筛选器 | `_like` / `_nlike` **必须带 `%` 通配**（旧实现不带 % 导致永不命中）；枚举用 `_in`；「已缓解」→ `securityAction_in`；「服务提供方」→ `cacheStatus_in` |
+| 事件日志 | `firewallEventsAdaptive(limit:50, orderBy:[datetime_DESC])`，以最后一条 `datetime` 作 `datetime_lt` 游标续页；UI 每次展示 10 条、滚动到底自动续加载 |
+| 分组维度 | 全部 / 国家 / 来源浏览器(`userAgentBrowser`) / 操作系统(`userAgentOS`) / 设备类型 / IP / HTTP 版本 / 缓存状态 / 安全性操作 / 安全性来源 —— 均实测存在于同一数据集 `dimensions` |
 
 ## 8. 二次开发指南
 

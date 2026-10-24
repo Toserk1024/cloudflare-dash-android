@@ -11,7 +11,6 @@ navigationCompose = "2.9.8"
 securityCrypto = "1.1.0-alpha06"
 lifecycleViewmodelCompose = "2.10.0"
 coroutines = "1.11.0"
-vico = "3.2.3"
 # MPAndroidChart 4.x（Kotlin 重写版，仅 JitPack；MPChartCompose 为官方 Compose 模块）
 mpandroidchart = "v4.0.1"
 junit = "4.13.2"
@@ -35,7 +34,6 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
-vico-compose = { group = "com.patrykandpatrick.vico", name = "compose", version.ref = "vico" }
 mpchart-lib = { group = "com.github.PhilJay.MPAndroidChart", name = "MPChartLib", version.ref = "mpandroidchart" }
 mpchart-compose = { group = "com.github.PhilJay.MPAndroidChart", name = "MPChartCompose", version.ref = "mpandroidchart" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

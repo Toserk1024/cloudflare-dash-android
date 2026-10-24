@@ -1,8 +1,15 @@
 package io.github.toserk1024.cfdash.ui.security
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,237 +19,358 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
-import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
-import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
-import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProducer
-import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
-import com.patrykandpatrick.vico.compose.cartesian.data.lineModel
-import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
-import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
-import com.patrykandpatrick.vico.compose.cartesian.marker.DefaultCartesianMarker
-import com.patrykandpatrick.vico.compose.cartesian.marker.LineCartesianLayerMarkerTarget
-import com.patrykandpatrick.vico.compose.cartesian.marker.rememberDefaultCartesianMarker
-import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
-import com.patrykandpatrick.vico.compose.common.Fill
-import com.patrykandpatrick.vico.compose.common.component.rememberTextComponent
-import com.patrykandpatrick.vico.compose.common.data.ExtraStore
+import com.github.mikephil.charting.compose.LineChart
+import com.github.mikephil.charting.data.Entry
+import com.github.mikephil.charting.data.LineData
+import com.github.mikephil.charting.data.LineDataSet
+import com.github.mikephil.charting.formatter.IAxisValueFormatter
 import io.github.toserk1024.cfdash.data.model.SecuritySegment
 import io.github.toserk1024.cfdash.data.model.SecurityTrendSeries
-import io.github.toserk1024.cfdash.ui.stats.formatCount
+import io.github.toserk1024.cfdash.ui.charts.applyAxes
+import io.github.toserk1024.cfdash.ui.charts.applyChartBase
+import io.github.toserk1024.cfdash.ui.charts.applyLine
+import io.github.toserk1024.cfdash.ui.charts.mp
+import io.github.toserk1024.cfdash.ui.charts.rememberChartPalette
 import kotlin.math.roundToInt
 
-/** x 轴分类标签（extras 同步） */
-private val labelListKey = ExtraStore.Key<List<String>>()
-/** 系列名（marker 按索引取当前系列名） */
-private val seriesNamesKey = ExtraStore.Key<List<String>>()
+/**
+ * 安全页图表。
+ *
+ * - 概况：[SecurityOverviewBar]（Canvas 手绘 100% 堆叠条，圆角 + 2dp 间隙 + 点按气泡 + 300ms 入场动画，观感对齐 MP）
+ * - 趋势：[SecurityTrendChart]（MP `LineChart` 多序列，样式复用统计页 MpChartStyle）
+ */
 
-/** 段色板（与 Cloudflare 橙主题协调） */
-private val segmentColors = listOf(
-    Color(0xFFF6821F), // Cloudflare 橙
-    Color(0xFF2D9CDB), // 蓝
-    Color(0xFF27AE60), // 绿
-    Color(0xFFEB5757), // 红
-    Color(0xFF9B51E0), // 紫
-    Color(0xFFF2994A), // 橙黄
-    Color(0xFF56CCF2), // 浅蓝
-    Color(0xFF6FCF97)  // 浅绿
-)
+/** 三段固定配色（对齐官网：已缓解=粉红、由 CF 提供=黄、由源站=蓝）；非分段时按色板顺序 */
+private fun segmentColor(palette: List<Color>, index: Int, segmented: Boolean): Color {
+    if (segmented) {
+        return when (index) {
+            0 -> palette[0]   // chart-1 浅红/粉
+            1 -> palette[2]   // chart-3 黄
+            else -> palette[5] // chart-6 浅蓝
+        }
+    }
+    return palette[index % palette.size]
+}
 
-// 分组=全部时三段固定色：回源(蓝) / 命中(绿) / 缓解(红)
-private val fixedSegmentColors = listOf(
-    Color(0xFF2D9CDB), Color(0xFF27AE60), Color(0xFFEB5757)
-)
-
-/** 100% 水平堆叠条形图（Canvas 自绘，天然处理 0 值）。分组=全部用固定三段色；分组=X 用色板多段 */
+/** 100% 堆叠条 + 图例（点按段或图例显示该段明细） */
 @Composable
-fun HorizontalStackBar(
+fun SecurityOverviewBar(
     segments: List<SecuritySegment>,
-    groupByAll: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showLegend: Boolean = true,
+    segmented: Boolean = true
 ) {
     val total = segments.sumOf { it.count }
     if (total <= 0) {
-        Box(
-            modifier = modifier.fillMaxWidth().height(120.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("暂无数据", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        EmptySecurityChart("暂无数据", modifier)
         return
     }
+    val palette = rememberChartPalette()
+    var selected by remember(segments) { mutableStateOf<Int?>(null) }
+    val anim = remember { Animatable(0f) }
+    // 数据变化时整条从左向右伸展（300ms），与 MP 的数据动画观感一致
+    LaunchedEffect(segments) {
+        anim.snapTo(0f)
+        anim.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
+    }
+    val currentSegments by rememberUpdatedState(segments)
     Column(modifier = modifier.fillMaxWidth()) {
-        Canvas(modifier = Modifier.fillMaxWidth().height(32.dp)) {
-            val w = size.width
-            val h = size.height
-            var x = 0f
-            segments.forEachIndexed { index, seg ->
-                val pct = seg.count.toFloat() / total
-                if (pct > 0f) {
-                    val color = if (groupByAll) fixedSegmentColors.getOrElse(index) { segmentColors[index % segmentColors.size] }
-                    else segmentColors[index % segmentColors.size]
-                    drawRect(color, Offset(x, 0f), Size(w * pct, h))
-                    x += w * pct
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(30.dp)
+                .pointerInput(segments) {
+                    detectTapGestures { pos ->
+                        val gap = 2.dp.toPx()
+                        val usable = size.width - gap * (currentSegments.size - 1).coerceAtLeast(0)
+                        var acc = 0f
+                        var hit: Int? = null
+                        currentSegments.forEachIndexed { i, s ->
+                            val w = usable * (s.count / total.toFloat())
+                            if (pos.x >= acc && pos.x <= acc + w + gap / 2f) hit = i
+                            acc += w + gap
+                        }
+                        selected = if (selected == hit) null else hit
+                    }
+                }
+        ) {
+            Canvas(modifier = Modifier.fillMaxWidth().height(30.dp)) {
+                val gap = 2.dp.toPx()
+                val radius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                val usable = size.width - gap * (segments.size - 1).coerceAtLeast(0)
+                var x = 0f
+                segments.forEachIndexed { index, seg ->
+                    val w = usable * (seg.count / total.toFloat()) * anim.value
+                    if (w > 0f) {
+                        drawRoundRect(
+                            color = segmentColor(palette, index, segmented),
+                            topLeft = Offset(x, 0f),
+                            size = Size(w.coerceAtLeast(if (anim.value > 0.02f) 2.dp.toPx() else 0f), size.height),
+                            cornerRadius = radius
+                        )
+                        x += w + gap
+                    }
                 }
             }
         }
         Spacer(modifier = Modifier.height(10.dp))
-        segments.forEachIndexed { index, seg ->
-            val color = if (groupByAll) fixedSegmentColors.getOrElse(index) { segmentColors[index % segmentColors.size] }
-            else segmentColors[index % segmentColors.size]
-            LegendSegment(color, seg.name, seg.count, total)
-        }
-    }
-}
-
-@Composable
-private fun LegendSegment(color: Color, name: String, value: Long, total: Long) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(color))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = name,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(text = formatCount(value), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = if (total > 0) "${(value * 100.0 / total).roundToInt()}%" else "0%",
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-/** 安全趋势折线图（支持多序列：分组=全部单线"请求"；分组=X Top5 分组各一线） */
-@Composable
-fun SecurityTrendChart(
-    series: List<SecurityTrendSeries>,
-    modifier: Modifier = Modifier
-) {
-    val validSeries = series.filter { it.points.isNotEmpty() }
-    if (validSeries.isEmpty()) {
-        Box(
-            modifier = modifier.fillMaxWidth().height(200.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("暂无数据", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        return
-    }
-    // 统一 x 轴：取全部 label 并集，缺失点补 0（保证多序列长度一致）
-    val allLabels = remember(validSeries) {
-        validSeries.flatMap { it.points.map { p -> p.label } }.distinct().sorted()
-    }
-    if (allLabels.isEmpty()) {
-        Box(
-            modifier = modifier.fillMaxWidth().height(200.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("暂无数据", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        return
-    }
-    val modelProducer = remember { CartesianChartModelProducer() }
-    LaunchedEffect(validSeries, allLabels) {
-        modelProducer.runTransaction {
-            lineModel {
-                validSeries.forEach { s ->
-                    series(
-                        y = allLabels.map { label ->
-                            s.points.firstOrNull { it.label == label }?.count?.toFloat() ?: 0f
-                        }
+        if (showLegend) {
+            val shown = selected?.let { listOf(it to segments[it]) } ?: segments.mapIndexed { i, s -> i to s }
+            shown.forEach { (index, seg) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { selected = if (selected == index) null else index }
+                        .background(
+                            if (selected == index) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            else Color.Transparent
+                        )
+                        .padding(vertical = 4.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(segmentColor(palette, index, segmented))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = seg.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = formatSecurityCount(seg.count),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "${seg.percent.roundToInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
-            extras { it[labelListKey] = allLabels; it[seriesNamesKey] = validSeries.map { s -> s.name } }
         }
     }
-    CartesianChartHost(
-        chart = rememberCartesianChart(
-            rememberLineCartesianLayer(
-                LineCartesianLayer.LineProvider.series(
-                    LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(segmentColors[0]))),
-                    LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(segmentColors[1]))),
-                    LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(segmentColors[2]))),
-                    LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(segmentColors[3]))),
-                    LineCartesianLayer.Line(LineCartesianLayer.LineFill.single(Fill(segmentColors[4])))
-                )
-            ),
-            startAxis = VerticalAxis.rememberStart(
-                valueFormatter = CartesianValueFormatter { _, y, _ -> formatCount(y.toLong()) }
-            ),
-            bottomAxis = HorizontalAxis.rememberBottom(
-                valueFormatter = CartesianValueFormatter { context, x, _ ->
-                    context.model.extraStore[labelListKey].getOrNull(x.toInt()) ?: ""
-                }
-            ),
-            marker = rememberDefaultCartesianMarker(
-                label = rememberTextComponent(
-                    style = TextStyle(color = Color.White, fontSize = 12.sp, background = Color(0xCC000000)),
-                    lineCount = 2,
-                    overflow = TextOverflow.Visible
-                ),
-                valueFormatter = remember {
-                    DefaultCartesianMarker.ValueFormatter { context, targets ->
-                        if (targets.isEmpty()) return@ValueFormatter ""
-                        val names = context.model.extraStore[seriesNamesKey]
-                        val lines = targets.mapNotNull { t ->
-                            val name = names.getOrNull(targets.indexOf(t)) ?: ""
-                            val y = (t as? LineCartesianLayerMarkerTarget)?.points?.firstOrNull()?.entry?.y?.toLong() ?: 0L
-                            if (name.isBlank() && y == 0L) null else "$name: ${formatCount(y)}"
-                        }.joinToString("\n")
-                        if (lines.isBlank()) return@ValueFormatter ""
-                        val xLabel = context.model.extraStore[labelListKey].getOrNull(targets.first().x.toInt()) ?: ""
-                        if (xLabel.isNotBlank()) "$xLabel\n$lines" else lines
-                    }
-                }
-            )
-        ),
-        modelProducer = modelProducer,
-        modifier = modifier.fillMaxWidth().height(200.dp)
-    )
 }
 
-/** 趋势图例：逐序列色块 + 名称 */
+/** 趋势折线（MP）：segmented=true 时用三段固定色，否则用彩色板顺序 */
 @Composable
-fun TrendLegend(series: List<SecurityTrendSeries>, modifier: Modifier = Modifier) {
-    if (series.isEmpty()) return
-    Column(modifier = modifier.fillMaxWidth().padding(top = 4.dp)) {
-        series.forEachIndexed { index, s ->
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
-                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(segmentColors[index % segmentColors.size]))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = s.name,
-                    style = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+fun SecurityTrendChart(
+    series: List<SecurityTrendSeries>,
+    modifier: Modifier = Modifier,
+    height: Dp = 200.dp,
+    segmented: Boolean = false
+) {
+    val valid = series.filter { it.points.isNotEmpty() }
+    if (valid.isEmpty()) {
+        EmptySecurityChart("暂无数据", modifier)
+        return
+    }
+    val palette = rememberChartPalette()
+    val labels = remember(valid) {
+        valid.flatMap { s -> s.points.map { it.label } }.distinct().sorted()
+    }
+    val colors = valid.indices.map { i -> segmentColor(palette, i, segmented) }
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.mp()
+    val gridColor = MaterialTheme.colorScheme.outlineVariant.mp()
+    val data = remember(valid, labels, colors) {
+        LineData(
+            *valid.mapIndexed { index, s ->
+                LineDataSet(
+                    labels.mapIndexed { x, label ->
+                        val v = s.points.firstOrNull { it.label == label }?.count ?: 0L
+                        Entry(x.toFloat(), v.toFloat())
+                    },
+                    s.name
+                ).apply { applyLine(colors[index].toArgb()) }
+            }.toTypedArray()
+        )
+    }
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val capacity = (maxWidth.value / 62f).toInt().coerceIn(2, labels.size.coerceAtLeast(2))
+        LineChart(
+            data = data,
+            modifier = Modifier.fillMaxWidth().height(height),
+            animateChanges = true,
+            marker = { entry, _ ->
+                val idx = entry.x.toInt()
+                SecurityTooltip(
+                    title = labels.getOrNull(idx).orEmpty(),
+                    rows = valid.mapIndexed { i, s ->
+                        s.name to formatSecurityCount(
+                            s.points.firstOrNull { it.label == labels.getOrNull(idx) }?.count ?: 0L
+                        )
+                    }
                 )
+            },
+            setup = {
+                applyChartBase(labelColor)
+                applyAxes(labelColor, gridColor)
+                axisLeft.axisMinimum = 0f
+            },
+            update = {
+                applyChartBase(labelColor)
+                applyAxes(labelColor, gridColor)
+                axisLeft.axisMinimum = 0f
+                axisLeft.valueFormatter = IAxisValueFormatter { v, _ -> formatSecurityCount(v.toLong()) }
+                xAxis.valueFormatter = IAxisValueFormatter { v, _ -> labels.getOrNull(v.toInt()).orEmpty() }
+                xAxis.labelCount = capacity
+                xAxis.axisMinimum = -0.5f
+                xAxis.axisMaximum = (labels.size - 1).toFloat() + 0.5f
+                notifyDataSetChanged()
+            }
+        )
+    }
+    Spacer(modifier = Modifier.height(6.dp))
+    // 图例
+    valid.forEachIndexed { index, s ->
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(colors[index])
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = s.name,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/** 折线浮层：时间 + 各序列数值 */
+@Composable
+private fun SecurityTooltip(title: String, rows: List<Pair<String, String>>) {
+    Surface(
+        color = MaterialTheme.colorScheme.inverseSurface,
+        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        shape = RoundedCornerShape(8.dp),
+        shadowElevation = 2.dp
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+            if (title.isNotBlank()) {
+                Text(text = title, fontSize = 11.sp, maxLines = 1)
+            }
+            rows.forEach { (name, value) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = name, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(text = value, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     }
+}
+
+/** 空态占位 */
+@Composable
+fun EmptySecurityChart(text: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.fillMaxWidth().height(140.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** Top 统计卡：标题 + Top3 横条（占比） */
+@Composable
+fun SecurityTopStatCard(
+    title: String,
+    items: List<SecuritySegment>,
+    modifier: Modifier = Modifier
+) {
+    val palette = rememberChartPalette()
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(text = title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+            if (items.isEmpty()) {
+                Text(
+                    "暂无数据",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                items.take(3).forEachIndexed { index, seg ->
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = seg.name.ifBlank { "（未知）" },
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "${seg.percent.roundToInt()}%",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Canvas(modifier = Modifier.fillMaxWidth().height(4.dp)) {
+                            val ratio = (seg.percent / 100f).coerceIn(0f, 1f)
+                            drawRoundRect(
+                                color = palette[index % palette.size].copy(alpha = 0.9f),
+                                size = Size(size.width * ratio, size.height),
+                                cornerRadius = CornerRadius(size.height / 2f, size.height / 2f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 安全页数字格式（与统计页 formatCount 一致：万 / 亿） */
+internal fun formatSecurityCount(n: Long): String = when {
+    n >= 100_000_000 -> String.format("%.1f亿", n / 100_000_000.0)
+    n >= 10_000 -> String.format("%.1f万", n / 10_000.0)
+    else -> n.toString()
 }

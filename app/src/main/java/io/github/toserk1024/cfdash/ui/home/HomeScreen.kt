@@ -298,16 +298,16 @@ fun HomeScreen(
                             onSection = securityViewModel::setSection,
                             onGroupBy = securityViewModel::setGroupBy,
                             onTimeRange = securityViewModel::setTimeRange,
-                            onLogTimeRange = securityViewModel::setLogTimeRange,
-                            onAddOverviewFilter = securityViewModel::addOverviewFilter,
-                            onRemoveOverviewFilter = securityViewModel::removeOverviewFilter,
-                            onClearOverviewFilters = securityViewModel::clearOverviewFilters,
-                            onAddLogFilter = securityViewModel::addLogFilter,
-                            onRemoveLogFilter = securityViewModel::removeLogFilter,
-                            onClearLogFilters = securityViewModel::clearLogFilters,
+                            onEventTimeRange = securityViewModel::setEventTimeRange,
+                            onAddTrafficFilter = securityViewModel::addTrafficFilter,
+                            onRemoveTrafficFilter = securityViewModel::removeTrafficFilter,
+                            onClearTrafficFilters = securityViewModel::clearTrafficFilters,
+                            onAddEventFilter = securityViewModel::addEventFilter,
+                            onRemoveEventFilter = securityViewModel::removeEventFilter,
+                            onClearEventFilters = securityViewModel::clearEventFilters,
                             onToggleLogColumn = securityViewModel::toggleLogColumn,
-                            onRefresh = securityViewModel::refresh,
-                            onRetry = securityViewModel::refresh
+                            onLoadMoreLogs = securityViewModel::loadMoreLogs,
+                            onRefresh = securityViewModel::refresh
                         )
                     }
                 }
