@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
@@ -422,6 +423,12 @@ fun HomeScreen(
                         label = { Text("网络") },
                         selected = selectedTab == 5,
                         onClick = { scope.launch { drawerState.close() }; selectedTab = 5 }
+                    )
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Security, contentDescription = null) },
+                        label = { Text("安全") },
+                        selected = selectedTab == 6,
+                        onClick = { scope.launch { drawerState.close() }; selectedTab = 6 }
                     )
                     NavigationDrawerItem(
                         icon = { Icon(Icons.Default.Person, contentDescription = null) },
